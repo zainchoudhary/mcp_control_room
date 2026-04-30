@@ -1,0 +1,148 @@
+.app {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header {
+  height: 64px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: linear-gradient(to right, #fff, #f8faff);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.chatArea {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: var(--bg-surface);
+}
+
+.emptyState {
+  height: 100%;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-xl);
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 8px;
+}
+
+.emptyState h2 {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg {
+  max-width: 80%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.user {
+  margin-left: auto;
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+}
+
+.assistant {
+  background: #fff;
+}
+
+.role {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+}
+
+.content {
+  white-space: pre-wrap;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.composer {
+  border-top: 1px solid var(--border-subtle);
+  background: #fff;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.input {
+  flex: 1;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  outline: none;
+  font-size: 14px;
+  background: var(--bg-input);
+}
+
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.send {
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  padding: 0 18px;
+  font-weight: 600;
+  min-width: 94px;
+}
+
+.send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .app {
+    flex-direction: column;
+  }
+
+  :global(.sidebar) {
+    width: 100%;
+    height: 280px;
+  }
+
+  .msg {
+    max-width: 100%;
+  }
+}

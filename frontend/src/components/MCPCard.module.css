@@ -1,0 +1,226 @@
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  transition: var(--transition);
+  animation: fadeSlide 0.22s ease;
+}
+.card:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+
+.connected {
+  border-color: var(--green-border);
+  background: linear-gradient(to bottom right, var(--bg-card), #f8fffe);
+}
+.connected:hover {
+  border-color: #86efac;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  letter-spacing: 0.03em;
+  border: 1px solid;
+}
+
+.badgeOn {
+  background: var(--green-light);
+  border-color: var(--green-border);
+  color: var(--green);
+}
+
+.badgeOff {
+  background: var(--bg-base);
+  border-color: var(--border-default);
+  color: var(--text-tertiary);
+}
+
+.transportBadge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.url {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.deleteBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+.deleteBtn:hover {
+  background: var(--red-light);
+  border-color: var(--red-border);
+  color: var(--red);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
+  transition: var(--transition);
+}
+
+.btnConnect {
+  background: var(--green-light);
+  border-color: var(--green-border);
+  color: var(--green);
+}
+.btnConnect:hover {
+  background: #dcfce7;
+}
+
+.btnDisconnect {
+  background: var(--amber-light);
+  border-color: var(--amber-border);
+  color: var(--amber);
+}
+.btnDisconnect:hover {
+  background: #fef3c7;
+}
+
+.btnProbe {
+  background: var(--bg-base);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+.btnProbe:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.btnProbe:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnToggle {
+  background: var(--violet-light);
+  border-color: var(--violet-border);
+  color: var(--violet);
+}
+.btnToggle:hover {
+  background: #ede9fe;
+}
+
+.probeError {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--red-light);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--red);
+}
+
+.toolsSection {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  animation: fadeSlide 0.18s ease;
+}
+
+.noTools {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.toolsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.toolTag {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

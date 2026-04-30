@@ -1,0 +1,98 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-base:        #f5f4f0;
+  --bg-surface:     #fafaf8;
+  --bg-card:        #ffffff;
+  --bg-input:       #ffffff;
+  --bg-sidebar:     #ffffff;
+
+  --border-subtle:  #e8e6e0;
+  --border-default: #d4d0c8;
+  --border-strong:  #b8b4a8;
+
+  --text-primary:   #1a1916;
+  --text-secondary: #6b6760;
+  --text-tertiary:  #9b9790;
+  --text-inverse:   #ffffff;
+
+  --accent:         #2563eb;
+  --accent-hover:   #1d4ed8;
+  --accent-light:   #eff6ff;
+  --accent-border:  #bfdbfe;
+
+  --green:          #16a34a;
+  --green-light:    #f0fdf4;
+  --green-border:   #bbf7d0;
+
+  --amber:          #d97706;
+  --amber-light:    #fffbeb;
+  --amber-border:   #fde68a;
+
+  --red:            #dc2626;
+  --red-light:      #fef2f2;
+  --red-border:     #fecaca;
+
+  --violet:         #7c3aed;
+  --violet-light:   #f5f3ff;
+  --violet-border:  #ddd6fe;
+
+  --font-sans:      'DM Sans', sans-serif;
+  --font-mono:      'DM Mono', monospace;
+  --font-display:   'Syne', sans-serif;
+
+  --radius-sm:      4px;
+  --radius:         8px;
+  --radius-lg:      12px;
+  --radius-xl:      16px;
+
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.04), 0 1px 6px rgba(0,0,0,0.04);
+  --shadow:         0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg:      0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-xl:      0 24px 64px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
+
+  --transition:     all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+button { cursor: pointer; font-family: var(--font-sans); }
+input, textarea, select { font-family: var(--font-sans); }
+textarea { resize: none; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+}

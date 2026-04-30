@@ -48,7 +48,6 @@ async def lifespan(app: FastAPI):
 
 
 # ─── App ─────────────────────────────────────────────────────────────────────
-
 app = FastAPI(
     title="MCP Agent Dashboard",
     description="Register MCP servers and chat with an AI agent that uses them as tools.",
@@ -63,7 +62,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="."), name="static")
+app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
@@ -84,7 +83,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/", include_in_schema=False)
 async def serve_dashboard():
-    return FileResponse("index.html")
+    return FileResponse("frontend/dist/index.html")
 
 
 # ─── Routes: MCP Registry ────────────────────────────────────────────────────
