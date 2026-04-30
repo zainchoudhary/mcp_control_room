@@ -95,11 +95,13 @@ async def api_list_mcps():
 
 @app.post("/api/mcps", status_code=201)
 async def api_register_mcp(body: MCPCreate):
-    # Validate name uniqueness
     existing = await list_mcps()
     if any(m["name"] == body.name for m in existing):
         raise HTTPException(status_code=409, detail=f"MCP with name '{body.name}' already exists.")
-    mcp = await register_mcp(body.name, body.url, body.transport, body.description)
+    url = body.url.rstrip("/")
+    if body.transport == "sse" and not url.endswith("/sse"):
+        url += "/sse"
+    mcp = await register_mcp(body.name, url, body.transport, body.description)
     return mcp
 
 

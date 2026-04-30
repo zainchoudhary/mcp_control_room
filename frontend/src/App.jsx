@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   createSession,
   listMCPs,
@@ -10,50 +10,60 @@ import {
   streamChat,
 } from './api.js'
 import { Sidebar } from './components/Sidebar.jsx'
+import { ChatMessage } from './components/ChatMessage.jsx'
+import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { useToast } from './hooks/useToast.js'
-import { Plus } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import styles from './App.module.css'
 
 export default function App() {
   const [mcps, setMcps] = useState([])
+  const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
-  const [showConnectors, setShowConnectors] = useState(false)
-  const [connectorView, setConnectorView] = useState('menu')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [streamingId, setStreamingId] = useState(null)
   const { toasts, toast, dismiss } = useToast()
-  const composerMenuRef = useRef(null)
+  const messagesEndRef = useRef(null)
+  const chatAreaRef = useRef(null)
 
   const connectedCount = useMemo(() => mcps.filter((m) => m.connected).length, [mcps])
 
-  const refreshMCPs = async () => {
-    const data = await listMCPs()
-    setMcps(data)
-  }
-
-  useEffect(() => {
-    refreshMCPs().catch((err) => toast(err.message, 'error'))
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
   useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (composerMenuRef.current && !composerMenuRef.current.contains(event.target)) {
-        setShowConnectors(false)
-        setConnectorView('menu')
-      }
-    }
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
-    window.addEventListener('mousedown', handleOutsideClick)
-    return () => window.removeEventListener('mousedown', handleOutsideClick)
+  const refreshMCPs = async () => {
+    try {
+      const data = await listMCPs()
+      setMcps(data)
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  useEffect(() => {
+    refreshMCPs()
   }, [])
 
   const ensureSession = async () => {
     if (sessionId) return sessionId
     const data = await createSession()
+    const newSession = {
+      id: data.session_id,
+      title: null,
+      created_at: new Date().toISOString(),
+    }
+    setSessions((prev) => [newSession, ...prev])
     setSessionId(data.session_id)
     return data.session_id
   }
@@ -68,243 +78,198 @@ export default function App() {
     const userMsg = { id: crypto.randomUUID(), role: 'user', content: text }
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '' }])
+    setStreamingId(assistantId)
+
+    // Update session title from first message
+    if (messages.length === 0) {
+      const title = text.length > 40 ? text.slice(0, 40) + '...' : text
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId || !sessionId ? { ...s, title } : s))
+      )
+    }
 
     try {
       const sid = await ensureSession()
+
+      // Fix session title mapping after session creation
+      if (!sessionId) {
+        const title = text.length > 40 ? text.slice(0, 40) + '...' : text
+        setSessions((prev) =>
+          prev.map((s) => (s.id === sid ? { ...s, title } : s))
+        )
+      }
+
       for await (const event of streamChat(sid, text)) {
         if (event.type === 'token') {
           setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + (event.content || '') } : m))
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + (event.content || '') } : m
+            )
           )
         }
         if (event.type === 'tool_use') {
           const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
           setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + line } : m))
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + line } : m
+            )
           )
         }
         if (event.type === 'tool_result') {
           const line = `Result: ${event.tool} -> ${event.content || ''}\n`
           setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + line } : m))
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + line } : m
+            )
           )
         }
         if (event.type === 'error') {
-          toast(event.content || 'Chat stream error', 'error')
+          toast(event.content || 'Stream error', 'error')
         }
       }
     } catch (err) {
       toast(err.message, 'error')
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: 'Failed to send message.' } : m))
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, content: 'Failed to get response. Please try again.' } : m
+        )
       )
     } finally {
       setSending(false)
+      setStreamingId(null)
+    }
+  }
+
+  const handleNewChat = () => {
+    setSessionId(null)
+    setMessages([])
+    setStreamingId(null)
+    setInput('')
+  }
+
+  const handleSelectSession = (id) => {
+    if (id === sessionId) return
+    setSessionId(id)
+    setMessages([])
+    setStreamingId(null)
+  }
+
+  const handleDeleteSession = (id) => {
+    setSessions((prev) => prev.filter((s) => s.id !== id))
+    if (id === sessionId) {
+      handleNewChat()
     }
   }
 
   const onRegister = async (payload) => {
     await registerMCP(payload)
     await refreshMCPs()
-    toast(`MCP "${payload.name}" registered`, 'success')
+    toast(`"${payload.name}" registered`, 'success')
   }
 
   const onConnect = async (id) => {
     await connectMCP(id)
     await refreshMCPs()
-    toast('MCP connected', 'success')
+    toast('Connected', 'success')
   }
 
   const onDisconnect = async (id) => {
     await disconnectMCP(id)
     await refreshMCPs()
-    toast('MCP disconnected', 'info')
+    toast('Disconnected', 'info')
   }
 
-  const onProbe = async (id) => {
-    return probeMCP(id)
-  }
+  const onProbe = async (id) => probeMCP(id)
 
   const onDelete = async (id, name) => {
-    if (!window.confirm(`Delete MCP "${name}"?`)) return
+    if (!window.confirm(`Delete "${name}"?`)) return
     await deleteMCP(id)
     await refreshMCPs()
-    toast('MCP deleted', 'info')
+    toast('Deleted', 'info')
   }
+
+  const suggestions = [
+    'What tools are available?',
+    'Tell me about the connected MCP servers',
+    'What can you help me with?',
+    'Run a quick test with available tools',
+  ]
 
   return (
     <div className={styles.app}>
-      <div className={styles.backdropA} />
-      <div className={styles.backdropB} />
       <Sidebar
-        mcps={mcps}
-        onAdd={() => setShowRegister(true)}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
-        onProbe={onProbe}
-        onDelete={onDelete}
+        sessions={sessions}
+        currentSessionId={sessionId}
+        onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onOpenRegister={() => setShowRegister(true)}
+        mcpCount={mcps.length}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 
       <main className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.headerCopy}>
-            <div className={styles.eyebrow}>MCP Agent Control Room</div>
-            <h1 className={styles.title}>MCP Agent Dashboard</h1>
-            <p className={styles.subtitle}>
-              Manage connected tools, inspect server status, and chat with your agent from one workspace.
-            </p>
-          </div>
-
-          <div className={styles.headerMeta}>
-            <div className={styles.metaPill}>
-              <span className={styles.metaLabel}>Active MCPs</span>
-              <span className={styles.metaValue}>{connectedCount}</span>
-            </div>
-            <div className={styles.metaPill}>
-              <span className={styles.metaLabel}>Session</span>
-              <span className={styles.metaValue}>{sessionId ? 'Connected' : 'Fresh'}</span>
-            </div>
-          </div>
-        </header>
-
-        <section className={styles.chatArea}>
+        <div className={styles.chatArea} ref={chatAreaRef}>
           {messages.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyBadge}>Waiting for input</div>
-              <h2>Ready to chat</h2>
-              <p>Connect MCP servers from the left and start asking questions.</p>
-              <div className={styles.emptyHints}>
-                <span>Probe servers before connecting</span>
-                <span>Stream responses in real time</span>
-                <span>Keep tools visible in the registry</span>
+            <div className={styles.welcome}>
+              <div className={styles.welcomeIcon}>
+                <Bot size={40} />
               </div>
+              <h1 className={styles.welcomeTitle}>MCP Agent</h1>
+              <p className={styles.welcomeSubtitle}>
+                Connect MCP servers and chat with an AI agent that uses their tools.
+              </p>
+              <div className={styles.suggestions}>
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    className={styles.suggestionBtn}
+                    onClick={() => { setInput(s) }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {connectedCount > 0 && (
+                <p className={styles.connectedInfo}>
+                  {connectedCount} MCP server{connectedCount !== 1 ? 's' : ''} connected
+                </p>
+              )}
             </div>
           ) : (
             <div className={styles.messages}>
               {messages.map((m) => (
-                <article key={m.id} className={`${styles.msg} ${m.role === 'user' ? styles.user : styles.assistant}`}>
-                  <div className={styles.role}>{m.role === 'user' ? 'You' : 'Agent'}</div>
-                  <pre className={styles.content}>{m.content}</pre>
-                </article>
+                <ChatMessage
+                  key={m.id}
+                  message={m}
+                  isStreaming={m.id === streamingId}
+                />
               ))}
+              <div ref={messagesEndRef} />
             </div>
           )}
-        </section>
+        </div>
 
-        <footer className={styles.composer}>
-          <div className={styles.composerCard} ref={composerMenuRef}>
-            <div className={styles.composerTop}>
-              <div>
-                <div className={styles.composerLabel}>Message</div>
-                <div className={styles.composerHint}>Use connectors, then send a prompt to the agent</div>
-              </div>
-              <div className={styles.composerStatus}>{sending ? 'Streaming…' : 'Idle'}</div>
-            </div>
-
-            <div className={styles.composerRow}>
-              <div className={styles.connectorWrap}>
-                <button
-                  type="button"
-                  className={styles.connectorButton}
-                  onClick={() => {
-                    setShowConnectors((value) => !value)
-                    setConnectorView('menu')
-                  }}
-                  aria-label="Open connectors"
-                >
-                  <Plus size={18} />
-                </button>
-
-                {showConnectors && (
-                  <div className={styles.connectorMenu}>
-                    {connectorView === 'menu' ? (
-                      <div className={styles.connectorPrimaryMenu}>
-                        <button
-                          type="button"
-                          className={styles.connectorPrimaryItem}
-                          onClick={() => setConnectorView('list')}
-                        >
-                          <div className={styles.connectorPrimaryLeft}>
-                            <div className={styles.connectorPrimaryTitle}>Connectors</div>
-                            <div className={styles.connectorPrimaryHint}>View registered MCPs</div>
-                          </div>
-                          <span className={styles.connectorPrimaryArrow}>›</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={styles.connectorListView}>
-                        <div className={styles.connectorList}>
-                          {mcps.length === 0 ? (
-                            <div className={styles.connectorEmpty}>No connectors registered yet.</div>
-                          ) : (
-                            mcps.map((mcp) => (
-                              <div key={mcp.id} className={styles.connectorItem}>
-                                <div className={styles.connectorItemMeta}>
-                                  <div className={styles.connectorItemName}>{mcp.name}</div>
-                                  <div className={styles.connectorItemSub}>
-                                    {mcp.connected ? 'Connected' : 'Disconnected'} · {mcp.transport}
-                                  </div>
-                                </div>
-
-                                <div className={styles.connectorItemActions}>
-                                  <label className={styles.connectorSwitch}>
-                                    <input
-                                      type="checkbox"
-                                      checked={mcp.connected}
-                                      onChange={() => (mcp.connected ? onDisconnect(mcp.id) : onConnect(mcp.id))}
-                                      aria-label={`${mcp.name} connector toggle`}
-                                    />
-                                    <span className={styles.connectorTrack}>
-                                      <span className={styles.connectorKnob} />
-                                    </span>
-                                  </label>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        <div className={styles.connectorMenuHeader}>
-                          <button
-                            type="button"
-                            className={styles.connectorBackBtn}
-                            onClick={() => setConnectorView('menu')}
-                          >
-                            ‹ Back
-                          </button>
-                          <div>
-                            <div className={styles.connectorMenuTitle}>Connectors</div>
-                            <div className={styles.connectorMenuHint}>Switch MCP tools on or off</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Message the agent..."
-                className={styles.input}
-                rows={2}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    send()
-                  }
-                }}
-              />
-              <button className={styles.send} disabled={sending || !input.trim()} onClick={send}>
-                {sending ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-          </div>
-        </footer>
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSend={send}
+          sending={sending}
+          mcps={mcps}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+          onProbe={onProbe}
+          onDelete={onDelete}
+          onOpenRegister={() => setShowRegister(true)}
+          connectedCount={connectedCount}
+        />
       </main>
 
-      {showRegister && <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />}
+      {showRegister && (
+        <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />
+      )}
+
       <ToastContainer toasts={toasts} dismiss={dismiss} />
     </div>
   )

@@ -46,24 +46,19 @@ export function RegisterModal({ onClose, onRegister }) {
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <div className={styles.icon}>⬡</div>
-            <div>
-              <div className={styles.title}>Register MCP Server</div>
-              <div className={styles.subtitle}>Add a new Model Context Protocol server</div>
-            </div>
+          <div>
+            <h2 className={styles.title}>Register MCP Server</h2>
+            <p className={styles.subtitle}>Add a new Model Context Protocol server</p>
           </div>
           <button className={styles.close} onClick={onClose}>
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
         <form onSubmit={submit} className={styles.form}>
           <div className={styles.row}>
             <div className={styles.field}>
-              <label className={styles.label}>
-                Server Name <span className={styles.req}>*</span>
-              </label>
+              <label className={styles.label}>Server Name</label>
               <input
                 ref={nameRef}
                 className={styles.input}
@@ -76,34 +71,32 @@ export function RegisterModal({ onClose, onRegister }) {
             <div className={styles.field}>
               <label className={styles.label}>Transport</label>
               <select className={styles.select} value={form.transport} onChange={(e) => update('transport', e.target.value)}>
-                <option value="sse">SSE (Server-Sent Events)</option>
+                <option value="sse">SSE</option>
                 <option value="streamable_http">Streamable HTTP</option>
               </select>
             </div>
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>
-              Server URL <span className={styles.req}>*</span>
-            </label>
+            <label className={styles.label}>Server URL</label>
             <input
               className={styles.input}
               type="text"
               value={form.url}
               onChange={(e) => update('url', e.target.value)}
-              placeholder="http://127.0.0.1:9000/sse"
+              placeholder="http://127.0.0.1:9000"
             />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>
-              Description <span className={styles.optional}>(optional)</span>
+              Description <span className={styles.optional}>optional</span>
             </label>
             <textarea
               className={styles.textarea}
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              placeholder="What tools or capabilities does this server provide?"
+              placeholder="What tools does this server provide?"
               rows={3}
             />
           </div>
@@ -111,11 +104,9 @@ export function RegisterModal({ onClose, onRegister }) {
           {error && <div className={styles.error}>{error}</div>}
 
           <div className={styles.actions}>
-            <button type="button" className={styles.btnCancel} onClick={onClose}>
-              Cancel
-            </button>
+            <button type="button" className={styles.btnCancel} onClick={onClose}>Cancel</button>
             <button type="submit" className={styles.btnSubmit} disabled={loading}>
-              {loading ? 'Registering…' : 'Register Server'}
+              {loading ? 'Registering...' : 'Register Server'}
             </button>
           </div>
         </form>

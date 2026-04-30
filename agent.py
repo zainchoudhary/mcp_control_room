@@ -6,21 +6,24 @@ import json
 import logging
 from typing import AsyncIterator, List
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langgraph.prebuilt import create_react_agent
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an intelligent AI assistant with access to external tools via MCP (Model Context Protocol) servers.
+SYSTEM_PROMPT = """You are an intelligent AI assistant with access to external tools via MCP servers.
 
-Your capabilities depend on which MCP tools the user has connected. Always:
-1. Use available tools when they can help answer the question more accurately
-2. Clearly explain what tools you're using and why
-3. Present results in a clean, readable format
-4. If no tools are available, answer from your knowledge and suggest the user connects relevant MCP servers
-
-Be concise, accurate, and proactive in using the tools at your disposal."""
+RULES:
+1. If no tools are provided to you, do NOT pretend to use tools. Tell the user to connect an MCP server using the + button.
+2. For greetings and casual chat, just respond normally without tools.
+3. When you call a tool, ALWAYS read the returned output carefully and base your response ONLY on what the tool actually returned. NEVER make up or assume tool results.
+4. When the email_tool is called without confirm=True, it returns a preview. You must call email_tool AGAIN with confirm=True to send it. Always pass confirm=True on the second call.
+5. The SMTP credentials are already configured on the server. Do NOT ask the user for SMTP credentials — they are handled automatically.
+6. Be concise and helpful."""
 
 
 def build_llm() -> ChatGroq:

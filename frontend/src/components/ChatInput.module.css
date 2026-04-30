@@ -1,0 +1,505 @@
+.wrapper {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+}
+
+.container {
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  overflow: visible;
+  transition: border-color 0.15s ease;
+  position: relative;
+}
+
+.container:focus-within {
+  border-color: var(--border-strong);
+}
+
+.inputArea {
+  padding: 14px 16px 0;
+}
+
+.textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  max-height: 200px;
+  font-family: var(--font-sans);
+}
+
+.textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 10px;
+}
+
+.toolbarLeft {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Plus Button ── */
+
+.plusBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary);
+  transition: var(--transition-fast);
+}
+
+.plusBtn:hover, .plusBtnActive {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-input);
+}
+
+/* ── Popup Menu ── */
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  width: 300px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: menuIn 0.12s ease;
+  z-index: 50;
+  overflow: hidden;
+}
+
+/* ── Step 1: Main Menu ── */
+
+.mainMenu {
+  padding: 6px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.menuItemIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.menuItemText {
+  flex: 1;
+  min-width: 0;
+}
+
+.menuItemTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.menuItemHint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.menuItemArrow {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ── Step 2: Connectors List ── */
+
+.connectorsList {
+  display: flex;
+  flex-direction: column;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-tertiary);
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.listTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.listHint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.listBody {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.listEmpty {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.listRegisterBtn {
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.listRegisterBtn:hover {
+  background: var(--accent-light);
+}
+
+/* ── Connector Row ── */
+
+.row {
+  border-radius: var(--radius);
+  margin-bottom: 2px;
+  overflow: hidden;
+  transition: var(--transition-fast);
+}
+
+.row:hover {
+  background: var(--bg-tertiary);
+}
+
+.rowActive {
+  background: rgba(16, 163, 127, 0.06);
+}
+
+.rowActive:hover {
+  background: rgba(16, 163, 127, 0.1);
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+}
+
+.rowInfo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.rowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+.rowDotOn {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowName {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowUrl {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Toggle Switch ── */
+
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleTrack {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-default);
+  transition: all 0.2s ease;
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: all 0.2s ease;
+}
+
+.toggle input:checked + .toggleTrack {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle input:checked + .toggleTrack .toggleKnob {
+  transform: translateX(16px);
+  background: white;
+}
+
+/* ── Row Actions ── */
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 8px;
+}
+
+.rowAction {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.rowAction:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.rowAction:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rowActionDanger:hover {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.rowError {
+  padding: 4px 10px 8px;
+  font-size: 11px;
+  color: var(--red);
+}
+
+.rowTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 10px;
+}
+
+.rowToolsEmpty {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.toolChip {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+
+/* ── Send Button ── */
+
+.sendBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  color: var(--bg-primary);
+  transition: var(--transition-fast);
+  opacity: 0.3;
+  cursor: default;
+}
+
+.sendActive {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  opacity: 1;
+  cursor: pointer;
+}
+
+.sendActive:hover {
+  opacity: 0.85;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.disclaimer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 0 12px 16px;
+  }
+
+  .textarea {
+    font-size: 16px;
+  }
+
+  .menu {
+    width: calc(100vw - 48px);
+    left: -12px;
+  }
+}

@@ -43,14 +43,14 @@ async def get_mcp_tools(mcps: list):
     server_config = build_server_config(mcps)
     logger.info("Connecting to MCP servers: %s", list(server_config.keys()))
 
+    tools = []
     try:
         client = MultiServerMCPClient(server_config)
         tools = await client.get_tools()
         logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
-        yield tools
     except Exception as exc:
         logger.error("Failed to load MCP tools: %s", exc)
-        yield []
+    yield tools
 
 
 async def probe_mcp(url: str, transport: str = "sse", timeout: float = 8.0) -> dict:
