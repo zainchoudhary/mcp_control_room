@@ -1,5 +1,4 @@
 import { Plus, Server } from 'lucide-react'
-import { MCPCard } from './MCPCard.jsx'
 import styles from './Sidebar.module.css'
 
 export function Sidebar({ mcps, onAdd, onConnect, onDisconnect, onProbe, onDelete }) {
@@ -41,26 +40,11 @@ export function Sidebar({ mcps, onAdd, onConnect, onDisconnect, onProbe, onDelet
       </div>
 
       <div className={styles.list}>
-        {mcps.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>⬡</div>
-            <div className={styles.emptyTitle}>No servers registered</div>
-            <div className={styles.emptySub}>Register your first MCP server to get started</div>
-          </div>
-        ) : (
-          <div className={styles.cards}>
-            {mcps.map((mcp) => (
-              <MCPCard
-                key={mcp.id}
-                mcp={mcp}
-                onConnect={onConnect}
-                onDisconnect={onDisconnect}
-                onProbe={onProbe}
-                onDelete={onDelete}
-              />
-            ))}
-          </div>
-        )}
+        <div className={styles.empty}>
+          <div className={styles.emptyIcon}>⬡</div>
+          <div className={styles.emptyTitle}>Registered MCPs stay in the connector menu</div>
+          <div className={styles.emptySub}>Use the composer plus button to view and toggle them.</div>
+        </div>
       </div>
     </aside>
   )
