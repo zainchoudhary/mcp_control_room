@@ -15,10 +15,12 @@ import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { useToast } from './hooks/useToast.js'
-import { Bot } from 'lucide-react'
+import { useTheme } from './hooks/useTheme.js'
+import { Bot, Server, Plus } from 'lucide-react'
 import styles from './App.module.css'
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme()
   const [mcps, setMcps] = useState([])
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -207,16 +209,27 @@ export default function App() {
         mcpCount={mcps.length}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main className={styles.main}>
-        <div className={styles.chatArea} ref={chatAreaRef}>
+        <header className={styles.topBar}>
+          <div className={styles.topBarLeft} />
+          <button className={styles.registerBtn} onClick={() => setShowRegister(true)}>
+            <Server size={15} />
+            <span>Register MCP</span>
+            <Plus size={14} />
+          </button>
+        </header>
+
+        <div className={`${styles.chatArea} ${messages.length > 0 ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
           {messages.length === 0 ? (
             <div className={styles.welcome}>
               <div className={styles.welcomeIcon}>
                 <Bot size={40} />
               </div>
-              <h1 className={styles.welcomeTitle}>MCP Agent</h1>
+              <h1 className={styles.welcomeTitle}>ToolChain AI</h1>
               <p className={styles.welcomeSubtitle}>
                 Connect MCP servers and chat with an AI agent that uses their tools.
               </p>

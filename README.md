@@ -1,4 +1,4 @@
-# MCP Agent Dashboard
+# ToolChain AI Dashboard
 
 A full-stack AI agent control room where you can register MCP (Model Context Protocol) servers,
 connect them, and chat with a LangGraph-powered Groq agent that uses those tools in real-time.

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot } from 'lucide-react'
+import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot, Sun, Moon } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
 export function Sidebar({
@@ -12,6 +12,8 @@ export function Sidebar({
   mcpCount,
   collapsed,
   onToggleCollapse,
+  theme,
+  onToggleTheme,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
 
@@ -35,7 +37,7 @@ export function Sidebar({
               <Bot size={18} />
             </div>
             <div className={styles.brandText}>
-              <span className={styles.brandName}>MCP Agent</span>
+              <span className={styles.brandName}>ToolChain AI</span>
               <span className={styles.brandTag}>AI-Powered Tools</span>
             </div>
           </div>
@@ -75,11 +77,19 @@ export function Sidebar({
           </nav>
 
           <div className={styles.bottom}>
-            <button className={styles.bottomBtn} onClick={onOpenRegister}>
-              <Server size={16} />
-              <span>MCP Servers</span>
-              {mcpCount > 0 && <span className={styles.badge}>{mcpCount}</span>}
-            </button>
+            <div className={styles.themeRow}>
+              <div className={styles.themeLabel}>
+                {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+                <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
+              </div>
+              <button className={styles.themeSwitch} onClick={onToggleTheme} title="Toggle theme">
+                <span className={`${styles.themeSwitchTrack} ${theme === 'light' ? styles.themeSwitchLight : ''}`}>
+                  <span className={styles.themeSwitchKnob}>
+                    {theme === 'dark' ? <Moon size={10} /> : <Sun size={10} />}
+                  </span>
+                </span>
+              </button>
+            </div>
           </div>
         </>
       )}

@@ -106,7 +106,7 @@ def email_tool(to: list, subject: str, message: str, max_retries: int = 3, confi
                 <h2>{subject}</h2>
                 <p>{message}</p>
                 <hr>
-                <small>Sent by MCP Agent | {smtp_user}</small>
+                <small>Sent by ToolChain AI | {smtp_user}</small>
             </div>
         </body>
     </html>

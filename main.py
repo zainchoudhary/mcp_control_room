@@ -1,5 +1,5 @@
 """
-main.py - FastAPI application for the MCP Agent Dashboard.
+main.py - FastAPI application for the ToolChain AI Dashboard.
 
 Routes:
   GET  /                       → serve dashboard HTML
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 # ─── App ─────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="MCP Agent Dashboard",
+    title="ToolChain AI Dashboard",
     description="Register MCP servers and chat with an AI agent that uses them as tools.",
     version="1.0.0",
     lifespan=lifespan,

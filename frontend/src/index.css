@@ -4,7 +4,8 @@
   padding: 0;
 }
 
-:root {
+/* ── Dark Theme (default) ── */
+:root, [data-theme="dark"] {
   --bg-primary:     #212121;
   --bg-secondary:   #171717;
   --bg-tertiary:    #2f2f2f;
@@ -39,6 +40,68 @@
   --blue-light:     rgba(59, 130, 246, 0.12);
   --violet:         #8b5cf6;
 
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.3);
+  --shadow:         0 2px 8px rgba(0,0,0,0.4);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg:      0 12px 40px rgba(0,0,0,0.6);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-hover: rgba(255, 255, 255, 0.2);
+  --selection-bg:    rgba(16, 163, 127, 0.3);
+
+  color-scheme: dark;
+}
+
+/* ── Light Theme ── */
+[data-theme="light"] {
+  --bg-primary:     #ffffff;
+  --bg-secondary:   #f7f7f8;
+  --bg-tertiary:    #ececf1;
+  --bg-hover:       #e3e3e8;
+  --bg-sidebar:     #f7f7f8;
+  --bg-chat:        #ffffff;
+  --bg-input:       #f7f7f8;
+  --bg-code:        #f6f6f6;
+  --bg-code-header: #e8e8e8;
+
+  --border-subtle:  rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-strong:  rgba(0, 0, 0, 0.18);
+
+  --text-primary:   #1a1a1a;
+  --text-secondary: #555555;
+  --text-tertiary:  #888888;
+  --text-inverse:   #ffffff;
+  --text-code:      #1a1a1a;
+
+  --accent:         #10a37f;
+  --accent-hover:   #0d8c6d;
+  --accent-light:   rgba(16, 163, 127, 0.1);
+  --accent-border:  rgba(16, 163, 127, 0.25);
+
+  --green:          #10a37f;
+  --green-light:    rgba(16, 163, 127, 0.1);
+  --red:            #dc2626;
+  --red-light:      rgba(220, 38, 38, 0.08);
+  --amber:          #d97706;
+  --blue:           #2563eb;
+  --blue-light:     rgba(37, 99, 235, 0.08);
+  --violet:         #7c3aed;
+
+  --shadow-sm:      0 1px 2px rgba(0,0,0,0.06);
+  --shadow:         0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.1);
+  --shadow-lg:      0 12px 40px rgba(0,0,0,0.12);
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-hover: rgba(0, 0, 0, 0.2);
+  --selection-bg:    rgba(16, 163, 127, 0.2);
+
+  color-scheme: light;
+}
+
+/* ── Shared tokens ── */
+:root {
   --font-sans:      -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   --font-mono:      'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
 
@@ -47,11 +110,6 @@
   --radius-lg:      16px;
   --radius-xl:      24px;
   --radius-full:    9999px;
-
-  --shadow-sm:      0 1px 2px rgba(0,0,0,0.3);
-  --shadow:         0 2px 8px rgba(0,0,0,0.4);
-  --shadow-md:      0 4px 16px rgba(0,0,0,0.5);
-  --shadow-lg:      0 12px 40px rgba(0,0,0,0.6);
 
   --transition:     all 0.15s ease;
   --transition-fast: all 0.1s ease;
@@ -70,6 +128,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 ::-webkit-scrollbar {
@@ -78,10 +137,10 @@ body {
 }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar-thumb);
   border-radius: 99px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
 button { cursor: pointer; font-family: var(--font-sans); }
 input, textarea, select { font-family: var(--font-sans); }
@@ -104,7 +163,7 @@ a:hover {
 }
 
 ::selection {
-  background: rgba(16, 163, 127, 0.3);
+  background: var(--selection-bg);
   color: var(--text-primary);
 }
 

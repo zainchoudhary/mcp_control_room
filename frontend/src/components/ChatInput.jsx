@@ -64,7 +64,7 @@ export function ChatInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message MCP Agent..."
+            placeholder="Message ToolChain AI..."
             className={styles.textarea}
             rows={1}
             disabled={sending}
@@ -120,7 +120,7 @@ export function ChatInput({
         </div>
       </div>
       <p className={styles.disclaimer}>
-        MCP Agent can make mistakes. Verify important information.
+        ToolChain AI can make mistakes. Verify important information.
       </p>
     </div>
   )
@@ -202,6 +202,10 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
 
   const handleProbe = async (e) => {
     e.stopPropagation()
+    if (tools !== null) {
+      setTools(null)
+      return
+    }
     setProbing(true)
     setError(null)
     try {
@@ -227,7 +231,6 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
           <div className={`${styles.rowDot} ${mcp.connected ? styles.rowDotOn : ''}`} />
           <div className={styles.rowText}>
             <span className={styles.rowName}>{mcp.name}</span>
-            <span className={styles.rowUrl}>{mcp.url}</span>
           </div>
         </div>
         <label className={styles.toggle} onClick={(e) => e.stopPropagation()}>
@@ -241,7 +244,7 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
       <div className={styles.rowActions}>
         <button className={styles.rowAction} onClick={handleProbe} disabled={probing}>
           <Search size={12} />
-          <span>{probing ? 'Probing...' : 'Probe'}</span>
+          <span>{probing ? 'Loading...' : tools !== null ? 'Hide Tools' : 'Tools'}</span>
         </button>
         <button
           className={`${styles.rowAction} ${styles.rowActionDanger}`}

@@ -179,7 +179,7 @@ export function ChatMessage({ message, isStreaming }) {
 
         <div className={styles.messageBody}>
           <div className={styles.roleLine}>
-            <span className={styles.roleName}>{isUser ? 'You' : 'MCP Agent'}</span>
+            <span className={styles.roleName}>{isUser ? 'You' : 'ToolChain AI'}</span>
           </div>
 
           <div className={styles.messageContent}>
