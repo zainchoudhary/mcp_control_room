@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot, Sun, Moon } from 'lucide-react'
+import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot, Sun, Moon, LogOut, User } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
 export function Sidebar({
@@ -14,6 +14,8 @@ export function Sidebar({
   onToggleCollapse,
   theme,
   onToggleTheme,
+  user,
+  onLogout,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
 
@@ -90,6 +92,21 @@ export function Sidebar({
                 </span>
               </button>
             </div>
+
+            {user && (
+              <div className={styles.userRow}>
+                <div className={styles.userAvatar}>
+                  {(user.full_name || user.username || '?')[0].toUpperCase()}
+                </div>
+                <div className={styles.userInfo}>
+                  <span className={styles.userName}>{user.full_name || user.username}</span>
+                  <span className={styles.userEmail}>{user.email}</span>
+                </div>
+                <button className={styles.logoutSideBtn} onClick={onLogout} title="Sign out">
+                  <LogOut size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

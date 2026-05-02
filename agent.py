@@ -15,17 +15,27 @@ from langgraph.prebuilt import create_react_agent
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a helpful AI assistant.
+BASE_SYSTEM_PROMPT = """You are a helpful AI assistant.
+
+You are knowledgeable about programming, science, math, general knowledge, and more. Answer questions directly from your own knowledge.
+
+CRITICAL: You currently have NO external tools connected. Do NOT mention, list, or reference any tools whatsoever. If the user asks about tools, tell them no tools are currently connected and they can connect MCP servers using the + button in the sidebar.
+
+Respond in the same language the user writes in."""
+
+TOOLS_SYSTEM_PROMPT = """You are a helpful AI assistant.
 
 You are knowledgeable about programming, science, math, general knowledge, and more. You can answer most questions directly from your own knowledge WITHOUT using any tools.
 
 ## TOOL USAGE POLICY — READ CAREFULLY
 
-You MAY have access to some external tools. Follow these rules STRICTLY:
+You have access to the following external tools: {tool_names}
+
+Follow these rules STRICTLY:
 
 ### WHEN TO USE TOOLS:
 - ONLY call a tool when the user's question CANNOT be answered without it.
-- "calculate" is ONLY for evaluating MATH EXPRESSIONS like "2+2" or "sin(45)". It is NOT for code, NOT for git commands, NOT for general questions. If the user asks about programming, git, coding, etc. — just answer directly, NEVER call calculate.
+- "calculate" is ONLY for evaluating MATH EXPRESSIONS like "2+2" or "sin(45)". It is NOT for code, NOT for git commands, NOT for general questions.
 - "email_tool" is ONLY for when the user explicitly says "send an email" or "email someone".
 - "get_current_time" is ONLY for when the user asks "what time is it" or "what's today's date".
 - "reverse_text", "count_words", "random_number", "convert_temperature" — only when the user explicitly asks for those specific operations.
@@ -39,10 +49,17 @@ You MAY have access to some external tools. Follow these rules STRICTLY:
 - ANY question you can answer from your own knowledge
 
 ### OTHER RULES:
-- NEVER fake tool calls or invent results. If a tool isn't connected, tell the user to connect it via the + button.
+- NEVER fake tool calls or invent results.
 - Read tool outputs carefully and report exactly what was returned.
 - For email_tool: first call returns a preview (confirm=false). Call again with confirm=true to send. SMTP is pre-configured — never ask for credentials.
 - Respond in the same language the user writes in."""
+
+
+def get_system_prompt(tools: list) -> str:
+    if tools:
+        tool_names = ", ".join(t.name for t in tools)
+        return TOOLS_SYSTEM_PROMPT.format(tool_names=tool_names)
+    return BASE_SYSTEM_PROMPT
 
 
 def build_llm() -> ChatGroq:
@@ -57,14 +74,69 @@ def build_llm() -> ChatGroq:
     )
 
 
-def build_history(raw_messages: list) -> List[BaseMessage]:
-    """Convert DB message rows to LangChain message objects."""
+KNOWN_TOOL_NAMES = [
+    "calculate", "email_tool", "get_current_time",
+    "reverse_text", "count_words", "random_number",
+    "convert_temperature",
+]
+
+TOOL_MENTION_MARKERS = [
+    "available tools", "here are the available tools",
+    "i have access to the following tools",
+    "i have access to", "access to the following",
+    "tool_use", "tool_result",
+    "i'll need to use the", "let me use the", "i'll use the",
+    "using the", "tool for you",
+    "to use any of these tools",
+    "following tools:",
+]
+
+TOOL_ASK_MARKERS = [
+    "available tools", "list tools", "show tools",
+    "what tools", "give me tools", "give available",
+    "which tools", "tools do you have",
+]
+
+
+def _mentions_tools(text: str) -> bool:
+    lower = text.lower()
+    if any(marker in lower for marker in TOOL_MENTION_MARKERS):
+        return True
+    tool_hits = sum(1 for name in KNOWN_TOOL_NAMES if name in lower)
+    return tool_hits >= 2
+
+
+def _asks_about_tools(text: str) -> bool:
+    lower = text.lower()
+    return any(marker in lower for marker in TOOL_ASK_MARKERS)
+
+
+def build_history(raw_messages: list, tools: list) -> List[BaseMessage]:
+    """Convert DB message rows to LangChain message objects.
+    When no tools are available, filters out both user and assistant
+    messages related to tools so the agent doesn't repeat stale info.
+    """
     mapping = {"user": HumanMessage, "assistant": AIMessage}
-    messages = [SystemMessage(content=SYSTEM_PROMPT)]
+    system_prompt = get_system_prompt(tools)
+    messages = [SystemMessage(content=system_prompt)]
+    has_tools = bool(tools)
+
+    skip_next_assistant = False
     for m in raw_messages:
         cls = mapping.get(m["role"])
-        if cls:
-            messages.append(cls(content=m["content"]))
+        if not cls:
+            continue
+        content = m["content"]
+        if not has_tools:
+            if m["role"] == "user" and _asks_about_tools(content):
+                skip_next_assistant = True
+                continue
+            if m["role"] == "assistant":
+                if skip_next_assistant or _mentions_tools(content):
+                    skip_next_assistant = False
+                    continue
+                skip_next_assistant = False
+        messages.append(cls(content=content))
     return messages
 
 
@@ -119,7 +191,7 @@ async def stream_agent_response(
       {"type": "error",   "content": "..."}
     """
     llm = build_llm()
-    messages = build_history(history)
+    messages = build_history(history, tools)
     messages.append(HumanMessage(content=user_message))
 
     agent = create_react_agent(llm, tools if tools else [])

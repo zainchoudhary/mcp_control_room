@@ -1,8 +1,17 @@
+import { getToken } from './auth.js'
+
 const BASE = '/api'
+
+function authHeaders() {
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { ...authHeaders(), ...options.headers },
     ...options,
   })
   if (!res.ok) {
@@ -30,7 +39,7 @@ export const getMessages = (id) => request(`/sessions/${id}/messages`)
 export async function* streamChat(sessionId, message) {
   const res = await fetch(`${BASE}/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ session_id: sessionId, message }),
   })
 

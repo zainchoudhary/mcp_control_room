@@ -3,6 +3,9 @@ main.py - FastAPI application for the ToolChain AI Dashboard.
 
 Routes:
   GET  /                       → serve dashboard HTML
+  POST /api/auth/signup        → register new user
+  POST /api/auth/login         → authenticate user
+  GET  /api/auth/me            → current user profile
   GET  /api/mcps               → list all registered MCPs
   POST /api/mcps               → register a new MCP
   GET  /api/mcps/{id}          → get single MCP
@@ -14,24 +17,27 @@ Routes:
   GET  /api/sessions/{id}/messages → get session history
   POST /api/chat/stream        → SSE streaming chat endpoint
 """
-import os
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db_config import init_db, get_db, AsyncSessionLocal
 from database import (
-    init_db, register_mcp, list_mcps, get_mcp,
+    register_mcp, list_mcps, get_mcp,
     set_mcp_connection, delete_mcp, get_connected_mcps,
-    create_session, save_message, get_session_messages
+    create_session, save_message, get_session_messages,
 )
 from mcp_manager import get_mcp_tools, probe_mcp
 from agent import stream_agent_response
+from auth_routes import router as auth_router
+from auth_utils import get_current_user
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -42,7 +48,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    logger.info("Database initialized.")
+    logger.info("PostgreSQL database initialized via SQLAlchemy.")
     yield
     logger.info("Shutting down.")
 
@@ -63,6 +69,7 @@ app.add_middleware(
 )
 
 app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+app.include_router(auth_router)
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
@@ -89,60 +96,87 @@ async def serve_dashboard():
 # ─── Routes: MCP Registry ────────────────────────────────────────────────────
 
 @app.get("/api/mcps")
-async def api_list_mcps():
-    return await list_mcps()
+async def api_list_mcps(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_mcps(db)
 
 
 @app.post("/api/mcps", status_code=201)
-async def api_register_mcp(body: MCPCreate):
-    existing = await list_mcps()
+async def api_register_mcp(
+    body: MCPCreate,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    existing = await list_mcps(db)
     if any(m["name"] == body.name for m in existing):
         raise HTTPException(status_code=409, detail=f"MCP with name '{body.name}' already exists.")
     url = body.url.rstrip("/")
     if body.transport == "sse" and not url.endswith("/sse"):
         url += "/sse"
-    mcp = await register_mcp(body.name, url, body.transport, body.description)
+    mcp = await register_mcp(db, body.name, url, body.transport, body.description)
     return mcp
 
 
 @app.get("/api/mcps/{mcp_id}")
-async def api_get_mcp(mcp_id: str):
-    mcp = await get_mcp(mcp_id)
+async def api_get_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    mcp = await get_mcp(db, mcp_id)
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
     return mcp
 
 
 @app.delete("/api/mcps/{mcp_id}", status_code=204)
-async def api_delete_mcp(mcp_id: str):
-    mcp = await get_mcp(mcp_id)
+async def api_delete_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    mcp = await get_mcp(db, mcp_id)
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await delete_mcp(mcp_id)
+    await delete_mcp(db, mcp_id)
 
 
 @app.post("/api/mcps/{mcp_id}/connect")
-async def api_connect_mcp(mcp_id: str):
-    mcp = await get_mcp(mcp_id)
+async def api_connect_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    mcp = await get_mcp(db, mcp_id)
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await set_mcp_connection(mcp_id, True)
+    await set_mcp_connection(db, mcp_id, True)
     return {"id": mcp_id, "connected": True}
 
 
 @app.post("/api/mcps/{mcp_id}/disconnect")
-async def api_disconnect_mcp(mcp_id: str):
-    mcp = await get_mcp(mcp_id)
+async def api_disconnect_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    mcp = await get_mcp(db, mcp_id)
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await set_mcp_connection(mcp_id, False)
+    await set_mcp_connection(db, mcp_id, False)
     return {"id": mcp_id, "connected": False}
 
 
 @app.post("/api/mcps/{mcp_id}/probe")
-async def api_probe_mcp(mcp_id: str):
+async def api_probe_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Probe MCP endpoint to check reachability and list available tools."""
-    mcp = await get_mcp(mcp_id)
+    mcp = await get_mcp(db, mcp_id)
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
     result = await probe_mcp(mcp["url"], mcp["transport"])
@@ -152,42 +186,49 @@ async def api_probe_mcp(mcp_id: str):
 # ─── Routes: Sessions ────────────────────────────────────────────────────────
 
 @app.post("/api/sessions", status_code=201)
-async def api_create_session():
-    session_id = await create_session()
+async def api_create_session(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    session_id = await create_session(db)
     return {"session_id": session_id}
 
 
 @app.get("/api/sessions/{session_id}/messages")
-async def api_get_messages(session_id: str):
-    messages = await get_session_messages(session_id)
+async def api_get_messages(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    messages = await get_session_messages(db, session_id)
     return messages
 
 
 # ─── Routes: Chat (SSE streaming) ────────────────────────────────────────────
 
 @app.post("/api/chat/stream")
-async def api_chat_stream(body: ChatRequest):
+async def api_chat_stream(
+    body: ChatRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     SSE endpoint. Opens MCP connections, runs the LangGraph agent,
     and streams tokens back to the client.
     """
-    # Validate session
-    history = await get_session_messages(body.session_id)
-
-    # Persist user message
-    await save_message(body.session_id, "user", body.message)
-
-    # Fetch connected MCPs
-    connected_mcps = await get_connected_mcps()
+    history = await get_session_messages(db, body.session_id)
+    await save_message(db, body.session_id, "user", body.message)
+    connected_mcps = await get_connected_mcps(db)
+    session_id = body.session_id
+    user_message = body.message
 
     async def event_generator():
         full_response_parts = []
 
         async with get_mcp_tools(connected_mcps) as tools:
-            async for sse_chunk in stream_agent_response(body.message, history, tools):
+            async for sse_chunk in stream_agent_response(user_message, history, tools):
                 yield sse_chunk
 
-                # Track full response to persist at end
                 if sse_chunk.startswith("data: "):
                     import json
                     try:
@@ -195,15 +236,14 @@ async def api_chat_stream(body: ChatRequest):
                         if data.get("type") == "token":
                             full_response_parts.append(data.get("content", ""))
                         elif data.get("type") == "done" and data.get("content"):
-                            # done event has full assembled content
                             full_response_parts = [data.get("content", "")]
                     except Exception:
                         pass
 
-        # Persist the full assistant response
         full_text = "".join(full_response_parts)
         if full_text.strip():
-            await save_message(body.session_id, "assistant", full_text)
+            async with AsyncSessionLocal() as new_db:
+                await save_message(new_db, session_id, "assistant", full_text)
 
     return StreamingResponse(
         event_generator(),

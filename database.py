@@ -1,131 +1,86 @@
 """
-database.py - SQLite persistence layer for MCP registry
+database.py - MCP registry, sessions, and messages persistence layer (SQLAlchemy + MySQL).
 """
-import aiosqlite
-import uuid
 from typing import Optional
-from datetime import datetime
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-DB_PATH = "mcp_agent.db"
-
-
-async def init_db():
-    """Initialize database and create tables."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS mcps (
-                id          TEXT PRIMARY KEY,
-                name        TEXT NOT NULL,
-                url         TEXT NOT NULL,
-                transport   TEXT NOT NULL DEFAULT 'sse',
-                description TEXT,
-                connected   INTEGER NOT NULL DEFAULT 0,
-                created_at  TEXT NOT NULL
-            )
-        """)
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS chat_sessions (
-                id         TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL
-            )
-        """)
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id         TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                role       TEXT NOT NULL,
-                content    TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
-            )
-        """)
-        await db.commit()
+from db_models import MCP, ChatSession, Message
 
 
-async def register_mcp(name: str, url: str, transport: str, description: Optional[str] = None) -> dict:
+async def register_mcp(
+    db: AsyncSession,
+    name: str,
+    url: str,
+    transport: str,
+    description: Optional[str] = None,
+) -> dict:
     """Register a new MCP server."""
-    mcp_id = str(uuid.uuid4())
-    created_at = datetime.utcnow().isoformat()
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO mcps (id, name, url, transport, description, connected, created_at) VALUES (?,?,?,?,?,0,?)",
-            (mcp_id, name, url, transport, description, created_at)
-        )
-        await db.commit()
-    return {"id": mcp_id, "name": name, "url": url, "transport": transport,
-            "description": description, "connected": False, "created_at": created_at}
+    mcp = MCP(name=name, url=url, transport=transport, description=description)
+    db.add(mcp)
+    await db.commit()
+    await db.refresh(mcp)
+    return mcp.to_dict()
 
 
-async def list_mcps() -> list:
+async def list_mcps(db: AsyncSession) -> list:
     """List all registered MCPs."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT * FROM mcps ORDER BY created_at DESC")
-        rows = await cursor.fetchall()
-        return [dict(r) | {"connected": bool(r["connected"])} for r in rows]
+    result = await db.execute(select(MCP).order_by(MCP.created_at.desc()))
+    return [row.to_dict() for row in result.scalars().all()]
 
 
-async def get_mcp(mcp_id: str) -> Optional[dict]:
+async def get_mcp(db: AsyncSession, mcp_id: str) -> Optional[dict]:
     """Get a single MCP by ID."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT * FROM mcps WHERE id = ?", (mcp_id,))
-        row = await cursor.fetchone()
-        if not row:
-            return None
-        return dict(row) | {"connected": bool(row["connected"])}
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+    mcp = result.scalar_one_or_none()
+    return mcp.to_dict() if mcp else None
 
 
-async def set_mcp_connection(mcp_id: str, connected: bool):
+async def set_mcp_connection(db: AsyncSession, mcp_id: str, connected: bool):
     """Toggle MCP connection status."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE mcps SET connected = ? WHERE id = ?", (1 if connected else 0, mcp_id))
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+    mcp = result.scalar_one_or_none()
+    if mcp:
+        mcp.connected = connected
         await db.commit()
 
 
-async def delete_mcp(mcp_id: str):
+async def delete_mcp(db: AsyncSession, mcp_id: str):
     """Delete an MCP by ID."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM mcps WHERE id = ?", (mcp_id,))
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+    mcp = result.scalar_one_or_none()
+    if mcp:
+        await db.delete(mcp)
         await db.commit()
 
 
-async def get_connected_mcps() -> list:
+async def get_connected_mcps(db: AsyncSession) -> list:
     """Get all connected MCPs."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT * FROM mcps WHERE connected = 1")
-        rows = await cursor.fetchall()
-        return [dict(r) | {"connected": True} for r in rows]
+    result = await db.execute(select(MCP).where(MCP.connected == True))  # noqa: E712
+    return [row.to_dict() for row in result.scalars().all()]
 
 
-async def create_session() -> str:
+async def create_session(db: AsyncSession) -> str:
     """Create a new chat session."""
-    session_id = str(uuid.uuid4())
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT INTO chat_sessions (id, created_at) VALUES (?,?)",
-                         (session_id, datetime.utcnow().isoformat()))
-        await db.commit()
-    return session_id
+    session = ChatSession()
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session.id
 
 
-async def save_message(session_id: str, role: str, content: str):
+async def save_message(db: AsyncSession, session_id: str, role: str, content: str):
     """Persist a chat message."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?,?,?,?,?)",
-            (str(uuid.uuid4()), session_id, role, content, datetime.utcnow().isoformat())
-        )
-        await db.commit()
+    msg = Message(session_id=session_id, role=role, content=content)
+    db.add(msg)
+    await db.commit()
 
 
-async def get_session_messages(session_id: str) -> list:
+async def get_session_messages(db: AsyncSession, session_id: str) -> list:
     """Retrieve all messages for a session."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT role, content FROM messages WHERE session_id = ? ORDER BY created_at",
-            (session_id,)
-        )
-        rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+    result = await db.execute(
+        select(Message)
+        .where(Message.session_id == session_id)
+        .order_by(Message.created_at)
+    )
+    return [row.to_dict() for row in result.scalars().all()]

@@ -9,18 +9,22 @@ import {
   probeMCP,
   streamChat,
 } from './api.js'
+import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
 import { ChatMessage } from './components/ChatMessage.jsx'
 import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
+import { AuthPage } from './components/AuthPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
-import { Bot, Server, Plus } from 'lucide-react'
+import { Bot, Server, Plus, LogOut } from 'lucide-react'
 import styles from './App.module.css'
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
+  const [user, setUser] = useState(() => getSavedUser())
+  const [authChecked, setAuthChecked] = useState(false)
   const [mcps, setMcps] = useState([])
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -33,6 +37,27 @@ export default function App() {
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
+
+  useEffect(() => {
+    fetchMe()
+      .then((u) => { if (u) setUser(u); else setUser(null) })
+      .catch(() => setUser(null))
+      .finally(() => setAuthChecked(true))
+  }, [])
+
+  const handleAuth = (userData) => {
+    setUser(userData)
+    refreshMCPs()
+  }
+
+  const handleLogout = () => {
+    logout()
+    setUser(null)
+    setMcps([])
+    setSessions([])
+    setSessionId(null)
+    setMessages([])
+  }
 
   const connectedCount = useMemo(() => mcps.filter((m) => m.connected).length, [mcps])
 
@@ -54,8 +79,8 @@ export default function App() {
   }
 
   useEffect(() => {
-    refreshMCPs()
-  }, [])
+    if (user) refreshMCPs()
+  }, [user])
 
   const ensureSession = async () => {
     if (sessionId) return sessionId
@@ -197,6 +222,19 @@ export default function App() {
     'Run a quick test with available tools',
   ]
 
+  if (!authChecked) {
+    return null
+  }
+
+  if (!user) {
+    return (
+      <>
+        <AuthPage onAuth={handleAuth} />
+        <ToastContainer toasts={toasts} dismiss={dismiss} />
+      </>
+    )
+  }
+
   return (
     <div className={styles.app}>
       <Sidebar
@@ -211,15 +249,27 @@ export default function App() {
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         theme={theme}
         onToggleTheme={toggleTheme}
+        user={user}
+        onLogout={handleLogout}
       />
 
       <main className={styles.main}>
         <header className={styles.topBar}>
-          <div className={styles.topBarLeft} />
+          <div className={styles.topBarLeft}>
+            {user && (
+              <span className={styles.greeting}>
+                Hello, <strong>{user.full_name || user.username}</strong>
+              </span>
+            )}
+          </div>
           <button className={styles.registerBtn} onClick={() => setShowRegister(true)}>
             <Server size={15} />
             <span>Register MCP</span>
             <Plus size={14} />
+          </button>
+          <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
+            <LogOut size={15} />
+            <span>Sign Out</span>
           </button>
         </header>
 
