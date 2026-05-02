@@ -14,6 +14,7 @@ export function ChatInput({
   onDelete,
   onOpenRegister,
   connectedCount,
+  togglingMcp,
 }) {
   const textareaRef = useRef(null)
   const menuRef = useRef(null)
@@ -103,6 +104,7 @@ export function ChatInput({
                     onProbe={onProbe}
                     onDelete={onDelete}
                     onRegister={() => { setMenuOpen(false); setView('main'); onOpenRegister() }}
+                    togglingMcp={togglingMcp}
                   />
                 )}
               </div>
@@ -157,7 +159,7 @@ function MainMenu({ onConnectors, onRegister, connectedCount, totalCount }) {
   )
 }
 
-function ConnectorsList({ mcps, onBack, onConnect, onDisconnect, onProbe, onDelete, onRegister }) {
+function ConnectorsList({ mcps, onBack, onConnect, onDisconnect, onProbe, onDelete, onRegister, togglingMcp }) {
   return (
     <div className={styles.connectorsList}>
       <div className={styles.listHeader}>
@@ -187,6 +189,7 @@ function ConnectorsList({ mcps, onBack, onConnect, onDisconnect, onProbe, onDele
               onDisconnect={onDisconnect}
               onProbe={onProbe}
               onDelete={onDelete}
+              isToggling={togglingMcp === mcp.id}
             />
           ))
         )}
@@ -195,7 +198,7 @@ function ConnectorsList({ mcps, onBack, onConnect, onDisconnect, onProbe, onDele
   )
 }
 
-function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
+function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete, isToggling }) {
   const [probing, setProbing] = useState(false)
   const [tools, setTools] = useState(null)
   const [error, setError] = useState(null)
@@ -220,6 +223,7 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
   }
 
   const handleToggle = () => {
+    if (isToggling) return
     if (mcp.connected) onDisconnect(mcp.id)
     else onConnect(mcp.id)
   }
@@ -234,9 +238,11 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, onProbe, onDelete }) {
           </div>
         </div>
         <label className={styles.toggle} onClick={(e) => e.stopPropagation()}>
-          <input type="checkbox" checked={mcp.connected} onChange={handleToggle} />
-          <span className={styles.toggleTrack}>
-            <span className={styles.toggleKnob} />
+          <input type="checkbox" checked={mcp.connected} onChange={handleToggle} disabled={isToggling} />
+          <span className={`${styles.toggleTrack} ${isToggling ? styles.toggleLoading : ''}`}>
+            <span className={styles.toggleKnob}>
+              {isToggling && <Loader2 size={10} className={styles.toggleSpinner} />}
+            </span>
           </span>
         </label>
       </div>

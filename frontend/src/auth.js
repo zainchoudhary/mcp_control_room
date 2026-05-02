@@ -59,6 +59,37 @@ function logout() {
   clearAuth()
 }
 
+async function forgotPassword(email) {
+  const res = await fetch(`${BASE}/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+async function resetPassword(token, password, confirm_password) {
+  const res = await fetch(`${BASE}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password, confirm_password }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    const detail = err.detail
+    if (Array.isArray(detail)) {
+      const msg = detail.map((d) => d.msg?.replace('Value error, ', '') || d.msg || '').join('\n')
+      throw new Error(msg)
+    }
+    throw new Error(typeof detail === 'string' ? detail : `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 async function fetchMe() {
   const token = getToken()
   if (!token) return null
@@ -74,4 +105,4 @@ async function fetchMe() {
   return user
 }
 
-export { getToken, getSavedUser, signup, login, logout, fetchMe }
+export { getToken, getSavedUser, signup, login, logout, fetchMe, forgotPassword, resetPassword }

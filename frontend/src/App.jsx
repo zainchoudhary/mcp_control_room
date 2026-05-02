@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   createSession,
+  listSessions,
+  deleteSessionApi,
+  getMessages,
   listMCPs,
   registerMCP,
   deleteMCP,
@@ -18,7 +21,7 @@ import { AuthPage } from './components/AuthPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
-import { Bot, Server, Plus, LogOut } from 'lucide-react'
+import { Bot, Server, Plus } from 'lucide-react'
 import styles from './App.module.css'
 
 export default function App() {
@@ -34,6 +37,7 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [streamingId, setStreamingId] = useState(null)
+  const [loadingMessages, setLoadingMessages] = useState(false)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -78,21 +82,28 @@ export default function App() {
     }
   }
 
+  const refreshSessions = async () => {
+    try {
+      const data = await listSessions()
+      setSessions(data)
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
   useEffect(() => {
-    if (user) refreshMCPs()
+    if (user) {
+      refreshMCPs()
+      refreshSessions()
+    }
   }, [user])
 
   const ensureSession = async () => {
     if (sessionId) return sessionId
     const data = await createSession()
-    const newSession = {
-      id: data.session_id,
-      title: null,
-      created_at: new Date().toISOString(),
-    }
-    setSessions((prev) => [newSession, ...prev])
-    setSessionId(data.session_id)
-    return data.session_id
+    setSessions((prev) => [data, ...prev])
+    setSessionId(data.id)
+    return data.id
   }
 
   const send = async () => {
@@ -107,20 +118,11 @@ export default function App() {
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '' }])
     setStreamingId(assistantId)
 
-    // Update session title from first message
-    if (messages.length === 0) {
-      const title = text.length > 40 ? text.slice(0, 40) + '...' : text
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId || !sessionId ? { ...s, title } : s))
-      )
-    }
-
     try {
       const sid = await ensureSession()
 
-      // Fix session title mapping after session creation
-      if (!sessionId) {
-        const title = text.length > 40 ? text.slice(0, 40) + '...' : text
+      if (messages.length === 0) {
+        const title = text.length > 80 ? text.slice(0, 80) + '...' : text
         setSessions((prev) =>
           prev.map((s) => (s.id === sid ? { ...s, title } : s))
         )
@@ -174,14 +176,26 @@ export default function App() {
     setInput('')
   }
 
-  const handleSelectSession = (id) => {
+  const handleSelectSession = async (id) => {
     if (id === sessionId) return
     setSessionId(id)
     setMessages([])
     setStreamingId(null)
+    setLoadingMessages(true)
+    try {
+      const msgs = await getMessages(id)
+      setMessages(msgs.map((m) => ({ id: crypto.randomUUID(), ...m })))
+    } catch {
+      setMessages([])
+    } finally {
+      setLoadingMessages(false)
+    }
   }
 
-  const handleDeleteSession = (id) => {
+  const handleDeleteSession = async (id) => {
+    try {
+      await deleteSessionApi(id)
+    } catch { /* ignore */ }
     setSessions((prev) => prev.filter((s) => s.id !== id))
     if (id === sessionId) {
       handleNewChat()
@@ -194,16 +208,24 @@ export default function App() {
     toast(`"${payload.name}" registered`, 'success')
   }
 
+  const [togglingMcp, setTogglingMcp] = useState(null)
+
   const onConnect = async (id) => {
-    await connectMCP(id)
-    await refreshMCPs()
-    toast('Connected', 'success')
+    setTogglingMcp(id)
+    try {
+      await connectMCP(id)
+      await refreshMCPs()
+      toast('Connected', 'success')
+    } finally { setTogglingMcp(null) }
   }
 
   const onDisconnect = async (id) => {
-    await disconnectMCP(id)
-    await refreshMCPs()
-    toast('Disconnected', 'info')
+    setTogglingMcp(id)
+    try {
+      await disconnectMCP(id)
+      await refreshMCPs()
+      toast('Disconnected', 'info')
+    } finally { setTogglingMcp(null) }
   }
 
   const onProbe = async (id) => probeMCP(id)
@@ -267,14 +289,22 @@ export default function App() {
             <span>Register MCP</span>
             <Plus size={14} />
           </button>
-          <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
-            <LogOut size={15} />
-            <span>Sign Out</span>
-          </button>
         </header>
 
-        <div className={`${styles.chatArea} ${messages.length > 0 ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
-          {messages.length === 0 ? (
+        <div className={`${styles.chatArea} ${messages.length > 0 || loadingMessages ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
+          {loadingMessages ? (
+            <div className={styles.skeletonWrap}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={`${styles.skeleton} ${i % 2 === 0 ? styles.skeletonAlt : ''}`}>
+                  <div className={styles.skeletonAvatar} />
+                  <div className={styles.skeletonLines}>
+                    <div className={styles.skeletonLine} style={{ width: i === 1 ? '70%' : i === 2 ? '90%' : '50%' }} />
+                    <div className={styles.skeletonLine} style={{ width: i === 1 ? '45%' : i === 2 ? '60%' : '35%' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : messages.length === 0 ? (
             <div className={styles.welcome}>
               <div className={styles.welcomeIcon}>
                 <Bot size={40} />
@@ -326,6 +356,7 @@ export default function App() {
           onDelete={onDelete}
           onOpenRegister={() => setShowRegister(true)}
           connectedCount={connectedCount}
+          togglingMcp={togglingMcp}
         />
       </main>
 

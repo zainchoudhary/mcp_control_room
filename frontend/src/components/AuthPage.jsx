@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Eye, EyeOff, Mail, Lock, User, UserCircle, ArrowRight, Bot, Sparkles, Shield, Zap, Check, X } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, UserCircle, ArrowRight, ArrowLeft, Bot, Sparkles, Shield, Zap, Check, X, KeyRound, CheckCircle } from 'lucide-react'
 import styles from './AuthPage.module.css'
 
 const PASSWORD_RULES = [
@@ -23,12 +23,20 @@ function validateUsername(username) {
 }
 
 export function AuthPage({ onAuth }) {
-  const [mode, setMode] = useState('login')
+  const [mode, setMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reset_token') ? 'reset' : 'login'
+  })
+  const [resetToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reset_token') || ''
+  })
   const [form, setForm] = useState({
     username: '', email: '', password: '', confirm_password: '', full_name: '',
   })
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -67,19 +75,35 @@ export function AuthPage({ onAuth }) {
     setForm({ username: '', email: '', password: '', confirm_password: '', full_name: '' })
     setErrors({})
     setServerError('')
+    setSuccessMessage('')
     setTouched({})
+    if (m !== 'reset') {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
   }
 
   const submit = async (e) => {
     e.preventDefault()
     setServerError('')
+    setSuccessMessage('')
     setLoading(true)
     try {
-      const { signup, login } = await import('../auth.js')
-      if (mode === 'signup') {
+      if (mode === 'forgot') {
+        const { forgotPassword } = await import('../auth.js')
+        const res = await forgotPassword(form.email.trim())
+        setSuccessMessage(res.message)
+      } else if (mode === 'reset') {
+        const { resetPassword } = await import('../auth.js')
+        const res = await resetPassword(resetToken, form.password, form.confirm_password)
+        setSuccessMessage(res.message)
+        window.history.replaceState({}, '', window.location.pathname)
+        setTimeout(() => switchMode('login'), 3000)
+      } else if (mode === 'signup') {
+        const { signup } = await import('../auth.js')
         const data = await signup({ username: form.username.trim(), email: form.email.trim(), password: form.password, confirm_password: form.confirm_password, full_name: form.full_name.trim() || null })
         onAuth(data.user, data.access_token)
       } else {
+        const { login } = await import('../auth.js')
         const data = await login({ email: form.email.trim(), password: form.password })
         onAuth(data.user, data.access_token)
       }
@@ -147,20 +171,51 @@ export function AuthPage({ onAuth }) {
                 <div className={styles.logoIcon}><Bot size={20} /></div>
                 <span>ToolChain AI</span>
               </div>
-              <h2 className={styles.cardTitle}>
-                {mode === 'login' ? 'Welcome back' : 'Create account'}
-              </h2>
-              <p className={styles.cardSubtitle}>
-                {mode === 'login' ? 'Enter your credentials to continue' : 'Get started for free'}
-              </p>
+              {mode === 'forgot' && (
+                <>
+                  <button type="button" className={styles.backBtn} onClick={() => switchMode('login')}>
+                    <ArrowLeft size={16} /> Back to login
+                  </button>
+                  <div className={styles.forgotIcon}><KeyRound size={28} /></div>
+                  <h2 className={styles.cardTitle}>Forgot password?</h2>
+                  <p className={styles.cardSubtitle}>Enter your email and we'll send you a reset link</p>
+                </>
+              )}
+              {mode === 'reset' && (
+                <>
+                  <div className={styles.forgotIcon}><KeyRound size={28} /></div>
+                  <h2 className={styles.cardTitle}>Set new password</h2>
+                  <p className={styles.cardSubtitle}>Choose a strong password for your account</p>
+                </>
+              )}
+              {(mode === 'login' || mode === 'signup') && (
+                <>
+                  <h2 className={styles.cardTitle}>
+                    {mode === 'login' ? 'Welcome back' : 'Create account'}
+                  </h2>
+                  <p className={styles.cardSubtitle}>
+                    {mode === 'login' ? 'Enter your credentials to continue' : 'Get started for free'}
+                  </p>
+                </>
+              )}
             </div>
 
-            <div className={styles.tabs}>
-              <button className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`} onClick={() => switchMode('login')} type="button">Sign In</button>
-              <button className={`${styles.tab} ${mode === 'signup' ? styles.tabActive : ''}`} onClick={() => switchMode('signup')} type="button">Sign Up</button>
-              <div className={styles.tabIndicator} style={{ transform: mode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }} />
-            </div>
+            {(mode === 'login' || mode === 'signup') && (
+              <div className={styles.tabs}>
+                <button className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`} onClick={() => switchMode('login')} type="button">Sign In</button>
+                <button className={`${styles.tab} ${mode === 'signup' ? styles.tabActive : ''}`} onClick={() => switchMode('signup')} type="button">Sign Up</button>
+                <div className={styles.tabIndicator} style={{ transform: mode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }} />
+              </div>
+            )}
 
+            {successMessage && (
+              <div className={styles.successBox}>
+                <CheckCircle size={16} />
+                <span>{successMessage}</span>
+              </div>
+            )}
+
+            {!(successMessage && mode === 'forgot') && (
             <form onSubmit={submit} className={styles.form} noValidate>
               {mode === 'signup' && (
                 <div className={styles.row}>
@@ -168,7 +223,7 @@ export function AuthPage({ onAuth }) {
                     <label className={styles.label}>Username</label>
                     <div className={styles.inputWrap}>
                       <User size={15} className={styles.inputIcon} />
-                      <input ref={usernameRef} className={`${styles.input} ${touched.username && errors.username ? styles.inputError : ''} ${touched.username && !errors.username && form.username ? styles.inputSuccess : ''}`} type="text" value={form.username} onChange={(e) => update('username', e.target.value)} onBlur={() => blur('username')} placeholder="johndoe" autoComplete="username" />
+                      <input ref={usernameRef} className={`${styles.input} ${touched.username && errors.username ? styles.inputError : ''} ${touched.username && !errors.username && form.username ? styles.inputSuccess : ''}`} type="text" value={form.username} onChange={(e) => update('username', e.target.value)} onBlur={() => blur('username')} placeholder="zain" autoComplete="username" />
                       {touched.username && form.username && (
                         <span className={`${styles.inputStatus} ${errors.username ? styles.statusError : styles.statusOk}`}>
                           {errors.username ? <X size={13} /> : <Check size={13} />}
@@ -181,61 +236,72 @@ export function AuthPage({ onAuth }) {
                     <label className={styles.label}>Full Name <span className={styles.optional}>optional</span></label>
                     <div className={styles.inputWrap}>
                       <UserCircle size={15} className={styles.inputIcon} />
-                      <input className={styles.input} type="text" value={form.full_name} onChange={(e) => update('full_name', e.target.value)} placeholder="John Doe" autoComplete="name" />
+                      <input className={styles.input} type="text" value={form.full_name} onChange={(e) => update('full_name', e.target.value)} placeholder="Zain Ch" autoComplete="name" />
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className={styles.field}>
-                <label className={styles.label}>Email address</label>
-                <div className={styles.inputWrap}>
-                  <Mail size={15} className={styles.inputIcon} />
-                  <input ref={mode === 'login' ? emailRef : null} className={`${styles.input} ${touched.email && errors.email ? styles.inputError : ''} ${touched.email && !errors.email && form.email ? styles.inputSuccess : ''}`} type="email" value={form.email} onChange={(e) => update('email', e.target.value)} onBlur={() => blur('email')} placeholder="you@example.com" autoComplete="email" />
-                  {touched.email && form.email && (
-                    <span className={`${styles.inputStatus} ${errors.email ? styles.statusError : styles.statusOk}`}>
-                      {errors.email ? <X size={13} /> : <Check size={13} />}
-                    </span>
+              {(mode === 'login' || mode === 'signup' || mode === 'forgot') && (
+                <div className={styles.field}>
+                  <label className={styles.label}>Email address</label>
+                  <div className={styles.inputWrap}>
+                    <Mail size={15} className={styles.inputIcon} />
+                    <input ref={emailRef} className={`${styles.input} ${touched.email && errors.email ? styles.inputError : ''} ${touched.email && !errors.email && form.email ? styles.inputSuccess : ''}`} type="email" value={form.email} onChange={(e) => update('email', e.target.value)} onBlur={() => blur('email')} placeholder="you@example.com" autoComplete="email" />
+                    {touched.email && form.email && (
+                      <span className={`${styles.inputStatus} ${errors.email ? styles.statusError : styles.statusOk}`}>
+                        {errors.email ? <X size={13} /> : <Check size={13} />}
+                      </span>
+                    )}
+                  </div>
+                  {touched.email && errors.email && <span className={styles.error}>{errors.email}</span>}
+                </div>
+              )}
+
+              {(mode === 'login' || mode === 'signup' || mode === 'reset') && (
+                <div className={styles.field}>
+                  <div className={styles.labelRow}>
+                    <label className={styles.label}>{mode === 'reset' ? 'New password' : 'Password'}</label>
+                    {mode === 'login' && (
+                      <button type="button" className={styles.forgotLink} onClick={() => switchMode('forgot')}>
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className={styles.inputWrap}>
+                    <Lock size={15} className={styles.inputIcon} />
+                    <input className={`${styles.input} ${touched.password && errors.password && (mode === 'signup' || mode === 'reset') ? styles.inputError : ''}`} type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => update('password', e.target.value)} onBlur={() => blur('password')} placeholder="••••••••" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+                    <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword((p) => !p)} tabIndex={-1}>
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                  {(mode === 'signup' || mode === 'reset') && form.password && (
+                    <div className={styles.strengthArea}>
+                      <div className={styles.strengthBar}>
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className={styles.strengthSeg} style={{ background: i <= passStrength.level ? passStrength.color : 'var(--border-default)', transform: i <= passStrength.level ? 'scaleY(1)' : 'scaleY(0.6)' }} />
+                        ))}
+                      </div>
+                      {passStrength.label && <span className={styles.strengthLabel} style={{ color: passStrength.color }}>{passStrength.label}</span>}
+                    </div>
+                  )}
+                  {(mode === 'signup' || mode === 'reset') && form.password && (
+                    <div className={styles.rulesList}>
+                      {PASSWORD_RULES.map((r, i) => {
+                        const ok = r.test(form.password)
+                        return (
+                          <span key={i} className={`${styles.rule} ${ok ? styles.ruleOk : ''}`}>
+                            {ok ? <Check size={10} /> : <X size={10} />}
+                            {r.label}
+                          </span>
+                        )
+                      })}
+                    </div>
                   )}
                 </div>
-                {touched.email && errors.email && <span className={styles.error}>{errors.email}</span>}
-              </div>
+              )}
 
-              <div className={styles.field}>
-                <label className={styles.label}>Password</label>
-                <div className={styles.inputWrap}>
-                  <Lock size={15} className={styles.inputIcon} />
-                  <input className={`${styles.input} ${touched.password && errors.password && mode === 'signup' ? styles.inputError : ''}`} type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => update('password', e.target.value)} onBlur={() => blur('password')} placeholder="••••••••" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
-                  <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword((p) => !p)} tabIndex={-1}>
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-                {mode === 'signup' && form.password && (
-                  <div className={styles.strengthArea}>
-                    <div className={styles.strengthBar}>
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className={styles.strengthSeg} style={{ background: i <= passStrength.level ? passStrength.color : 'var(--border-default)', transform: i <= passStrength.level ? 'scaleY(1)' : 'scaleY(0.6)' }} />
-                      ))}
-                    </div>
-                    {passStrength.label && <span className={styles.strengthLabel} style={{ color: passStrength.color }}>{passStrength.label}</span>}
-                  </div>
-                )}
-                {mode === 'signup' && form.password && (
-                  <div className={styles.rulesList}>
-                    {PASSWORD_RULES.map((r, i) => {
-                      const ok = r.test(form.password)
-                      return (
-                        <span key={i} className={`${styles.rule} ${ok ? styles.ruleOk : ''}`}>
-                          {ok ? <Check size={10} /> : <X size={10} />}
-                          {r.label}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {mode === 'signup' && (
+              {(mode === 'signup' || mode === 'reset') && (
                 <div className={styles.field}>
                   <label className={styles.label}>Confirm password</label>
                   <div className={styles.inputWrap}>
@@ -251,24 +317,45 @@ export function AuthPage({ onAuth }) {
 
               {serverError && <div className={styles.serverError}>{serverError}</div>}
 
-              <button type="submit" className={styles.submitBtn} disabled={loading || (mode === 'signup' ? !isSignupValid() : !isLoginValid())}>
+              <button type="submit" className={styles.submitBtn} disabled={loading || (mode === 'signup' ? !isSignupValid() : mode === 'forgot' ? !form.email || !!errors.email : mode === 'reset' ? !form.password || !form.confirm_password || !!errors.password || !!errors.confirm_password : !isLoginValid())}>
                 {loading ? <span className={styles.spinner} /> : (
                   <>
-                    {mode === 'login' ? 'Sign In' : 'Create Account'}
+                    {mode === 'login' && 'Sign In'}
+                    {mode === 'signup' && 'Create Account'}
+                    {mode === 'forgot' && 'Send Reset Link'}
+                    {mode === 'reset' && 'Reset Password'}
                     <ArrowRight size={16} />
                   </>
                 )}
               </button>
             </form>
+            )}
 
-            <div className={styles.divider}><span>or</span></div>
+            {(mode === 'login' || mode === 'signup') && (
+              <>
+                <div className={styles.divider}><span>or</span></div>
+                <p className={styles.switchText}>
+                  {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                  <button type="button" className={styles.switchLink} onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}>
+                    {mode === 'login' ? 'Create one' : 'Sign in'}
+                  </button>
+                </p>
+              </>
+            )}
 
-            <p className={styles.switchText}>
-              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-              <button type="button" className={styles.switchLink} onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}>
-                {mode === 'login' ? 'Create one' : 'Sign in'}
-              </button>
-            </p>
+            {mode === 'forgot' && successMessage && (
+              <p className={styles.switchText} style={{ marginTop: '16px' }}>
+                <button type="button" className={styles.switchLink} onClick={() => switchMode('login')}>
+                  Back to Sign In
+                </button>
+              </p>
+            )}
+
+            {mode === 'reset' && successMessage && (
+              <p className={styles.switchText} style={{ marginTop: '16px' }}>
+                Redirecting to login...
+              </p>
+            )}
           </div>
         </div>
       </div>

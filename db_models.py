@@ -66,9 +66,20 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+    user: Mapped["User"] = relationship(backref="sessions")
     messages: Mapped[list["Message"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "title": self.title,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class Message(Base):

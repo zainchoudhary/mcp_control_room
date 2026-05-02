@@ -371,6 +371,9 @@
   border-radius: 50%;
   background: var(--text-tertiary);
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toggle input:checked + .toggleTrack {
@@ -381,6 +384,22 @@
 .toggle input:checked + .toggleTrack .toggleKnob {
   transform: translateX(16px);
   background: white;
+}
+
+/* ── Toggle Loading ── */
+
+.toggleLoading {
+  animation: togglePulse 1s ease-in-out infinite;
+}
+
+.toggleSpinner {
+  animation: spin 0.7s linear infinite;
+  color: inherit;
+}
+
+@keyframes togglePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 /* ── Row Actions ── */

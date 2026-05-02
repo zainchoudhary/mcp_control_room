@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot, Sun, Moon, LogOut, User } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Plus, MessageSquare, PanelLeftClose, PanelLeft, Server, Trash2, Bot, Sun, Moon, LogOut, MoreVertical } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
 export function Sidebar({
@@ -18,6 +18,19 @@ export function Sidebar({
   onLogout,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [userMenuOpen])
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
@@ -94,7 +107,7 @@ export function Sidebar({
             </div>
 
             {user && (
-              <div className={styles.userRow}>
+              <div className={styles.userRow} ref={menuRef}>
                 <div className={styles.userAvatar}>
                   {(user.full_name || user.username || '?')[0].toUpperCase()}
                 </div>
@@ -102,9 +115,24 @@ export function Sidebar({
                   <span className={styles.userName}>{user.full_name || user.username}</span>
                   <span className={styles.userEmail}>{user.email}</span>
                 </div>
-                <button className={styles.logoutSideBtn} onClick={onLogout} title="Sign out">
-                  <LogOut size={14} />
+                <button
+                  className={`${styles.dotsBtn} ${userMenuOpen ? styles.dotsBtnActive : ''}`}
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  title="Options"
+                >
+                  <MoreVertical size={16} />
                 </button>
+                {userMenuOpen && (
+                  <div className={styles.userMenu}>
+                    <button
+                      className={styles.userMenuItem}
+                      onClick={() => { setUserMenuOpen(false); onLogout() }}
+                    >
+                      <LogOut size={14} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

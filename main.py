@@ -32,7 +32,8 @@ from db_config import init_db, get_db, AsyncSessionLocal
 from database import (
     register_mcp, list_mcps, get_mcp,
     set_mcp_connection, delete_mcp, get_connected_mcps,
-    create_session, save_message, get_session_messages,
+    create_session, list_user_sessions, update_session_title,
+    delete_session, save_message, get_session_messages,
 )
 from mcp_manager import get_mcp_tools, probe_mcp
 from agent import stream_agent_response
@@ -185,13 +186,48 @@ async def api_probe_mcp(
 
 # ─── Routes: Sessions ────────────────────────────────────────────────────────
 
+@app.get("/api/sessions")
+async def api_list_sessions(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all chat sessions for the current user."""
+    return await list_user_sessions(db, user["id"])
+
+
 @app.post("/api/sessions", status_code=201)
 async def api_create_session(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    session_id = await create_session(db)
-    return {"session_id": session_id}
+    session = await create_session(db, user["id"])
+    return session
+
+
+@app.patch("/api/sessions/{session_id}")
+async def api_update_session(
+    session_id: str,
+    body: dict,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update session title."""
+    title = body.get("title")
+    if title:
+        await update_session_title(db, session_id, title)
+    return {"id": session_id, "title": title}
+
+
+@app.delete("/api/sessions/{session_id}", status_code=204)
+async def api_delete_session(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a chat session and its messages."""
+    deleted = await delete_session(db, session_id, user["id"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found.")
 
 
 @app.get("/api/sessions/{session_id}/messages")
@@ -218,6 +254,11 @@ async def api_chat_stream(
     """
     history = await get_session_messages(db, body.session_id)
     await save_message(db, body.session_id, "user", body.message)
+
+    if not history:
+        title = body.message[:80] + ("..." if len(body.message) > 80 else "")
+        await update_session_title(db, body.session_id, title)
+
     connected_mcps = await get_connected_mcps(db)
     session_id = body.session_id
     user_message = body.message

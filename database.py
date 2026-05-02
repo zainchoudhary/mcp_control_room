@@ -1,8 +1,8 @@
 """
-database.py - MCP registry, sessions, and messages persistence layer (SQLAlchemy + MySQL).
+database.py - MCP registry, sessions, and messages persistence layer (SQLAlchemy + PostgreSQL).
 """
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_models import MCP, ChatSession, Message
@@ -60,13 +60,46 @@ async def get_connected_mcps(db: AsyncSession) -> list:
     return [row.to_dict() for row in result.scalars().all()]
 
 
-async def create_session(db: AsyncSession) -> str:
-    """Create a new chat session."""
-    session = ChatSession()
+async def create_session(db: AsyncSession, user_id: str, title: Optional[str] = None) -> dict:
+    """Create a new chat session for a user."""
+    session = ChatSession(user_id=user_id, title=title)
     db.add(session)
     await db.commit()
     await db.refresh(session)
-    return session.id
+    return session.to_dict()
+
+
+async def list_user_sessions(db: AsyncSession, user_id: str) -> list:
+    """List all chat sessions for a user, newest first."""
+    result = await db.execute(
+        select(ChatSession)
+        .where(ChatSession.user_id == user_id)
+        .order_by(ChatSession.created_at.desc())
+    )
+    return [row.to_dict() for row in result.scalars().all()]
+
+
+async def update_session_title(db: AsyncSession, session_id: str, title: str):
+    """Update a session's title."""
+    await db.execute(
+        update(ChatSession)
+        .where(ChatSession.id == session_id)
+        .values(title=title)
+    )
+    await db.commit()
+
+
+async def delete_session(db: AsyncSession, session_id: str, user_id: str):
+    """Delete a session and its messages (only if owned by user)."""
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id)
+    )
+    session = result.scalar_one_or_none()
+    if session:
+        await db.delete(session)
+        await db.commit()
+        return True
+    return False
 
 
 async def save_message(db: AsyncSession, session_id: str, role: str, content: str):

@@ -98,6 +98,52 @@ class AuthResponse(BaseModel):
     user: dict
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v:
+            raise ValueError("Email is required.")
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(pattern, v):
+            raise ValueError("Please enter a valid email address.")
+        return v
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+    confirm_password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 128:
+            raise ValueError("Password must not exceed 128 characters.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit.")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", v):
+            raise ValueError("Password must contain at least one special character.")
+        return v
+
+    @field_validator("confirm_password")
+    @classmethod
+    def validate_confirm_password(cls, v: str, info) -> str:
+        password = info.data.get("password")
+        if password and v != password:
+            raise ValueError("Passwords do not match.")
+        return v
+
+
 class UserResponse(BaseModel):
     id: str
     username: str

@@ -32,7 +32,10 @@ export const disconnectMCP = (id) => request(`/mcps/${id}/disconnect`, { method:
 export const probeMCP = (id) => request(`/mcps/${id}/probe`, { method: 'POST' })
 
 // Sessions
+export const listSessions = () => request('/sessions')
 export const createSession = () => request('/sessions', { method: 'POST' })
+export const updateSession = (id, body) => request(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+export const deleteSessionApi = (id) => request(`/sessions/${id}`, { method: 'DELETE' })
 export const getMessages = (id) => request(`/sessions/${id}/messages`)
 
 // Chat Stream

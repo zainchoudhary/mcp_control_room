@@ -212,6 +212,86 @@
   color: var(--text-tertiary);
 }
 
+/* ── Back Button ── */
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.backBtn:hover {
+  color: var(--accent);
+}
+
+/* ── Forgot Icon ── */
+
+.forgotIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+/* ── Forgot Link ── */
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.forgotLink {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.forgotLink:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* ── Success Box ── */
+
+.successBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(16, 163, 127, 0.08);
+  border: 1px solid rgba(16, 163, 127, 0.2);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--accent);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.successBox svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 /* ── Tabs ── */
 
 .tabs {

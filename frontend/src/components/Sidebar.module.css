@@ -276,6 +276,7 @@
 /* ── User Row ── */
 
 .userRow {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -322,7 +323,9 @@
   text-overflow: ellipsis;
 }
 
-.logoutSideBtn {
+/* ── 3-Dots Menu ── */
+
+.dotsBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,9 +337,57 @@
   color: var(--text-tertiary);
   transition: var(--transition-fast);
   flex-shrink: 0;
+  cursor: pointer;
 }
 
-.logoutSideBtn:hover {
+.dotsBtn:hover,
+.dotsBtnActive {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.userMenu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 8px;
+  min-width: 160px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  z-index: 50;
+  animation: menuFadeIn 0.15s ease;
+}
+
+@keyframes menuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.userMenuItem:hover {
   background: var(--red-light);
   color: var(--red);
 }
