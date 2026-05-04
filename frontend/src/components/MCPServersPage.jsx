@@ -288,7 +288,7 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
               {probing ? (
                 <div className={styles.toolsProbing}>
                   <Loader2 size={20} className={styles.toolsLoader} />
-                  <span>Probing server for tools...</span>
+                  <span>Loading tools...</span>
                 </div>
               ) : probeError ? (
                 <div className={styles.toolsError}>

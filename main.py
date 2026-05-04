@@ -108,7 +108,7 @@ async def api_list_mcps(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await list_mcps(db)
+    return await list_mcps(db, user["id"])
 
 
 @app.post("/api/mcps", status_code=201)
@@ -117,7 +117,7 @@ async def api_register_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    existing = await list_mcps(db)
+    existing = await list_mcps(db, user["id"])
     if any(m["name"] == body.name for m in existing):
         raise HTTPException(status_code=409, detail=f"MCP with name '{body.name}' already exists.")
     url = body.url.rstrip("/")
@@ -131,7 +131,7 @@ async def api_register_mcp(
             detail="Server unreachable. Please check the URL and ensure the server is running.",
         )
 
-    mcp = await register_mcp(db, body.name, url, body.transport, body.description)
+    mcp = await register_mcp(db, user["id"], body.name, url, body.transport, body.description)
     return mcp
 
 
@@ -141,7 +141,7 @@ async def api_get_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    mcp = await get_mcp(db, mcp_id)
+    mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
     return mcp
@@ -153,10 +153,10 @@ async def api_delete_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    mcp = await get_mcp(db, mcp_id)
+    mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await delete_mcp(db, mcp_id)
+    await delete_mcp(db, mcp_id, user["id"])
 
 
 @app.post("/api/mcps/{mcp_id}/connect")
@@ -165,10 +165,10 @@ async def api_connect_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    mcp = await get_mcp(db, mcp_id)
+    mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await set_mcp_connection(db, mcp_id, True)
+    await set_mcp_connection(db, mcp_id, user["id"], True)
     return {"id": mcp_id, "connected": True}
 
 
@@ -178,10 +178,10 @@ async def api_disconnect_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    mcp = await get_mcp(db, mcp_id)
+    mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
-    await set_mcp_connection(db, mcp_id, False)
+    await set_mcp_connection(db, mcp_id, user["id"], False)
     return {"id": mcp_id, "connected": False}
 
 
@@ -192,7 +192,7 @@ async def api_probe_mcp(
     db: AsyncSession = Depends(get_db),
 ):
     """Probe MCP endpoint to check reachability and list available tools."""
-    mcp = await get_mcp(db, mcp_id)
+    mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
     result = await probe_mcp(mcp["url"], mcp["transport"])
@@ -274,7 +274,7 @@ async def api_chat_stream(
         title = body.message[:80] + ("..." if len(body.message) > 80 else "")
         await update_session_title(db, body.session_id, title)
 
-    connected_mcps = await get_connected_mcps(db)
+    connected_mcps = await get_connected_mcps(db, user["id"])
     session_id = body.session_id
     user_message = body.message
 

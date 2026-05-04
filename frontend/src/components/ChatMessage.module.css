@@ -298,9 +298,13 @@
 }
 
 @media (max-width: 768px) {
+  .message {
+    padding: 16px 0;
+  }
+
   .messageInner {
-    padding: 0 16px;
-    gap: 12px;
+    padding: 0 14px;
+    gap: 10px;
   }
 
   .avatar {
@@ -310,5 +314,43 @@
 
   .messageContent {
     font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .codeHeader {
+    padding: 6px 12px;
+  }
+
+  .toolInput, .toolOutput {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .list {
+    padding-left: 18px;
+  }
+
+  .actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .messageInner {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .avatar {
+    width: 24px;
+    height: 24px;
+  }
+
+  .messageContent {
+    font-size: 13px;
+  }
+
+  .roleName {
+    font-size: 13px;
   }
 }

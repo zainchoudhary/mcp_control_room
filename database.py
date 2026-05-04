@@ -10,53 +10,58 @@ from db_models import MCP, ChatSession, Message
 
 async def register_mcp(
     db: AsyncSession,
+    user_id: str,
     name: str,
     url: str,
     transport: str,
     description: Optional[str] = None,
 ) -> dict:
-    """Register a new MCP server."""
-    mcp = MCP(name=name, url=url, transport=transport, description=description)
+    """Register a new MCP server for a user."""
+    mcp = MCP(user_id=user_id, name=name, url=url, transport=transport, description=description)
     db.add(mcp)
     await db.commit()
     await db.refresh(mcp)
     return mcp.to_dict()
 
 
-async def list_mcps(db: AsyncSession) -> list:
-    """List all registered MCPs."""
-    result = await db.execute(select(MCP).order_by(MCP.created_at.desc()))
+async def list_mcps(db: AsyncSession, user_id: str) -> list:
+    """List all registered MCPs for a user."""
+    result = await db.execute(
+        select(MCP).where(MCP.user_id == user_id).order_by(MCP.created_at.desc())
+    )
     return [row.to_dict() for row in result.scalars().all()]
 
 
-async def get_mcp(db: AsyncSession, mcp_id: str) -> Optional[dict]:
-    """Get a single MCP by ID."""
-    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+async def get_mcp(db: AsyncSession, mcp_id: str, user_id: str) -> Optional[dict]:
+    """Get a single MCP by ID, scoped to user."""
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id, MCP.user_id == user_id))
     mcp = result.scalar_one_or_none()
     return mcp.to_dict() if mcp else None
 
 
-async def set_mcp_connection(db: AsyncSession, mcp_id: str, connected: bool):
-    """Toggle MCP connection status."""
-    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+async def set_mcp_connection(db: AsyncSession, mcp_id: str, user_id: str, connected: bool):
+    """Toggle MCP connection status (only if owned by user)."""
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id, MCP.user_id == user_id))
     mcp = result.scalar_one_or_none()
     if mcp:
         mcp.connected = connected
         await db.commit()
 
 
-async def delete_mcp(db: AsyncSession, mcp_id: str):
-    """Delete an MCP by ID."""
-    result = await db.execute(select(MCP).where(MCP.id == mcp_id))
+async def delete_mcp(db: AsyncSession, mcp_id: str, user_id: str):
+    """Delete an MCP by ID (only if owned by user)."""
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id, MCP.user_id == user_id))
     mcp = result.scalar_one_or_none()
     if mcp:
         await db.delete(mcp)
         await db.commit()
 
 
-async def get_connected_mcps(db: AsyncSession) -> list:
-    """Get all connected MCPs."""
-    result = await db.execute(select(MCP).where(MCP.connected == True))  # noqa: E712
+async def get_connected_mcps(db: AsyncSession, user_id: str) -> list:
+    """Get all connected MCPs for a user."""
+    result = await db.execute(
+        select(MCP).where(MCP.user_id == user_id, MCP.connected == True)  # noqa: E712
+    )
     return [row.to_dict() for row in result.scalars().all()]
 
 

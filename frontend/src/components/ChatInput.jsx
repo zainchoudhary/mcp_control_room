@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Plus, Server } from 'lucide-react'
+import { ArrowUp, Loader2, Plus, Server, Plug, ChevronRight } from 'lucide-react'
 import styles from './ChatInput.module.css'
 
 export function ChatInput({
@@ -9,10 +9,15 @@ export function ChatInput({
   sending,
   connectedCount,
   onOpenRegister,
+  mcps,
+  onConnect,
+  onDisconnect,
+  togglingMcp,
 }) {
   const textareaRef = useRef(null)
-  const menuRef = useRef(null)
+  const wrapperRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showConnectors, setShowConnectors] = useState(false)
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current
@@ -27,7 +32,10 @@ export function ChatInput({
   useEffect(() => {
     if (!menuOpen) return
     const handleClick = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setMenuOpen(false)
+        setShowConnectors(false)
+      }
     }
     window.addEventListener('mousedown', handleClick)
     return () => window.removeEventListener('mousedown', handleClick)
@@ -38,6 +46,13 @@ export function ChatInput({
       e.preventDefault()
       onSend()
     }
+  }
+
+  const toggleMenu = () => {
+    setMenuOpen((v) => {
+      if (v) setShowConnectors(false)
+      return !v
+    })
   }
 
   const canSend = value.trim() && !sending
@@ -59,28 +74,80 @@ export function ChatInput({
         </div>
 
         <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft} ref={menuRef}>
+          <div className={styles.toolbarLeft} ref={wrapperRef}>
             <button
               type="button"
               className={`${styles.plusBtn} ${menuOpen ? styles.plusBtnActive : ''}`}
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={toggleMenu}
               title="Options"
             >
               <Plus size={18} />
+              {connectedCount > 0 && (
+                <span className={styles.badge}>{connectedCount}</span>
+              )}
             </button>
 
             {menuOpen && (
-              <div className={styles.plusMenu}>
-                <button
-                  className={styles.plusMenuItem}
-                  onClick={() => { setMenuOpen(false); onOpenRegister() }}
-                >
-                  <div className={styles.plusMenuIcon}><Server size={15} /></div>
-                  <div className={styles.plusMenuText}>
-                    <span className={styles.plusMenuTitle}>Register MCP Server</span>
-                    <span className={styles.plusMenuHint}>Add a new MCP server</span>
+              <div className={styles.floatingGroup}>
+                <div className={styles.plusMenu}>
+                  <button
+                    className={`${styles.plusMenuItem} ${showConnectors ? styles.plusMenuItemActive : ''}`}
+                    onClick={() => setShowConnectors((v) => !v)}
+                  >
+                    <div className={styles.plusMenuIcon}><Plug size={15} /></div>
+                    <div className={styles.plusMenuText}>
+                      <span className={styles.plusMenuTitle}>Connectors</span>
+                      <span className={styles.plusMenuHint}>
+                        {mcps.length === 0 ? 'No servers registered' : `${connectedCount} of ${mcps.length} connected`}
+                      </span>
+                    </div>
+                    <ChevronRight size={15} className={`${styles.plusMenuArrow} ${showConnectors ? styles.arrowRotated : ''}`} />
+                  </button>
+                  <button
+                    className={styles.plusMenuItem}
+                    onClick={() => { setMenuOpen(false); setShowConnectors(false); onOpenRegister() }}
+                  >
+                    <div className={styles.plusMenuIcon}><Server size={15} /></div>
+                    <div className={styles.plusMenuText}>
+                      <span className={styles.plusMenuTitle}>Register Server</span>
+                      <span className={styles.plusMenuHint}>Add a new MCP server</span>
+                    </div>
+                  </button>
+                </div>
+
+                {showConnectors && (
+                  <div className={styles.connPanel}>
+                    <div className={styles.connPanelBody}>
+                      {mcps.length === 0 ? (
+                        <div className={styles.connPanelEmpty}>
+                          <div className={styles.emptyIcon}><Plug size={22} /></div>
+                          <p>No servers registered</p>
+                          <button
+                            className={styles.emptyRegBtn}
+                            onClick={() => { setMenuOpen(false); setShowConnectors(false); onOpenRegister() }}
+                          >
+                            Register a server
+                          </button>
+                        </div>
+                      ) : (
+                        mcps.map((mcp) => (
+                          <ConnectorRow
+                            key={mcp.id}
+                            mcp={mcp}
+                            onConnect={onConnect}
+                            onDisconnect={onDisconnect}
+                            isToggling={togglingMcp === mcp.id}
+                          />
+                        ))
+                      )}
+                    </div>
+                    {mcps.length > 0 && (
+                      <div className={styles.connPanelFooter}>
+                        {connectedCount} of {mcps.length} connected
+                      </div>
+                    )}
                   </div>
-                </button>
+                )}
               </div>
             )}
 
@@ -105,6 +172,38 @@ export function ChatInput({
       <p className={styles.disclaimer}>
         ToolChain AI can make mistakes. Verify important information.
       </p>
+    </div>
+  )
+}
+
+function ConnectorRow({ mcp, onConnect, onDisconnect, isToggling }) {
+  const handleToggle = () => {
+    if (isToggling) return
+    if (mcp.connected) onDisconnect(mcp.id)
+    else onConnect(mcp.id)
+  }
+
+  return (
+    <div className={styles.connRow}>
+      <div className={styles.connInfo}>
+        <div className={`${styles.connDot} ${mcp.connected ? styles.connDotOn : ''}`} />
+        <div className={styles.connDetails}>
+          <span className={styles.connName}>{mcp.name}</span>
+          <span className={styles.connStatus}>
+            {isToggling ? (mcp.connected ? 'Disconnecting...' : 'Connecting...') : mcp.connected ? 'Connected' : 'Disconnected'}
+          </span>
+        </div>
+      </div>
+      <button
+        className={`${styles.switchTrack} ${mcp.connected ? styles.switchOn : ''} ${isToggling ? styles.switchToggling : ''}`}
+        onClick={handleToggle}
+        disabled={isToggling}
+        aria-label={mcp.connected ? 'Disconnect' : 'Connect'}
+      >
+        <span className={styles.switchThumb}>
+          {isToggling && <Loader2 size={10} className={styles.thumbSpinner} />}
+        </span>
+      </button>
     </div>
   )
 }

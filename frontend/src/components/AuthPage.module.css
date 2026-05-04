@@ -688,4 +688,37 @@
   .cardTitle {
     font-size: 20px;
   }
+
+  .submitBtn {
+    padding: 11px;
+    font-size: 14px;
+  }
+
+  .input {
+    padding: 9px 36px 9px 34px;
+    font-size: 15px;
+  }
+
+  .tabs {
+    margin-bottom: 16px;
+  }
+
+  .tab {
+    padding: 7px 0;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 380px) {
+  .formScroll {
+    padding: 12px;
+  }
+
+  .cardTitle {
+    font-size: 18px;
+  }
+
+  .cardSubtitle {
+    font-size: 13px;
+  }
 }

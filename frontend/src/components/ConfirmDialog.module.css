@@ -141,12 +141,36 @@
   background: #d97706;
 }
 
+@media (max-width: 768px) {
+  .overlay {
+    padding: 16px;
+  }
+
+  .dialog {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 480px) {
+  .overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
   .dialog {
     padding: 24px 20px 16px;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius) var(--radius);
   }
 
   .actions {
     flex-direction: column-reverse;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .message {
+    font-size: 13px;
   }
 }

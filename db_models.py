@@ -43,6 +43,7 @@ class MCP(Base):
     __tablename__ = "mcps"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     transport: Mapped[str] = mapped_column(String(50), nullable=False, default="sse")
@@ -50,9 +51,12 @@ class MCP(Base):
     connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+    user: Mapped["User"] = relationship(backref="mcps")
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "user_id": self.user_id,
             "name": self.name,
             "url": self.url,
             "transport": self.transport,

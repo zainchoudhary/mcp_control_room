@@ -19,6 +19,8 @@
   max-width: 100%;
   box-shadow: var(--shadow-lg);
   animation: slideUp 0.2s ease;
+  overflow: hidden;
+  border-top: 2px solid var(--accent);
 }
 
 .header {
@@ -192,6 +194,20 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@media (max-width: 768px) {
+  .overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 90vh;
+    border-top: 2px solid var(--accent);
+  }
+}
+
 @media (max-width: 640px) {
   .row {
     grid-template-columns: 1fr;
@@ -204,5 +220,13 @@
   .btnCancel, .btnSubmit {
     width: 100%;
     text-align: center;
+  }
+
+  .header {
+    padding: 16px 18px;
+  }
+
+  .body {
+    padding: 16px 18px;
   }
 }

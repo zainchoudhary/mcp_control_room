@@ -5,6 +5,10 @@
   background: var(--bg-primary);
 }
 
+.mobileHeader {
+  display: none;
+}
+
 .main {
   flex: 1;
   display: flex;
@@ -126,6 +130,7 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
+  box-shadow: 0 0 24px var(--accent-light), 0 0 48px rgba(16, 163, 127, 0.08);
 }
 
 .welcomeTitle {
@@ -165,8 +170,8 @@
 }
 
 .suggestionBtn:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-strong);
+  background: var(--accent-light);
+  border-color: var(--accent-border);
   color: var(--text-primary);
 }
 
@@ -191,16 +196,84 @@
 /* ── Responsive ── */
 
 @media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .mobileHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    z-index: 50;
+  }
+
+  .mobileMenuBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+  }
+
+  .mobileMenuBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .mobileHeaderBrand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .mobileHeaderIcon {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .main {
+    height: 0;
+    flex: 1;
+  }
+
   .suggestions {
     grid-template-columns: 1fr;
   }
 
   .welcomeTitle {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .welcomeSubtitle {
     font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .welcomeIcon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .skeletonWrap {
+    padding: 24px 16px;
   }
 }
 
@@ -210,7 +283,7 @@
   }
 
   .welcomeTitle {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .suggestionBtn {

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
-  Plus, Trash2, Bot, Sun, Moon, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings, Check,
+  Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
+  Settings,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -16,8 +16,7 @@ export function Sidebar({
   onDeleteSession,
   collapsed,
   onToggleCollapse,
-  theme,
-  onToggleTheme,
+  onOpenSettings,
   user,
   onLogout,
   mcpCount,
@@ -26,19 +25,23 @@ export function Sidebar({
   const [hoveredSession, setHoveredSession] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(true)
-  const [prefsOpen, setPrefsOpen] = useState(false)
   const menuRef = useRef(null)
-  const prefsRef = useRef(null)
+  const collapsedMenuRef = useRef(null)
 
   useEffect(() => {
-    if (!userMenuOpen && !prefsOpen) return
+    if (!userMenuOpen) return
     const handleClickOutside = (e) => {
-      if (userMenuOpen && menuRef.current && !menuRef.current.contains(e.target)) setUserMenuOpen(false)
-      if (prefsOpen && prefsRef.current && !prefsRef.current.contains(e.target)) setPrefsOpen(false)
+      const inMenu = (menuRef.current && menuRef.current.contains(e.target)) ||
+        (collapsedMenuRef.current && collapsedMenuRef.current.contains(e.target))
+      if (!inMenu) setUserMenuOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [userMenuOpen, prefsOpen])
+  }, [userMenuOpen])
+
+  useEffect(() => {
+    setUserMenuOpen(false)
+  }, [collapsed])
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -47,6 +50,8 @@ export function Sidebar({
   ]
 
   return (
+    <>
+    {!collapsed && <div className={styles.mobileOverlay} onClick={onToggleCollapse} />}
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <div className={styles.top}>
         <button className={styles.toggleBtn} onClick={onToggleCollapse} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
@@ -78,39 +83,27 @@ export function Sidebar({
 
           <div className={styles.collapsedSpacer} />
 
-          <div className={styles.collapsedPrefsWrap} ref={prefsRef}>
-            <button
-              className={`${styles.collapsedBtn} ${prefsOpen ? styles.collapsedBtnActive : ''}`}
-              onClick={() => setPrefsOpen((v) => !v)}
-              title="Preferences"
-            >
-              <Settings size={18} />
-            </button>
-            {prefsOpen && (
-              <div className={styles.collapsedPrefsMenu}>
-                <div className={styles.prefsLabel}>Theme</div>
-                <button
-                  className={`${styles.prefsOption} ${theme === 'light' ? styles.prefsOptionActive : ''}`}
-                  onClick={() => { if (theme !== 'light') onToggleTheme(); }}
-                >
-                  <Sun size={14} />
-                  <span>Light</span>
-                  {theme === 'light' && <Check size={14} className={styles.prefsCheck} />}
-                </button>
-                <button
-                  className={`${styles.prefsOption} ${theme === 'dark' ? styles.prefsOptionActive : ''}`}
-                  onClick={() => { if (theme !== 'dark') onToggleTheme(); }}
-                >
-                  <Moon size={14} />
-                  <span>Dark</span>
-                  {theme === 'dark' && <Check size={14} className={styles.prefsCheck} />}
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            className={styles.collapsedBtn}
+            onClick={onOpenSettings}
+            title="Settings"
+          >
+            <Settings size={18} />
+          </button>
 
           {user && (
-            <div className={styles.collapsedUserWrap} ref={menuRef}>
+            <>
+              {userMenuOpen && (
+                <div className={styles.collapsedInlineMenu} ref={collapsedMenuRef}>
+                  <button
+                    className={styles.collapsedInlineBtn}
+                    onClick={() => { setUserMenuOpen(false); onLogout() }}
+                    title="Sign Out"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+              )}
               <button
                 className={`${styles.collapsedUserBtn} ${userMenuOpen ? styles.collapsedUserBtnActive : ''}`}
                 onClick={() => setUserMenuOpen((v) => !v)}
@@ -118,18 +111,7 @@ export function Sidebar({
               >
                 {(user.full_name || user.username || '?')[0].toUpperCase()}
               </button>
-              {userMenuOpen && (
-                <div className={styles.collapsedUserMenu}>
-                  <button
-                    className={styles.userMenuItem}
-                    onClick={() => { setUserMenuOpen(false); onLogout() }}
-                  >
-                    <LogOut size={14} />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            </>
           )}
         </div>
       ) : (
@@ -202,36 +184,10 @@ export function Sidebar({
           </nav>
 
           <div className={styles.bottom}>
-            <div className={styles.prefsWrap} ref={prefsRef}>
-              <button
-                className={`${styles.prefsBtn} ${prefsOpen ? styles.prefsBtnActive : ''}`}
-                onClick={() => setPrefsOpen((v) => !v)}
-              >
-                <Settings size={15} />
-                <span>Preferences</span>
-              </button>
-              {prefsOpen && (
-                <div className={styles.prefsMenu}>
-                  <div className={styles.prefsLabel}>Theme</div>
-                  <button
-                    className={`${styles.prefsOption} ${theme === 'light' ? styles.prefsOptionActive : ''}`}
-                    onClick={() => { if (theme !== 'light') onToggleTheme(); }}
-                  >
-                    <Sun size={14} />
-                    <span>Light</span>
-                    {theme === 'light' && <Check size={14} className={styles.prefsCheck} />}
-                  </button>
-                  <button
-                    className={`${styles.prefsOption} ${theme === 'dark' ? styles.prefsOptionActive : ''}`}
-                    onClick={() => { if (theme !== 'dark') onToggleTheme(); }}
-                  >
-                    <Moon size={14} />
-                    <span>Dark</span>
-                    {theme === 'dark' && <Check size={14} className={styles.prefsCheck} />}
-                  </button>
-                </div>
-              )}
-            </div>
+            <button className={styles.settingsBtn} onClick={onOpenSettings}>
+              <Settings size={15} />
+              <span>Settings</span>
+            </button>
 
             {user && (
               <div className={styles.userRow} ref={menuRef}>
@@ -266,5 +222,6 @@ export function Sidebar({
         </>
       )}
     </aside>
+    </>
   )
 }

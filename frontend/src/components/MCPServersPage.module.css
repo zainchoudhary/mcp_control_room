@@ -17,12 +17,25 @@
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 
 .subtitle {
   font-size: 14px;
   color: var(--text-tertiary);
   margin-top: 4px;
+  padding-left: 14px;
 }
 
 .addBtn {
@@ -59,12 +72,13 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: var(--bg-tertiary);
-  color: var(--text-tertiary);
+  background: var(--accent-light);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
+  border: 1px solid var(--accent-border);
 }
 
 .emptyTitle {
@@ -117,6 +131,19 @@
   padding: 20px;
   transition: var(--transition);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--border-subtle);
+  transition: var(--transition);
 }
 
 .card:hover {
@@ -125,12 +152,26 @@
   box-shadow: var(--shadow);
 }
 
+.card:hover::before {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
 .cardConnected {
   border-color: var(--accent-border);
 }
 
+.cardConnected::before {
+  background: var(--accent);
+  height: 2px;
+}
+
 .cardConnected:hover {
   border-color: var(--accent);
+}
+
+.cardConnected:hover::before {
+  opacity: 1;
 }
 
 .cardTop {
@@ -393,6 +434,7 @@
   background: var(--accent-light);
   color: var(--accent);
   border-color: var(--accent-border);
+  box-shadow: 0 0 12px var(--accent-light);
 }
 
 .modalTitle {
@@ -752,11 +794,22 @@
 
 @media (max-width: 768px) {
   .page {
-    padding: 24px 16px;
+    padding: 20px 16px;
   }
 
   .header {
     flex-direction: column;
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .addBtn {
+    width: 100%;
+    justify-content: center;
+    border-radius: var(--radius);
   }
 
   .grid {
@@ -764,11 +817,40 @@
   }
 
   .overlay {
-    padding: 12px;
+    padding: 10px;
+    align-items: flex-end;
   }
 
   .modal {
-    max-height: calc(100vh - 24px);
+    max-height: 90vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .modalHeader {
+    padding: 16px 18px;
+  }
+
+  .modalBody {
+    padding: 16px 18px;
+  }
+
+  .modalFooter {
+    padding: 14px 18px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .footerRight {
+    width: 100%;
+  }
+
+  .footerRight button {
+    flex: 1;
+  }
+
+  .footerBtn.footerBtnDanger {
+    width: 100%;
+    justify-content: center;
   }
 
   .detailRow {
@@ -779,5 +861,23 @@
 
   .detailValue {
     justify-content: flex-start;
+  }
+
+  .toolsGrid {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 16px 12px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .cardName {
+    font-size: 14px;
   }
 }

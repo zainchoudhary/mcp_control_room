@@ -22,9 +22,10 @@ import { RegisterModal } from './components/RegisterModal.jsx'
 import { AuthPage } from './components/AuthPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
+import { SettingsModal } from './components/SettingsModal.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
-import { Bot } from 'lucide-react'
+import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
 const APP_PAGES = ['dashboard', 'mcp-servers', 'chat']
@@ -60,6 +61,7 @@ export default function App() {
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -355,13 +357,22 @@ export default function App() {
         onDeleteSession={handleDeleteSession}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-        theme={theme}
-        onToggleTheme={toggleTheme}
+        onOpenSettings={() => setShowSettings(true)}
         user={user}
         onLogout={requestLogout}
         mcpCount={mcps.length}
         connectedCount={connectedCount}
       />
+
+      <div className={styles.mobileHeader}>
+        <button className={styles.mobileMenuBtn} onClick={() => setSidebarCollapsed(false)}>
+          <Menu size={20} />
+        </button>
+        <div className={styles.mobileHeaderBrand}>
+          <div className={styles.mobileHeaderIcon}><Bot size={14} /></div>
+          <span>ToolChain AI</span>
+        </div>
+      </div>
 
       <main className={styles.main}>
         {activePage === 'dashboard' && (
@@ -370,6 +381,7 @@ export default function App() {
             sessions={sessions}
             connectedCount={connectedCount}
             onNavigate={handleNavigate}
+            user={user}
           />
         )}
 
@@ -448,6 +460,10 @@ export default function App() {
               sending={sending}
               connectedCount={connectedCount}
               onOpenRegister={() => setShowRegister(true)}
+              mcps={mcps}
+              onConnect={onConnect}
+              onDisconnect={onDisconnect}
+              togglingMcp={togglingMcp}
             />
           </div>
         )}
@@ -455,6 +471,14 @@ export default function App() {
 
       {showRegister && (
         <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onClose={() => setShowSettings(false)}
+        />
       )}
 
       {confirmDialog && (
