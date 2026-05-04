@@ -14,20 +14,41 @@ import {
 } from './api.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
+import { DashboardPage } from './components/DashboardPage.jsx'
+import { MCPServersPage } from './components/MCPServersPage.jsx'
 import { ChatMessage } from './components/ChatMessage.jsx'
 import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
 import { AuthPage } from './components/AuthPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
+import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
-import { Bot, Server, Plus } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import styles from './App.module.css'
+
+const APP_PAGES = ['dashboard', 'mcp-servers', 'chat']
+const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
+
+function getPageFromUrl() {
+  const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+  if (APP_PAGES.includes(path)) return path
+  return 'dashboard'
+}
+
+function getAuthModeFromUrl() {
+  const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+  if (path === 'signup') return 'signup'
+  if (path === 'forgot-password') return 'forgot'
+  if (path === 'reset-password') return 'reset'
+  return 'login'
+}
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
   const [user, setUser] = useState(() => getSavedUser())
   const [authChecked, setAuthChecked] = useState(false)
+  const [activePage, setActivePage] = useState(getPageFromUrl)
   const [mcps, setMcps] = useState([])
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -38,6 +59,7 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState(null)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -49,18 +71,51 @@ export default function App() {
       .finally(() => setAuthChecked(true))
   }, [])
 
+  useEffect(() => {
+    if (!authChecked) return
+    const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+    if (user) {
+      if (AUTH_PAGES.includes(path) || !APP_PAGES.includes(path)) {
+        const target = APP_PAGES.includes(path) ? path : 'dashboard'
+        setActivePage(target)
+        window.history.replaceState(null, '', `/${target}`)
+      }
+    } else {
+      if (!AUTH_PAGES.includes(path)) {
+        window.history.replaceState(null, '', '/login')
+      }
+    }
+  }, [authChecked, user])
+
   const handleAuth = (userData) => {
     setUser(userData)
     refreshMCPs()
+    const savedPage = getPageFromUrl()
+    setActivePage(savedPage)
+    if (!APP_PAGES.includes(window.location.pathname.replace(/^\/+/, ''))) {
+      window.history.replaceState(null, '', '/dashboard')
+    }
   }
 
-  const handleLogout = () => {
-    logout()
-    setUser(null)
-    setMcps([])
-    setSessions([])
-    setSessionId(null)
-    setMessages([])
+  const requestLogout = () => {
+    setConfirmDialog({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out? You will need to log in again.',
+      confirmLabel: 'Sign Out',
+      icon: 'logout',
+      variant: 'danger',
+      onConfirm: () => {
+        setConfirmDialog(null)
+        logout()
+        setUser(null)
+        setMcps([])
+        setSessions([])
+        setSessionId(null)
+        setMessages([])
+        setActivePage('dashboard')
+        window.history.replaceState(null, '', '/login')
+      },
+    })
   }
 
   const connectedCount = useMemo(() => mcps.filter((m) => m.connected).length, [mcps])
@@ -174,6 +229,7 @@ export default function App() {
     setMessages([])
     setStreamingId(null)
     setInput('')
+    setActivePage('chat')
   }
 
   const handleSelectSession = async (id) => {
@@ -182,6 +238,7 @@ export default function App() {
     setMessages([])
     setStreamingId(null)
     setLoadingMessages(true)
+    setActivePage('chat')
     try {
       const msgs = await getMessages(id)
       setMessages(msgs.map((m) => ({ id: crypto.randomUUID(), ...m })))
@@ -192,14 +249,25 @@ export default function App() {
     }
   }
 
-  const handleDeleteSession = async (id) => {
-    try {
-      await deleteSessionApi(id)
-    } catch { /* ignore */ }
-    setSessions((prev) => prev.filter((s) => s.id !== id))
-    if (id === sessionId) {
-      handleNewChat()
-    }
+  const handleDeleteSession = (id) => {
+    const session = sessions.find((s) => s.id === id)
+    setConfirmDialog({
+      title: 'Delete Conversation',
+      message: `Delete "${session?.title || 'this conversation'}"? All messages will be lost.`,
+      confirmLabel: 'Delete',
+      icon: 'delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          await deleteSessionApi(id)
+        } catch { /* ignore */ }
+        setSessions((prev) => prev.filter((s) => s.id !== id))
+        if (id === sessionId) {
+          handleNewChat()
+        }
+      },
+    })
   }
 
   const onRegister = async (payload) => {
@@ -230,11 +298,31 @@ export default function App() {
 
   const onProbe = async (id) => probeMCP(id)
 
-  const onDelete = async (id, name) => {
-    if (!window.confirm(`Delete "${name}"?`)) return
-    await deleteMCP(id)
-    await refreshMCPs()
-    toast('Deleted', 'info')
+  const onDelete = (id, name) => {
+    setConfirmDialog({
+      title: 'Delete Server',
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      icon: 'delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        await deleteMCP(id)
+        await refreshMCPs()
+        toast('Deleted', 'info')
+      },
+    })
+  }
+
+  useEffect(() => {
+    const onPop = () => setActivePage(getPageFromUrl())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const handleNavigate = (page) => {
+    setActivePage(page)
+    window.history.pushState(null, '', `/${page}`)
   }
 
   const suggestions = [
@@ -244,14 +332,12 @@ export default function App() {
     'Run a quick test with available tools',
   ]
 
-  if (!authChecked) {
-    return null
-  }
+  if (!authChecked) return null
 
   if (!user) {
     return (
       <>
-        <AuthPage onAuth={handleAuth} />
+        <AuthPage onAuth={handleAuth} initialMode={getAuthModeFromUrl()} />
         <ToastContainer toasts={toasts} dismiss={dismiss} />
       </>
     )
@@ -260,108 +346,128 @@ export default function App() {
   return (
     <div className={styles.app}>
       <Sidebar
+        activePage={activePage}
+        onNavigate={handleNavigate}
         sessions={sessions}
         currentSessionId={sessionId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
-        onOpenRegister={() => setShowRegister(true)}
-        mcpCount={mcps.length}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         theme={theme}
         onToggleTheme={toggleTheme}
         user={user}
-        onLogout={handleLogout}
+        onLogout={requestLogout}
+        mcpCount={mcps.length}
+        connectedCount={connectedCount}
       />
 
       <main className={styles.main}>
-        <header className={styles.topBar}>
-          <div className={styles.topBarLeft}>
-            {user && (
-              <span className={styles.greeting}>
-                Hello, <strong>{user.full_name || user.username}</strong>
-              </span>
-            )}
-          </div>
-          <button className={styles.registerBtn} onClick={() => setShowRegister(true)}>
-            <Server size={15} />
-            <span>Register MCP</span>
-            <Plus size={14} />
-          </button>
-        </header>
+        {activePage === 'dashboard' && (
+          <DashboardPage
+            mcps={mcps}
+            sessions={sessions}
+            connectedCount={connectedCount}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-        <div className={`${styles.chatArea} ${messages.length > 0 || loadingMessages ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
-          {loadingMessages ? (
-            <div className={styles.skeletonWrap}>
-              {[1, 2, 3].map((i) => (
-                <div key={i} className={`${styles.skeleton} ${i % 2 === 0 ? styles.skeletonAlt : ''}`}>
-                  <div className={styles.skeletonAvatar} />
-                  <div className={styles.skeletonLines}>
-                    <div className={styles.skeletonLine} style={{ width: i === 1 ? '70%' : i === 2 ? '90%' : '50%' }} />
-                    <div className={styles.skeletonLine} style={{ width: i === 1 ? '45%' : i === 2 ? '60%' : '35%' }} />
-                  </div>
+        {activePage === 'mcp-servers' && (
+          <MCPServersPage
+            mcps={mcps}
+            onConnect={onConnect}
+            onDisconnect={onDisconnect}
+            onProbe={onProbe}
+            onDelete={onDelete}
+            onOpenRegister={() => setShowRegister(true)}
+            togglingMcp={togglingMcp}
+            connectedCount={connectedCount}
+          />
+        )}
+
+        {activePage === 'chat' && (
+          <div className={styles.chatPage}>
+            <div className={`${styles.chatArea} ${messages.length > 0 || loadingMessages ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
+              {loadingMessages ? (
+                <div className={styles.skeletonWrap}>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className={`${styles.skeleton} ${i % 2 === 0 ? styles.skeletonAlt : ''}`}>
+                      <div className={styles.skeletonAvatar} />
+                      <div className={styles.skeletonLines}>
+                        <div className={styles.skeletonLine} style={{ width: i === 1 ? '70%' : i === 2 ? '90%' : '50%' }} />
+                        <div className={styles.skeletonLine} style={{ width: i === 1 ? '45%' : i === 2 ? '60%' : '35%' }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : messages.length === 0 ? (
-            <div className={styles.welcome}>
-              <div className={styles.welcomeIcon}>
-                <Bot size={40} />
-              </div>
-              <h1 className={styles.welcomeTitle}>ToolChain AI</h1>
-              <p className={styles.welcomeSubtitle}>
-                Connect MCP servers and chat with an AI agent that uses their tools.
-              </p>
-              <div className={styles.suggestions}>
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    className={styles.suggestionBtn}
-                    onClick={() => { setInput(s) }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              {connectedCount > 0 && (
-                <p className={styles.connectedInfo}>
-                  {connectedCount} MCP server{connectedCount !== 1 ? 's' : ''} connected
-                </p>
+              ) : messages.length === 0 ? (
+                <div className={styles.welcome}>
+                  <div className={styles.welcomeIcon}>
+                    <Bot size={40} />
+                  </div>
+                  <h1 className={styles.welcomeTitle}>ToolChain AI</h1>
+                  <p className={styles.welcomeSubtitle}>
+                    Connect MCP servers and chat with an AI agent that uses their tools.
+                  </p>
+                  <div className={styles.suggestions}>
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        className={styles.suggestionBtn}
+                        onClick={() => { setInput(s) }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {connectedCount > 0 && (
+                    <p className={styles.connectedInfo}>
+                      {connectedCount} MCP server{connectedCount !== 1 ? 's' : ''} connected
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.messages}>
+                  {messages.map((m) => (
+                    <ChatMessage
+                      key={m.id}
+                      message={m}
+                      isStreaming={m.id === streamingId}
+                    />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
               )}
             </div>
-          ) : (
-            <div className={styles.messages}>
-              {messages.map((m) => (
-                <ChatMessage
-                  key={m.id}
-                  message={m}
-                  isStreaming={m.id === streamingId}
-                />
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
 
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          sending={sending}
-          mcps={mcps}
-          onConnect={onConnect}
-          onDisconnect={onDisconnect}
-          onProbe={onProbe}
-          onDelete={onDelete}
-          onOpenRegister={() => setShowRegister(true)}
-          connectedCount={connectedCount}
-          togglingMcp={togglingMcp}
-        />
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={send}
+              sending={sending}
+              connectedCount={connectedCount}
+              onOpenRegister={() => setShowRegister(true)}
+            />
+          </div>
+        )}
       </main>
 
       {showRegister && (
         <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          open
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          icon={confirmDialog.icon}
+          variant={confirmDialog.variant}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
 
       <ToastContainer toasts={toasts} dismiss={dismiss} />

@@ -90,7 +90,14 @@ class ChatRequest(BaseModel):
 # ─── Routes: Dashboard ───────────────────────────────────────────────────────
 
 @app.get("/", include_in_schema=False)
-async def serve_dashboard():
+@app.get("/dashboard", include_in_schema=False)
+@app.get("/mcp-servers", include_in_schema=False)
+@app.get("/chat", include_in_schema=False)
+@app.get("/login", include_in_schema=False)
+@app.get("/signup", include_in_schema=False)
+@app.get("/forgot-password", include_in_schema=False)
+@app.get("/reset-password", include_in_schema=False)
+async def serve_frontend():
     return FileResponse("frontend/dist/index.html")
 
 
@@ -116,6 +123,14 @@ async def api_register_mcp(
     url = body.url.rstrip("/")
     if body.transport == "sse" and not url.endswith("/sse"):
         url += "/sse"
+
+    probe_result = await probe_mcp(url, body.transport)
+    if not probe_result["ok"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Server unreachable. Please check the URL and ensure the server is running.",
+        )
+
     mcp = await register_mcp(db, body.name, url, body.transport, body.description)
     return mcp
 

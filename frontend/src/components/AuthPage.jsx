@@ -22,10 +22,13 @@ function validateUsername(username) {
   return ''
 }
 
-export function AuthPage({ onAuth }) {
+const MODE_TO_PATH = { login: '/login', signup: '/signup', forgot: '/forgot-password', reset: '/reset-password' }
+
+export function AuthPage({ onAuth, initialMode }) {
   const [mode, setMode] = useState(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('reset_token') ? 'reset' : 'login'
+    if (params.get('reset_token')) return 'reset'
+    return initialMode || 'login'
   })
   const [resetToken] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -45,9 +48,27 @@ export function AuthPage({ onAuth }) {
   const usernameRef = useRef(null)
 
   useEffect(() => {
+    const current = window.location.pathname
+    const expected = MODE_TO_PATH[mode]
+    if (expected && current !== expected && mode !== 'reset') {
+      window.history.replaceState(null, '', expected)
+    }
+  }, [])
+
+  useEffect(() => {
     if (mode === 'signup') usernameRef.current?.focus()
     else emailRef.current?.focus()
   }, [mode])
+
+  useEffect(() => {
+    const pathToMode = { '/login': 'login', '/signup': 'signup', '/forgot-password': 'forgot', '/reset-password': 'reset' }
+    const onPop = () => {
+      const m = pathToMode[window.location.pathname] || 'login'
+      setMode(m)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const update = (key, value) => {
     setForm((p) => ({ ...p, [key]: value }))
@@ -77,8 +98,13 @@ export function AuthPage({ onAuth }) {
     setServerError('')
     setSuccessMessage('')
     setTouched({})
-    if (m !== 'reset') {
-      window.history.replaceState({}, '', window.location.pathname)
+    const targetPath = MODE_TO_PATH[m] || '/login'
+    if (m === 'reset') {
+      const params = new URLSearchParams(window.location.search)
+      const token = params.get('reset_token')
+      window.history.pushState(null, '', token ? `${targetPath}?reset_token=${token}` : targetPath)
+    } else {
+      window.history.pushState(null, '', targetPath)
     }
   }
 
