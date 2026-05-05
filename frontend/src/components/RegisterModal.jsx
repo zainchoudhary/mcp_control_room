@@ -106,7 +106,7 @@ export function RegisterModal({ onClose, onRegister }) {
           <div className={styles.actions}>
             <button type="button" className={styles.btnCancel} onClick={onClose}>Cancel</button>
             <button type="submit" className={styles.btnSubmit} disabled={loading}>
-              {loading ? 'Registering...' : 'Register Server'}
+              {loading ? <span className={styles.spinner} /> : 'Register Server'}
             </button>
           </div>
         </form>

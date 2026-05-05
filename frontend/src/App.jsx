@@ -127,6 +127,8 @@ export default function App() {
     setDataLoading(false)
   }
 
+  const [logoutLoading, setLogoutLoading] = useState(false)
+
   const requestLogout = () => {
     setConfirmDialog({
       title: 'Sign Out',
@@ -135,15 +137,19 @@ export default function App() {
       icon: 'logout',
       variant: 'danger',
       onConfirm: () => {
-        setConfirmDialog(null)
-        logout()
-        setUser(null)
-        setMcps([])
-        setSessions([])
-        setSessionId(null)
-        setMessages([])
-        setActivePage('landing')
-        window.history.replaceState(null, '', '/')
+        setLogoutLoading(true)
+        setTimeout(() => {
+          setLogoutLoading(false)
+          setConfirmDialog(null)
+          logout()
+          setUser(null)
+          setMcps([])
+          setSessions([])
+          setSessionId(null)
+          setMessages([])
+          setActivePage('login')
+          window.history.replaceState(null, '', '/login')
+        }, 1000)
       },
     })
   }
@@ -322,6 +328,8 @@ export default function App() {
 
   const onProbe = async (id) => probeMCP(id)
 
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
   const onDelete = (id, name) => {
     setConfirmDialog({
       title: 'Delete Server',
@@ -330,9 +338,11 @@ export default function App() {
       icon: 'delete',
       variant: 'danger',
       onConfirm: async () => {
-        setConfirmDialog(null)
+        setDeleteLoading(true)
         await deleteMCP(id)
         await refreshMCPs()
+        setDeleteLoading(false)
+        setConfirmDialog(null)
         toast('Deleted', 'info')
       },
     })
@@ -581,7 +591,8 @@ export default function App() {
           icon={confirmDialog.icon}
           variant={confirmDialog.variant}
           onConfirm={confirmDialog.onConfirm}
-          onCancel={() => setConfirmDialog(null)}
+          onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}
+          loading={logoutLoading || deleteLoading}
         />
       )}
 

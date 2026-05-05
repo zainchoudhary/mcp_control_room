@@ -174,3 +174,14 @@
     font-size: 13px;
   }
 }
+
+.spinner {
+  display: block;
+  width: 16px; height: 16px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spinConfirm 0.6s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spinConfirm { to { transform: rotate(360deg); } }

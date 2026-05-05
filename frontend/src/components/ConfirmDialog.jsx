@@ -58,7 +58,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? 'Please wait...' : confirmLabel}
+            {loading ? <span className={styles.spinner} /> : confirmLabel}
           </button>
         </div>
       </div>
