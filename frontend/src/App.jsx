@@ -62,15 +62,29 @@ export default function App() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [dataLoading, setDataLoading] = useState(true)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
 
   useEffect(() => {
+    let cancelled = false
     fetchMe()
-      .then((u) => { if (u) setUser(u); else setUser(null) })
-      .catch(() => setUser(null))
-      .finally(() => setAuthChecked(true))
+      .then(async (u) => {
+        if (cancelled) return
+        if (u) {
+          setUser(u)
+          setDataLoading(true)
+          await Promise.all([refreshMCPs(), refreshSessions()])
+          if (!cancelled) setDataLoading(false)
+        } else {
+          setUser(null)
+          setDataLoading(false)
+        }
+      })
+      .catch(() => { if (!cancelled) { setUser(null); setDataLoading(false) } })
+      .finally(() => { if (!cancelled) setAuthChecked(true) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -89,14 +103,16 @@ export default function App() {
     }
   }, [authChecked, user])
 
-  const handleAuth = (userData) => {
+  const handleAuth = async (userData) => {
     setUser(userData)
-    refreshMCPs()
+    setDataLoading(true)
     const savedPage = getPageFromUrl()
     setActivePage(savedPage)
     if (!APP_PAGES.includes(window.location.pathname.replace(/^\/+/, ''))) {
       window.history.replaceState(null, '', '/dashboard')
     }
+    await Promise.all([refreshMCPs(), refreshSessions()])
+    setDataLoading(false)
   }
 
   const requestLogout = () => {
@@ -148,12 +164,6 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    if (user) {
-      refreshMCPs()
-      refreshSessions()
-    }
-  }, [user])
 
   const ensureSession = async () => {
     if (sessionId) return sessionId
@@ -334,7 +344,42 @@ export default function App() {
     'Run a quick test with available tools',
   ]
 
-  if (!authChecked) return null
+  if (!authChecked) return (
+    <div className={styles.fullLoader}>
+      <div className={styles.loaderContent}>
+        <div className={styles.loaderOrb}>
+          <div className={styles.loaderOrbCore} />
+          <div className={styles.loaderRing} />
+          <div className={styles.loaderRing2} />
+          <div className={styles.loaderRing3} />
+        </div>
+        <div className={styles.loaderChain}>
+          <div className={styles.chainNode} />
+          <div className={styles.chainLink} />
+          <div className={styles.chainNode} />
+          <div className={styles.chainLink} />
+          <div className={styles.chainNode} />
+          <div className={styles.chainLink} />
+          <div className={styles.chainNode} />
+          <div className={styles.chainLink} />
+          <div className={styles.chainNode} />
+        </div>
+        <div className={styles.loaderBrand}>
+          <span className={styles.loaderBrandText}>ToolChain</span>
+          <span className={styles.loaderBrandAi}>AI</span>
+        </div>
+        <div className={styles.loaderProgress}>
+          <div className={styles.loaderProgressBar} />
+        </div>
+        <span className={styles.loaderText}>Initializing your workspace...</span>
+      </div>
+      <div className={styles.loaderParticles}>
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className={styles.particle} style={{ '--i': i }} />
+        ))}
+      </div>
+    </div>
+  )
 
   if (!user) {
     return (
@@ -382,6 +427,7 @@ export default function App() {
             connectedCount={connectedCount}
             onNavigate={handleNavigate}
             user={user}
+            loading={dataLoading}
           />
         )}
 

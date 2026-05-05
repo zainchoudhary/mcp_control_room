@@ -11,7 +11,7 @@ function getGreeting() {
   return 'Good Evening'
 }
 
-export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user }) {
+export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user, loading }) {
   const disconnectedCount = mcps.length - connectedCount
   const healthPercent = mcps.length ? Math.round((connectedCount / mcps.length) * 100) : 0
 
@@ -74,6 +74,31 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user
   const firstName = user?.full_name?.split(' ')[0] || user?.username || 'there'
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.skeletonWelcome}>
+          <div className={styles.skeletonTitle} />
+          <div className={styles.skeletonSubtitle} />
+        </div>
+        <div className={styles.skeletonStatsGrid}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={styles.skeletonStatCard}>
+              <div className={styles.skeletonStatIcon} />
+              <div className={styles.skeletonStatLine} />
+              <div className={styles.skeletonStatLineSm} />
+            </div>
+          ))}
+        </div>
+        <div className={styles.skeletonActionsGrid}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={styles.skeletonActionCard} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.page}>

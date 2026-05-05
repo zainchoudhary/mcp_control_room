@@ -12,8 +12,8 @@
   justify-content: space-between;
   gap: 24px;
   padding: 28px 32px;
-  background: linear-gradient(135deg, var(--accent-light), transparent 60%);
-  border: 1px solid var(--accent-border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   margin-bottom: 28px;
 }
@@ -49,16 +49,16 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 7px 16px;
   border: none;
   border-radius: var(--radius-full);
   background: var(--accent);
   color: white;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  transition: var(--transition-fast);
-  margin-top: 10px;
+  transition: all 0.2s ease;
+  margin-top: 12px;
   width: fit-content;
 }
 
@@ -80,32 +80,33 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-full);
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: 600;
   letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
 }
 
 .welcomeStatus {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
+  gap: 8px;
+  padding: 8px 16px;
   border-radius: var(--radius-full);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.15);
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #22c55e;
 }
 
 .welcomeStatusDot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--text-tertiary);
   opacity: 0.4;
@@ -114,13 +115,19 @@
 .welcomeStatusDotOn {
   background: #22c55e;
   opacity: 1;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.3);
+  animation: livePulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
-  50% { box-shadow: 0 0 14px rgba(34, 197, 94, 0.7); }
+@keyframes livePulse {
+  0%, 100% { 
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.3);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.8), 0 0 24px rgba(34, 197, 94, 0.4);
+    transform: scale(1.2);
+  }
 }
 
 /* ── Stats Grid ── */
@@ -137,16 +144,27 @@
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
-  transition: var(--transition);
+  transition: all 0.25s ease;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  animation: cardFadeIn 0.4s ease both;
 }
 
+.statCard:nth-child(1) { animation-delay: 0.05s; }
+.statCard:nth-child(2) { animation-delay: 0.1s; }
+.statCard:nth-child(3) { animation-delay: 0.15s; }
+.statCard:nth-child(4) { animation-delay: 0.2s; }
+
 .statCard:hover {
-  border-color: var(--accent-border);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow), 0 0 0 1px var(--accent-light);
+  border-color: var(--border-default);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .statTop {
@@ -219,21 +237,21 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
-  color: var(--accent);
+  color: var(--text-tertiary);
 }
 
 .sectionHeader::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(to right, var(--accent-border), transparent);
+  background: linear-gradient(to right, var(--border-subtle), transparent);
   margin-left: 8px;
 }
 
 .sectionTitle {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -256,14 +274,14 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   text-align: left;
-  transition: var(--transition);
+  transition: all 0.2s ease;
 }
 
 .actionCard:hover {
-  border-color: var(--accent-border);
+  border-color: var(--border-default);
   background: var(--bg-tertiary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 }
 
 .actionCard:hover .actionArrow {
@@ -335,11 +353,12 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: var(--transition);
+  transition: all 0.25s ease;
 }
 
 .card:hover {
-  border-color: var(--accent-border);
+  border-color: var(--border-default);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 .cardHeader {
@@ -619,6 +638,118 @@
 
 @media (max-width: 480px) {
   .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Dashboard Skeleton Loading ── */
+
+@keyframes dashShimmer {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes dashFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.skeletonWelcome {
+  padding: 28px 32px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: 28px;
+  animation: dashFadeIn 0.3s ease;
+}
+
+.skeletonTitle {
+  height: 28px;
+  width: 260px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  animation: dashShimmer 1.4s ease-in-out infinite;
+  margin-bottom: 12px;
+}
+
+.skeletonSubtitle {
+  height: 16px;
+  width: 360px;
+  max-width: 80%;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  animation: dashShimmer 1.4s ease-in-out infinite 0.2s;
+}
+
+.skeletonStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 32px;
+  animation: dashFadeIn 0.4s ease 0.1s both;
+}
+
+.skeletonStatCard {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonStatIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  animation: dashShimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonStatLine {
+  height: 24px;
+  width: 50%;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  animation: dashShimmer 1.4s ease-in-out infinite 0.3s;
+}
+
+.skeletonStatLineSm {
+  height: 12px;
+  width: 70%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: dashShimmer 1.4s ease-in-out infinite 0.5s;
+}
+
+.skeletonActionsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  animation: dashFadeIn 0.4s ease 0.2s both;
+}
+
+.skeletonActionCard {
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  animation: dashShimmer 1.4s ease-in-out infinite 0.4s;
+}
+
+@media (max-width: 768px) {
+  .skeletonStatsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .skeletonActionsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .skeletonStatsGrid {
     grid-template-columns: 1fr;
   }
 }

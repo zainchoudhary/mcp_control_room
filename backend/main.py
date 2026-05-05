@@ -69,7 +69,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="assets")
 app.include_router(auth_router)
 
 
@@ -98,7 +98,7 @@ class ChatRequest(BaseModel):
 @app.get("/forgot-password", include_in_schema=False)
 @app.get("/reset-password", include_in_schema=False)
 async def serve_frontend():
-    return FileResponse("frontend/dist/index.html")
+    return FileResponse("../frontend/dist/index.html")
 
 
 # ─── Routes: MCP Registry ────────────────────────────────────────────────────
