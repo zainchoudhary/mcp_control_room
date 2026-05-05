@@ -20,6 +20,7 @@ import { ChatMessage } from './components/ChatMessage.jsx'
 import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
 import { AuthPage } from './components/AuthPage.jsx'
+import { LandingPage } from './components/LandingPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { SettingsModal } from './components/SettingsModal.jsx'
@@ -33,6 +34,7 @@ const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
   const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+  if (path === '' || path === '/') return 'landing'
   if (APP_PAGES.includes(path)) return path
   return 'dashboard'
 }
@@ -47,8 +49,9 @@ function getAuthModeFromUrl() {
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
-  const [user, setUser] = useState(() => getSavedUser())
-  const [authChecked, setAuthChecked] = useState(false)
+  const savedUser = getSavedUser()
+  const [user, setUser] = useState(() => savedUser)
+  const [authChecked, setAuthChecked] = useState(!!savedUser)
   const [activePage, setActivePage] = useState(getPageFromUrl)
   const [mcps, setMcps] = useState([])
   const [sessions, setSessions] = useState([])
@@ -62,7 +65,7 @@ export default function App() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [dataLoading, setDataLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(!!savedUser)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -91,17 +94,26 @@ export default function App() {
     if (!authChecked) return
     const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
     if (user) {
-      if (AUTH_PAGES.includes(path) || !APP_PAGES.includes(path)) {
-        const target = APP_PAGES.includes(path) ? path : 'dashboard'
-        setActivePage(target)
-        window.history.replaceState(null, '', `/${target}`)
+      if (AUTH_PAGES.includes(path)) {
+        setActivePage('dashboard')
+        window.history.replaceState(null, '', '/dashboard')
+      } else if (path === '' || path === '/') {
+        setActivePage('landing')
       }
     } else {
-      if (!AUTH_PAGES.includes(path)) {
-        window.history.replaceState(null, '', '/login')
+      if (!AUTH_PAGES.includes(path) && path !== '') {
+        window.history.replaceState(null, '', '/')
       }
     }
   }, [authChecked, user])
+
+  useEffect(() => {
+    if (!user) {
+      document.documentElement.setAttribute('data-theme', 'light')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+  }, [user, theme])
 
   const handleAuth = async (userData) => {
     setUser(userData)
@@ -130,8 +142,8 @@ export default function App() {
         setSessions([])
         setSessionId(null)
         setMessages([])
-        setActivePage('dashboard')
-        window.history.replaceState(null, '', '/login')
+        setActivePage('landing')
+        window.history.replaceState(null, '', '/')
       },
     })
   }
@@ -327,7 +339,14 @@ export default function App() {
   }
 
   useEffect(() => {
-    const onPop = () => setActivePage(getPageFromUrl())
+    const onPop = () => {
+      const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+      if (path === '' || path === '/') {
+        setActivePage('landing')
+      } else {
+        setActivePage(getPageFromUrl())
+      }
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
@@ -344,49 +363,75 @@ export default function App() {
     'Run a quick test with available tools',
   ]
 
-  if (!authChecked) return (
-    <div className={styles.fullLoader}>
-      <div className={styles.loaderContent}>
-        <div className={styles.loaderOrb}>
-          <div className={styles.loaderOrbCore} />
-          <div className={styles.loaderRing} />
-          <div className={styles.loaderRing2} />
-          <div className={styles.loaderRing3} />
-        </div>
-        <div className={styles.loaderChain}>
-          <div className={styles.chainNode} />
-          <div className={styles.chainLink} />
-          <div className={styles.chainNode} />
-          <div className={styles.chainLink} />
-          <div className={styles.chainNode} />
-          <div className={styles.chainLink} />
-          <div className={styles.chainNode} />
-          <div className={styles.chainLink} />
-          <div className={styles.chainNode} />
-        </div>
-        <div className={styles.loaderBrand}>
-          <span className={styles.loaderBrandText}>ToolChain</span>
-          <span className={styles.loaderBrandAi}>AI</span>
-        </div>
-        <div className={styles.loaderProgress}>
-          <div className={styles.loaderProgressBar} />
-        </div>
-        <span className={styles.loaderText}>Initializing your workspace...</span>
-      </div>
-      <div className={styles.loaderParticles}>
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className={styles.particle} style={{ '--i': i }} />
-        ))}
-      </div>
-    </div>
-  )
+  if (!authChecked) {
+    const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+
+    if (path === '' || path === '/') {
+      return (
+        <LandingPage
+          onGetStarted={() => {
+            window.history.pushState(null, '', '/signup')
+            setActivePage('signup')
+          }}
+          onSignIn={() => {
+            window.history.pushState(null, '', '/login')
+            setActivePage('login')
+          }}
+        />
+      )
+    }
+
+    if (AUTH_PAGES.includes(path)) {
+      return (
+        <>
+          <AuthPage onAuth={handleAuth} initialMode={getAuthModeFromUrl()} />
+          <ToastContainer toasts={toasts} dismiss={dismiss} />
+        </>
+      )
+    }
+
+    return null
+  }
 
   if (!user) {
+    const currentPath = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+    const showAuth = AUTH_PAGES.includes(currentPath) || AUTH_PAGES.includes(activePage)
+
+    if (!showAuth) {
+      return (
+        <LandingPage
+          onGetStarted={() => {
+            window.history.pushState(null, '', '/signup')
+            setActivePage('signup')
+          }}
+          onSignIn={() => {
+            window.history.pushState(null, '', '/login')
+            setActivePage('login')
+          }}
+        />
+      )
+    }
+
     return (
       <>
         <AuthPage onAuth={handleAuth} initialMode={getAuthModeFromUrl()} />
         <ToastContainer toasts={toasts} dismiss={dismiss} />
       </>
+    )
+  }
+
+  if (activePage === 'landing') {
+    return (
+      <LandingPage
+        onGetStarted={() => {
+          setActivePage('dashboard')
+          window.history.pushState(null, '', '/dashboard')
+        }}
+        onSignIn={() => {
+          setActivePage('dashboard')
+          window.history.pushState(null, '', '/dashboard')
+        }}
+      />
     )
   }
 
