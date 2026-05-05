@@ -345,12 +345,12 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
             >
               {isToggling ? (
                 <Loader2 size={14} className={styles.toggleSpinner} />
-              ) : mcp.connected ? (
-                <WifiOff size={14} />
               ) : (
-                <Wifi size={14} />
+                <>
+                  {mcp.connected ? <WifiOff size={14} /> : <Wifi size={14} />}
+                  <span>{mcp.connected ? 'Disconnect' : 'Connect'}</span>
+                </>
               )}
-              <span>{isToggling ? 'Processing...' : mcp.connected ? 'Disconnect' : 'Connect'}</span>
             </button>
           </div>
         </div>
