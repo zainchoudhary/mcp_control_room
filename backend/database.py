@@ -15,9 +15,10 @@ async def register_mcp(
     url: str,
     transport: str,
     description: Optional[str] = None,
+    icon: Optional[str] = None,
 ) -> dict:
     """Register a new MCP server for a user."""
-    mcp = MCP(user_id=user_id, name=name, url=url, transport=transport, description=description)
+    mcp = MCP(user_id=user_id, name=name, url=url, transport=transport, description=description, icon=icon)
     db.add(mcp)
     await db.commit()
     await db.refresh(mcp)

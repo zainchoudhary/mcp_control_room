@@ -186,7 +186,14 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, isToggling }) {
   return (
     <div className={styles.connRow}>
       <div className={styles.connInfo}>
-        <div className={`${styles.connDot} ${mcp.connected ? styles.connDotOn : ''}`} />
+        <div className={styles.connIconWrap}>
+          {mcp.icon ? (
+            <img src={mcp.icon} alt="" className={styles.connIcon} onError={(e) => { e.target.style.display = 'none' }} />
+          ) : (
+            <Server size={14} className={styles.connIconFallback} />
+          )}
+          <div className={`${styles.connDot} ${mcp.connected ? styles.connDotOn : ''}`} />
+        </div>
         <div className={styles.connDetails}>
           <span className={styles.connName}>{mcp.name}</span>
           <span className={styles.connStatus}>

@@ -80,6 +80,7 @@ class MCPCreate(BaseModel):
     url: str
     transport: str = "sse"
     description: Optional[str] = None
+    icon: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -131,7 +132,7 @@ async def api_register_mcp(
             detail="Server unreachable. Please check the URL and ensure the server is running.",
         )
 
-    mcp = await register_mcp(db, user["id"], body.name, url, body.transport, body.description)
+    mcp = await register_mcp(db, user["id"], body.name, url, body.transport, body.description, body.icon)
     return mcp
 
 

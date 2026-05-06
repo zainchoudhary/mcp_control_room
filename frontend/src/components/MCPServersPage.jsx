@@ -15,8 +15,18 @@ export function MCPServersPage({
   onOpenRegister,
   togglingMcp,
   connectedCount,
+  initialSelectedMcp,
+  onClearInitialMcp,
 }) {
   const [selectedMcp, setSelectedMcp] = useState(null)
+
+  useEffect(() => {
+    if (initialSelectedMcp) {
+      const found = mcps.find((m) => m.id === initialSelectedMcp.id)
+      if (found) setSelectedMcp(found)
+      onClearInitialMcp && onClearInitialMcp()
+    }
+  }, [initialSelectedMcp])
 
   useEffect(() => {
     if (selectedMcp && !mcps.find((m) => m.id === selectedMcp.id)) {
@@ -116,11 +126,18 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen
       onClick={onOpen}
     >
       <div className={styles.cardTop}>
-        {isToggling ? (
-          <Loader2 size={14} className={styles.statusSpinner} />
-        ) : (
-          <div className={`${styles.statusDot} ${mcp.connected ? styles.statusDotOn : ''}`} />
-        )}
+        <div className={styles.cardIconWrap}>
+          {mcp.icon ? (
+            <img src={mcp.icon} alt="" className={styles.cardIcon} onError={(e) => { e.target.style.display = 'none' }} />
+          ) : (
+            <Server size={18} className={styles.cardIconFallback} />
+          )}
+          {isToggling ? (
+            <Loader2 size={10} className={`${styles.statusBadge} ${styles.statusSpinner}`} />
+          ) : (
+            <div className={`${styles.statusBadge} ${mcp.connected ? styles.statusBadgeOn : ''}`} />
+          )}
+        </div>
         <h3 className={styles.cardName}>{mcp.name}</h3>
         <div className={styles.dotsWrap} ref={menuRef} onClick={(e) => e.stopPropagation()}>
           <button
@@ -229,7 +246,11 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
         <div className={styles.modalHeader}>
           <div className={styles.modalHeaderLeft}>
             <div className={`${styles.modalIcon} ${mcp.connected ? styles.modalIconOn : ''}`}>
-              <Server size={22} />
+              {mcp.icon ? (
+                <img src={mcp.icon} alt="" className={styles.modalIconImg} onError={(e) => { e.target.replaceWith(document.createElement('span')) }} />
+              ) : (
+                <Server size={22} />
+              )}
             </div>
             <div>
               <h2 className={styles.modalTitle}>{mcp.name}</h2>

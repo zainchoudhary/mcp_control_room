@@ -130,6 +130,25 @@
   cursor: pointer;
 }
 
+.iconInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.iconInputWrap .input {
+  flex: 1;
+}
+.iconPreview {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  border: 1px solid var(--border-subtle);
+  padding: 3px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
 .error {
   padding: 10px 14px;
   background: var(--red-light);

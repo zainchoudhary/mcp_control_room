@@ -48,6 +48,7 @@ class MCP(Base):
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     transport: Mapped[str] = mapped_column(String(50), nullable=False, default="sse")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(500), nullable=True)
     connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -61,6 +62,7 @@ class MCP(Base):
             "url": self.url,
             "transport": self.transport,
             "description": self.description,
+            "icon": self.icon,
             "connected": self.connected,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

@@ -11,7 +11,7 @@ function getGreeting() {
   return 'Good Evening'
 }
 
-export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, user, loading }) {
+export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, onSelectMcp, user, loading }) {
   const disconnectedCount = mcps.length - connectedCount
   const healthPercent = mcps.length ? Math.round((connectedCount / mcps.length) * 100) : 0
 
@@ -200,8 +200,15 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
             ) : (
               <div className={styles.serverList}>
                 {mcps.slice(0, 5).map((mcp) => (
-                  <div key={mcp.id} className={styles.serverRow}>
-                    <div className={`${styles.serverDot} ${mcp.connected ? styles.serverDotOn : ''}`} />
+                  <div key={mcp.id} className={styles.serverRow} onClick={() => { onNavigate('mcp-servers'); onSelectMcp && onSelectMcp(mcp) }}>
+                    <div className={styles.serverIconWrap}>
+                      {mcp.icon ? (
+                        <img src={mcp.icon} alt="" className={styles.serverIcon} onError={(e) => { e.target.style.display = 'none' }} />
+                      ) : (
+                        <Server size={14} className={styles.serverIconFallback} />
+                      )}
+                      <div className={`${styles.serverDot} ${mcp.connected ? styles.serverDotOn : ''}`} />
+                    </div>
                     <span className={styles.serverName}>{mcp.name}</span>
                     <span className={`${styles.serverBadge} ${mcp.connected ? styles.serverBadgeOn : styles.serverBadgeOff}`}>
                       {mcp.connected ? 'Connected' : 'Offline'}

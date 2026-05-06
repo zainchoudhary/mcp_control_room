@@ -314,18 +314,44 @@
   min-width: 0;
 }
 
+.connIconWrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.connIcon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+.connIconFallback {
+  color: var(--text-tertiary);
+}
+
 .connDot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--text-quaternary, var(--text-tertiary));
+  border: 1.5px solid var(--bg-secondary);
   flex-shrink: 0;
   transition: all 0.3s ease;
 }
 
 .connDotOn {
   background: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
 }
 
 .connDetails {

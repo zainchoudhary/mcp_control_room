@@ -60,6 +60,7 @@ export default function App() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [initialSelectedMcp, setInitialSelectedMcp] = useState(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
@@ -491,6 +492,7 @@ export default function App() {
             onNewChat={handleNewChat}
             onSelectSession={handleSelectSession}
             onOpenRegister={() => setShowRegister(true)}
+            onSelectMcp={(mcp) => { setInitialSelectedMcp(mcp); handleNavigate('mcp-servers') }}
             user={user}
             loading={dataLoading}
           />
@@ -506,6 +508,8 @@ export default function App() {
             onOpenRegister={() => setShowRegister(true)}
             togglingMcp={togglingMcp}
             connectedCount={connectedCount}
+            initialSelectedMcp={initialSelectedMcp}
+            onClearInitialMcp={() => setInitialSelectedMcp(null)}
           />
         )}
 
