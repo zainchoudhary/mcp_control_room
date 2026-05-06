@@ -26,6 +26,23 @@ def build_server_config(mcps: list) -> dict:
     return config
 
 
+def _sanitize_tool_name(name: str) -> str:
+    """Ensure tool name contains only valid characters for Groq/OpenAI function calling."""
+    import re
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    return sanitized[:64]
+
+
+def _sanitize_tools(tools: list) -> list:
+    """Clean up tool names and descriptions to avoid Groq parsing issues."""
+    for tool in tools:
+        if hasattr(tool, 'name'):
+            tool.name = _sanitize_tool_name(tool.name)
+        if hasattr(tool, 'description') and tool.description:
+            tool.description = tool.description[:200]
+    return tools
+
+
 @asynccontextmanager
 async def get_mcp_tools(mcps: list):
     """
@@ -47,7 +64,10 @@ async def get_mcp_tools(mcps: list):
     try:
         client = MultiServerMCPClient(server_config)
         tools = await client.get_tools()
+        tools = _sanitize_tools(tools)
         logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
+        for t in tools:
+            logger.info("  Tool: %s", t.name)
     except Exception as exc:
         logger.error("Failed to load MCP tools: %s", exc)
     yield tools

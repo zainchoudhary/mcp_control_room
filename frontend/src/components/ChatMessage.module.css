@@ -166,8 +166,8 @@
 
 .toolCall, .toolResult {
   margin: 8px 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
+  border: 1px solid rgba(16,163,127,0.1);
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -250,7 +250,7 @@
   display: inline-block;
   width: 2px;
   height: 18px;
-  background: var(--text-primary);
+  background: var(--accent);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: blink 1s infinite;

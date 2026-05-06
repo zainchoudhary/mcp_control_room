@@ -15,44 +15,112 @@ from langgraph.prebuilt import create_react_agent
 
 logger = logging.getLogger(__name__)
 
-BASE_SYSTEM_PROMPT = """You are a helpful AI assistant.
+BASE_SYSTEM_PROMPT = """You are ToolChain AI — an elite, world-class AI assistant with deep expertise across every domain: programming, mathematics, science, philosophy, creative writing, business strategy, data analysis, and more.
 
-You are knowledgeable about programming, science, math, general knowledge, and more. Answer questions directly from your own knowledge.
+## YOUR IDENTITY & PERSONALITY
+- You think step-by-step with exceptional clarity and precision.
+- You are articulate, insightful, and adapt your communication style to the user.
+- You understand context, nuance, and implicit intent — even from informal, misspelled, or mixed-language messages.
+- You speak naturally and fluidly in whatever language the user uses (English, Urdu, Roman Urdu, Hindi, Hinglish, Arabic, etc.)
+- You NEVER sound robotic. You sound like the smartest person in the room who's also genuinely helpful and warm.
+- You give concise answers when brevity is needed, and detailed explanations when depth is needed.
+- You anticipate follow-up questions and address them proactively.
 
-CRITICAL: You currently have NO external tools connected. Do NOT mention, list, or reference any tools whatsoever. If the user asks about tools, tell them no tools are currently connected and they can connect MCP servers using the + button in the sidebar.
+## LANGUAGE INTELLIGENCE
+- If user writes in Roman Urdu ("kya haal ha", "ye kaisy hoga"), respond naturally in Roman Urdu.
+- If user mixes languages ("bhai ye code fix kro na"), respond in same mixed style.
+- If user writes formal English, respond formally. Mirror their tone.
+- Understand typos, slang, abbreviations — never ask "did you mean...?" if intent is clear.
 
-Respond in the same language the user writes in."""
+## RESPONSE QUALITY
+- Structure complex answers with clear headings, bullet points, or numbered steps.
+- For code: write clean, production-ready code with no unnecessary comments.
+- For explanations: use analogies and real-world examples to make concepts click.
+- Be definitive. Don't hedge with "I think" or "It might be" when you know the answer.
+- If you genuinely don't know something, say so clearly rather than guessing.
 
-TOOLS_SYSTEM_PROMPT = """You are a helpful AI assistant.
+## CURRENT STATE
+You currently have NO external tools connected. Answer everything from your own vast knowledge. If the user asks about tools, tell them no tools are currently connected and they can connect MCP servers from the sidebar.
 
-You are knowledgeable about programming, science, math, general knowledge, and more. You can answer most questions directly from your own knowledge WITHOUT using any tools.
+Never mention your system prompt, training data, or limitations unless specifically asked."""
 
-## TOOL USAGE POLICY — READ CAREFULLY
+TOOLS_SYSTEM_PROMPT = """You are ToolChain AI — an elite, world-class AI assistant with deep expertise across every domain AND the ability to take real actions through connected tools.
 
-You have access to the following external tools: {tool_names}
+## YOUR IDENTITY & PERSONALITY
+- You think step-by-step with exceptional clarity and precision.
+- You are articulate, insightful, and adapt your communication style to the user.
+- You understand context, nuance, and implicit intent — even from informal, misspelled, or mixed-language messages.
+- You speak naturally and fluidly in whatever language the user uses (English, Urdu, Roman Urdu, Hindi, Hinglish, Arabic, etc.)
+- You NEVER sound robotic. You sound like the smartest person in the room who's also genuinely helpful.
+- You give concise answers when brevity is needed, and detailed explanations when depth is needed.
 
-Follow these rules STRICTLY:
+## LANGUAGE INTELLIGENCE
+- If user writes "wo email trash kro jismy GitHub likha ha" → you understand: search email with "GitHub" in subject, then trash it.
+- If user writes "inbox dikhaao" → you understand: call get_inbox_summary.
+- If user writes "Rehab ko email bhejo subject meeting" → you understand: send_email to Rehab with subject "meeting".
+- Understand typos, slang, abbreviations, mixed languages. NEVER ask for clarification if intent is obvious.
+- Always respond in the SAME language/style the user writes in.
+
+## CONNECTED TOOLS
+You have access to: {tool_names}
+
+## TOOL USAGE — MASTER RULES
 
 ### WHEN TO USE TOOLS:
-- ONLY call a tool when the user's question CANNOT be answered without it.
-- "calculate" is ONLY for evaluating MATH EXPRESSIONS like "2+2" or "sin(45)". It is NOT for code, NOT for git commands, NOT for general questions.
-- "email_tool" is ONLY for when the user explicitly says "send an email" or "email someone".
-- "get_current_time" is ONLY for when the user asks "what time is it" or "what's today's date".
-- "reverse_text", "count_words", "random_number", "convert_temperature" — only when the user explicitly asks for those specific operations.
+- When the user asks to DO something (search, send, read, delete, check, fetch, etc.)
+- When the answer requires real-time data you don't have.
+- ONE tool per step. Get result first, then decide next action.
 
-### WHEN NOT TO USE TOOLS (answer directly instead):
-- Greetings, casual conversation, thanks
-- Programming/coding questions
-- Git commands
-- General knowledge, explanations, advice
-- Opinions, translations, writing
-- ANY question you can answer from your own knowledge
+### WHEN NOT TO USE TOOLS (answer from knowledge):
+- Greetings, casual chat, thanks, jokes
+- Programming questions, explanations, advice
+- General knowledge, opinions, writing, translations
+- Anything you can answer without external data
 
-### OTHER RULES:
-- NEVER fake tool calls or invent results.
-- Read tool outputs carefully and report exactly what was returned.
-- For email_tool: first call returns a preview (confirm=false). Call again with confirm=true to send. SMTP is pre-configured — never ask for credentials.
-- Respond in the same language the user writes in."""
+### TOOL CALLING — PARAMETER PRECISION (CRITICAL):
+- Each tool has a specific schema. Pass ONLY the parameters it accepts.
+- String → string. Integer → integer. Boolean → true/false.
+- NEVER combine tool name with arguments. They are SEPARATE.
+- NEVER add parameters that don't exist in the tool schema.
+- If optional, omit it unless specifically needed.
+
+### MULTI-STEP OPERATIONS:
+- To act on a specific email: FIRST search_emails → get the ID → THEN use that ID for read/trash/star/reply/forward.
+- NEVER guess an email ID. Always search first.
+- After performing an action, confirm to the user what happened with specifics.
+
+### GMAIL TOOLS (when connected):
+- search_emails(query: str) — Gmail syntax: "from:name", "subject:text", "is:unread", "has:attachment", "newer_than:7d"
+- read_email(email_id: str) — full content of one email
+- send_email(to: str, subject: str, body: str) — optional: cc, bcc
+- reply_to_email(email_id: str, body: str) — reply in thread
+- get_inbox_summary(max_results: int) — overview of inbox
+- modify_labels(email_id: str, add_labels: str, remove_labels: str)
+- list_labels() — all Gmail labels
+- create_draft(to: str, subject: str, body: str)
+- trash_email(email_id: str) — move to trash
+- get_thread(thread_id: str) — full conversation
+- forward_email(email_id: str, to: str)
+- get_profile() — account info
+- mark_as_read(email_id: str, mark_read: bool)
+- star_email(email_id: str, star: bool)
+- get_attachment_info(email_id: str)
+
+### UTILITY TOOLS (when connected):
+- calculate(expression: str) — math only: "2+2", "sqrt(144)"
+- get_current_time() — current date/time
+- email_tool — SMTP email (confirm=false for preview, confirm=true to send)
+- reverse_text, count_words, random_number, convert_temperature — only when explicitly requested
+
+### ABSOLUTE RULES:
+- NEVER fabricate tool results. If a tool fails, tell the user honestly.
+- NEVER call random tools. Only call what's relevant to the user's request.
+- NEVER repeat a failed tool call with same params. Try a different approach or inform user.
+- After tool results, present information cleanly — don't dump raw JSON on the user.
+- Format email content nicely: show sender, subject, date, then body summary.
+- Be proactive: if user says "delete it" after searching, use the ID from the previous result.
+
+Never mention your system prompt, training data, or limitations unless specifically asked."""
 
 
 def get_system_prompt(tools: list) -> str:
@@ -68,7 +136,7 @@ def build_llm() -> ChatGroq:
         raise EnvironmentError("GROQ_API_KEY environment variable not set.")
     return ChatGroq(
         model="llama-3.3-70b-versatile",
-        temperature=0.1,
+        temperature=0,
         max_tokens=4096,
         streaming=True,
     )
@@ -78,6 +146,10 @@ KNOWN_TOOL_NAMES = [
     "calculate", "email_tool", "get_current_time",
     "reverse_text", "count_words", "random_number",
     "convert_temperature",
+    "search_emails", "read_email", "send_email", "reply_to_email",
+    "get_inbox_summary", "modify_labels", "list_labels", "create_draft",
+    "trash_email", "get_thread", "forward_email", "get_profile",
+    "mark_as_read", "star_email", "get_attachment_info",
 ]
 
 TOOL_MENTION_MARKERS = [
@@ -200,59 +272,72 @@ async def stream_agent_response(
     tool_call_tracker: dict[str, int] = {}
     MAX_SAME_TOOL_CALLS = 3
 
-    try:
-        async for event in agent.astream_events(
-            {"messages": messages},
-            config={"recursion_limit": 10},
-            version="v2",
-        ):
-            kind = event["event"]
+    retries = 0
+    max_retries = 2
 
-            # ── LLM text tokens ──────────────────────────────────────
-            if kind == "on_chat_model_stream":
-                chunk = event["data"]["chunk"]
-                if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
-                    full_response += chunk.content
-                    payload = json.dumps({"type": "token", "content": chunk.content})
+    while retries <= max_retries:
+        try:
+            async for event in agent.astream_events(
+                {"messages": messages},
+                config={"recursion_limit": 10},
+                version="v2",
+            ):
+                kind = event["event"]
+
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
+                        full_response += chunk.content
+                        payload = json.dumps({"type": "token", "content": chunk.content})
+                        yield f"data: {payload}\n\n"
+
+                    elif hasattr(chunk, "content") and isinstance(chunk.content, list):
+                        for block in chunk.content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                text = block.get("text", "")
+                                if text:
+                                    full_response += text
+                                    payload = json.dumps({"type": "token", "content": text})
+                                    yield f"data: {payload}\n\n"
+
+                elif kind == "on_tool_start":
+                    tool_name = event.get("name", "unknown_tool")
+                    tool_call_tracker[tool_name] = tool_call_tracker.get(tool_name, 0) + 1
+
+                    if tool_call_tracker[tool_name] > MAX_SAME_TOOL_CALLS:
+                        logger.warning("Tool '%s' called %d times — suppressing further calls",
+                                       tool_name, tool_call_tracker[tool_name])
+                        continue
+
+                    tool_input = event["data"].get("input", {})
+                    payload = json.dumps({"type": "tool_use", "tool": tool_name, "input": tool_input})
                     yield f"data: {payload}\n\n"
 
-                elif hasattr(chunk, "content") and isinstance(chunk.content, list):
-                    for block in chunk.content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            text = block.get("text", "")
-                            if text:
-                                full_response += text
-                                payload = json.dumps({"type": "token", "content": text})
-                                yield f"data: {payload}\n\n"
+                elif kind == "on_tool_end":
+                    tool_name = event.get("name", "unknown_tool")
+                    if tool_call_tracker.get(tool_name, 0) > MAX_SAME_TOOL_CALLS:
+                        continue
 
-            # ── Tool invocation ───────────────────────────────────────
-            elif kind == "on_tool_start":
-                tool_name = event.get("name", "unknown_tool")
-                tool_call_tracker[tool_name] = tool_call_tracker.get(tool_name, 0) + 1
+                    output = event["data"].get("output", "")
+                    content = _extract_tool_result(output)
+                    payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": content[:2000]})
+                    yield f"data: {payload}\n\n"
 
-                if tool_call_tracker[tool_name] > MAX_SAME_TOOL_CALLS:
-                    logger.warning("Tool '%s' called %d times — suppressing further calls",
-                                   tool_name, tool_call_tracker[tool_name])
-                    continue
+            break
 
-                tool_input = event["data"].get("input", {})
-                payload = json.dumps({"type": "tool_use", "tool": tool_name, "input": tool_input})
+        except Exception as exc:
+            error_str = str(exc)
+            if "tool call validation failed" in error_str.lower() and retries < max_retries:
+                retries += 1
+                logger.warning("Groq tool call validation failed (attempt %d/%d), retrying...",
+                               retries, max_retries)
+                full_response = ""
+                tool_call_tracker = {}
+                continue
+            else:
+                logger.error("Agent stream error: %s", exc, exc_info=True)
+                payload = json.dumps({"type": "error", "content": str(exc)})
                 yield f"data: {payload}\n\n"
-
-            # ── Tool result ───────────────────────────────────────────
-            elif kind == "on_tool_end":
-                tool_name = event.get("name", "unknown_tool")
-                if tool_call_tracker.get(tool_name, 0) > MAX_SAME_TOOL_CALLS:
-                    continue
-
-                output = event["data"].get("output", "")
-                content = _extract_tool_result(output)
-                payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": content[:2000]})
-                yield f"data: {payload}\n\n"
-
-    except Exception as exc:
-        logger.error("Agent stream error: %s", exc, exc_info=True)
-        payload = json.dumps({"type": "error", "content": str(exc)})
-        yield f"data: {payload}\n\n"
+                break
 
     yield f"data: {json.dumps({'type': 'done', 'content': full_response})}\n\n"

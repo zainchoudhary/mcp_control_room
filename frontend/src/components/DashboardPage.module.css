@@ -2,7 +2,15 @@
   height: 100%;
   overflow-y: auto;
   padding: 32px 40px 48px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16,163,127,0.15) transparent;
 }
+.page::-webkit-scrollbar { width: 5px; }
+.page::-webkit-scrollbar-thumb {
+  background: rgba(16,163,127,0.2);
+  border-radius: 10px;
+}
+.page::-webkit-scrollbar-track { background: transparent; }
 
 /* ── Welcome Banner ── */
 
@@ -12,8 +20,8 @@
   justify-content: space-between;
   gap: 24px;
   padding: 32px 36px;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(16,163,127,0.04) 100%);
-  border: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(16,163,127,0.06) 50%, rgba(16,163,127,0.02) 100%);
+  border: 1px solid rgba(16,163,127,0.12);
   border-radius: 20px;
   margin-bottom: 28px;
   position: relative;
@@ -21,10 +29,18 @@
 }
 .welcome::before {
   content: '';
-  position: absolute; top: -50%; right: -20%;
-  width: 300px; height: 300px;
+  position: absolute; top: -40%; right: -15%;
+  width: 350px; height: 350px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(16,163,127,0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(16,163,127,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+.welcome::after {
+  content: '';
+  position: absolute; bottom: -30%; left: -10%;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16,163,127,0.05) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -92,8 +108,8 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: var(--radius-full);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
+  background: rgba(16,163,127,0.04);
+  border: 1px solid rgba(16,163,127,0.12);
   font-size: 12px;
   color: var(--text-primary);
   font-weight: 600;
@@ -151,7 +167,7 @@
 
 .statCard {
   padding: 20px;
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   transition: all 0.25s ease;
@@ -159,7 +175,18 @@
   flex-direction: column;
   gap: 2px;
   animation: cardFadeIn 0.4s ease both;
+  position: relative;
+  overflow: hidden;
 }
+.statCard::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.statCard:hover::after { opacity: 1; }
 
 .statCard:nth-child(1) { animation-delay: 0.05s; }
 .statCard:nth-child(2) { animation-delay: 0.1s; }
@@ -167,9 +194,9 @@
 .statCard:nth-child(4) { animation-delay: 0.2s; }
 
 .statCard:hover {
-  border-color: var(--border-default);
+  border-color: rgba(16, 163, 127, 0.2);
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(16, 163, 127, 0.06);
 }
 
 @keyframes cardFadeIn {
@@ -229,9 +256,10 @@
 
 .statValue {
   font-size: 30px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .statSub {
@@ -254,7 +282,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(to right, var(--border-subtle), transparent);
+  background: linear-gradient(to right, rgba(16,163,127,0.2), transparent);
   margin-left: 8px;
 }
 
@@ -280,18 +308,19 @@
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   text-align: left;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .actionCard:hover {
-  border-color: var(--border-default);
+  border-color: rgba(16,163,127,0.25);
   background: var(--bg-tertiary);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 20px rgba(16, 163, 127, 0.06);
 }
 
 .actionCard:hover .actionArrow {
@@ -361,14 +390,15 @@
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   overflow: hidden;
   transition: all 0.25s ease;
 }
 
 .card:hover {
-  border-color: var(--border-default);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border-color: rgba(16,163,127,0.2);
+  box-shadow: 0 6px 24px rgba(16, 163, 127, 0.05);
+  transform: translateY(-2px);
 }
 
 .cardHeader {
@@ -408,19 +438,19 @@
   align-items: center;
   gap: 4px;
   padding: 5px 14px;
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(16,163,127,0.2);
   border-radius: var(--radius-full);
-  background: transparent;
+  background: rgba(16,163,127,0.03);
   color: var(--text-tertiary);
   font-size: 12px;
   font-weight: 500;
-  transition: var(--transition-fast);
+  transition: all 0.15s ease;
 }
 
 .cardAction:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: var(--accent-light);
+  background: rgba(16,163,127,0.1);
 }
 
 .cardBody {

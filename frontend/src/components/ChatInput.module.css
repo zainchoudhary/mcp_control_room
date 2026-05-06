@@ -16,7 +16,8 @@
 }
 
 .container:focus-within {
-  border-color: var(--border-strong);
+  border-color: rgba(16,163,127,0.35);
+  box-shadow: 0 0 0 2px rgba(16,163,127,0.06);
 }
 
 .inputArea {
@@ -458,14 +459,15 @@
 }
 
 .sendActive {
-  background: var(--text-primary);
-  color: var(--bg-primary);
+  background: var(--accent);
+  color: white;
   opacity: 1;
   cursor: pointer;
 }
 
 .sendActive:hover {
-  opacity: 0.85;
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(16,163,127,0.25);
 }
 
 .spinner {
