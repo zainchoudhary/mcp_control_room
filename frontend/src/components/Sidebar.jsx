@@ -154,26 +154,54 @@ export function Sidebar({
                         {sessions.length === 0 ? (
                           <div className={styles.empty}>No conversations yet</div>
                         ) : (
-                          sessions.map((s) => (
-                            <button
-                              key={s.id}
-                              className={`${styles.sessionItem} ${s.id === currentSessionId ? styles.active : ''}`}
-                              onClick={() => onSelectSession(s.id)}
-                              onMouseEnter={() => setHoveredSession(s.id)}
-                              onMouseLeave={() => setHoveredSession(null)}
-                            >
-                              <span className={styles.sessionTitle}>{s.title || 'New conversation'}</span>
-                              {hoveredSession === s.id && (
-                                <button
-                                  className={styles.deleteSessionBtn}
-                                  onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id) }}
-                                  title="Delete"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </button>
-                          ))
+                          (() => {
+                            const now = new Date()
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                            const yesterday = new Date(today - 86400000)
+                            const weekAgo = new Date(today - 604800000)
+
+                            const groups = { today: [], yesterday: [], week: [], older: [] }
+                            sessions.forEach(s => {
+                              const d = new Date(s.created_at)
+                              if (d >= today) groups.today.push(s)
+                              else if (d >= yesterday) groups.yesterday.push(s)
+                              else if (d >= weekAgo) groups.week.push(s)
+                              else groups.older.push(s)
+                            })
+
+                            const renderGroup = (label, items) => items.length === 0 ? null : (
+                              <div key={label}>
+                                <div className={styles.sessionGroup}>{label}</div>
+                                {items.map(s => (
+                                  <button
+                                    key={s.id}
+                                    className={`${styles.sessionItem} ${s.id === currentSessionId ? styles.active : ''}`}
+                                    onClick={() => onSelectSession(s.id)}
+                                    onMouseEnter={() => setHoveredSession(s.id)}
+                                    onMouseLeave={() => setHoveredSession(null)}
+                                  >
+                                    <span className={styles.sessionTitle}>{s.title || 'New conversation'}</span>
+                                    {hoveredSession === s.id && (
+                                      <button
+                                        className={styles.deleteSessionBtn}
+                                        onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id) }}
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )
+
+                            return <>
+                              {renderGroup('Today', groups.today)}
+                              {renderGroup('Yesterday', groups.yesterday)}
+                              {renderGroup('This Week', groups.week)}
+                              {renderGroup('Older', groups.older)}
+                            </>
+                          })()
                         )}
                       </div>
                     </div>

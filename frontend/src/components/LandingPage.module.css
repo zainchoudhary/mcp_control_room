@@ -463,3 +463,53 @@
   .statNum { font-size: 28px; }
   .logoText { display: none; }
 }
+
+/* ═══════════ SCROLL REVEAL ANIMATIONS ═══════════ */
+.hidden {
+  opacity: 0;
+  transform: translateY(60px);
+  filter: blur(4px);
+}
+.revealed {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+  transition:
+    opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.revealed .trustedHeader { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.revealed .marqueeWrap { animation: revealFade 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.revealed .statsGrid { animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both; }
+.revealed .showcaseText { animation: revealSlideRight 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.revealed .showcaseVisual { animation: revealSlideLeft 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.revealed .featureDarkVisual { animation: revealSlideRight 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.revealed .featureDarkText { animation: revealSlideLeft 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.revealed .howHeader { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.revealed .howCard:nth-child(1) { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.revealed .howCard:nth-child(2) { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
+.revealed .howCard:nth-child(3) { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both; }
+.revealed .flowItem:nth-child(1) { animation: revealSlideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
+.revealed .flowItem:nth-child(2) { animation: revealSlideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
+.revealed .flowItem:nth-child(3) { animation: revealSlideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both; }
+.revealed .flowItem:nth-child(4) { animation: revealSlideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both; }
+.revealed .flowItem:nth-child(5) { animation: revealSlideRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both; }
+.revealed .stat:nth-child(1) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both; }
+.revealed .stat:nth-child(2) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both; }
+.revealed .stat:nth-child(3) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both; }
+.revealed .stat:nth-child(4) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both; }
+.revealed.ctaDark h2 { animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.revealed.ctaDark p { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.revealed.ctaDark .ctaBtns { animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
+.revealed .ctaGlow { animation: ctaGlowPulse 3s ease-in-out infinite; }
+
+@keyframes revealUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes revealFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes revealSlideRight { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes revealSlideLeft { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes ctaGlowPulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; } 50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.8; } }
+
+.revealed .previewCard { animation: previewFloat 4s ease-in-out infinite 0.8s; }
+@keyframes previewFloat { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-6px); } 75% { transform: translateY(4px); } }

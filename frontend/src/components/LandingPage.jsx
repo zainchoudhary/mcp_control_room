@@ -8,6 +8,21 @@ import {
 } from 'lucide-react'
 import styles from './LandingPage.module.css'
 
+function useReveal(threshold = 0.15) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setVisible(true); obs.unobserve(el) }
+    }, { threshold })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [threshold])
+  return [ref, visible]
+}
+
 function Counter({ end, suffix = '', prefix = '' }) {
   const [count, setCount] = useState(0)
   const ref = useRef(null)
@@ -32,6 +47,12 @@ function Counter({ end, suffix = '', prefix = '' }) {
 }
 
 export function LandingPage({ onGetStarted, onSignIn }) {
+  const [trustedRef, trustedVis] = useReveal()
+  const [showcaseRef, showcaseVis] = useReveal()
+  const [flowRef, flowVis] = useReveal()
+  const [howRef, howVis] = useReveal(0.1)
+  const [ctaRef, ctaVis] = useReveal(0.2)
+
   return (
     <div className={styles.page}>
       {/* ══════ NAV ══════ */}
@@ -102,7 +123,7 @@ export function LandingPage({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ══════ TRUSTED BY (Dark Section) ══════ */}
-      <section className={styles.darkSection}>
+      <section ref={trustedRef} className={`${styles.darkSection} ${trustedVis ? styles.revealed : styles.hidden}`}>
         <div className={styles.trustedHeader}>
           <h2>Trusted by teams shipping AI to production</h2>
         </div>
@@ -134,7 +155,7 @@ export function LandingPage({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ══════ PRODUCT SHOWCASE (Alternating) ══════ */}
-      <section className={styles.showcase}>
+      <section ref={showcaseRef} className={`${styles.showcase} ${showcaseVis ? styles.revealed : styles.hidden}`}>
         <div className={styles.showcaseRow}>
           <div className={styles.showcaseText}>
             <span className={styles.showcaseChip}><Brain size={13} /> Neural Hub</span>
@@ -171,7 +192,7 @@ export function LandingPage({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ══════ DARK FEATURE SECTION ══════ */}
-      <section className={styles.darkSection}>
+      <section ref={flowRef} className={`${styles.darkSection} ${flowVis ? styles.revealed : styles.hidden}`}>
         <div className={styles.featureDark}>
           <div className={styles.featureDarkVisual}>
             <div className={styles.flowDemo}>
@@ -212,7 +233,7 @@ export function LandingPage({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ══════ HOW IT WORKS ══════ */}
-      <section className={styles.howSection}>
+      <section ref={howRef} className={`${styles.howSection} ${howVis ? styles.revealed : styles.hidden}`}>
         <div className={styles.howHeader}>
           <span className={styles.showcaseChip}><Workflow size={13} /> How it works</span>
           <h2>From zero to AI automation</h2>
@@ -237,7 +258,7 @@ export function LandingPage({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ══════ CTA (Dark) ══════ */}
-      <section className={styles.ctaDark}>
+      <section ref={ctaRef} className={`${styles.ctaDark} ${ctaVis ? styles.revealed : styles.hidden}`}>
         <div className={styles.ctaGlow} />
         <h2>Start building with<br />AI tools today.</h2>
         <p>Free forever. No credit card. Deploy in under 2 minutes.</p>

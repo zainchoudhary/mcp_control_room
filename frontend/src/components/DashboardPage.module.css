@@ -11,11 +11,21 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 28px 32px;
-  background: var(--bg-secondary);
+  padding: 32px 36px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(16,163,127,0.04) 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.welcome::before {
+  content: '';
+  position: absolute; top: -50%; right: -20%;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16,163,127,0.06) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .welcomeLeft {
@@ -26,10 +36,10 @@
 }
 
 .welcomeTitle {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1.3;
 }
 
@@ -48,13 +58,13 @@
 .welcomeAction {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
+  gap: 7px;
+  padding: 10px 20px;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: 12px;
   background: var(--accent);
   color: white;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   transition: all 0.2s ease;
