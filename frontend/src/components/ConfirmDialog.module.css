@@ -1,187 +1,124 @@
 .overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: rgba(0, 0, 0, 0.55);
+  position: fixed; inset: 0; z-index: 300;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  animation: overlayIn 0.15s ease;
+  animation: in 0.15s ease;
+}
+@keyframes in { from { opacity:0 } }
+
+.modal {
+  width: 92%; max-width: 360px;
+  background: var(--bg-primary);
+  border-radius: 20px;
+  box-shadow: 0 25px 60px -12px rgba(0,0,0,0.35);
+  overflow: hidden;
+  animation: drop 0.3s cubic-bezier(.2,1.1,.4,1);
+}
+@keyframes drop {
+  from { opacity:0; transform: translateY(-20px) scale(0.95); }
+  to { opacity:1; transform: translateY(0) scale(1); }
 }
 
-@keyframes overlayIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.topStrip {
+  height: 4px; width: 100%;
 }
+.strip_danger {
+  background: linear-gradient(90deg, #ef4444, #f97316, #ef4444);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+.strip_warning {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
 
-.dialog {
-  width: 100%;
-  max-width: 400px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  padding: 28px 24px 20px;
+.body {
+  padding: 28px 24px 24px;
+  display: flex; flex-direction: column; align-items: center;
   text-align: center;
-  animation: dialogIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes dialogIn {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.iconWrap {
-  width: 52px;
-  height: 52px;
+.badge {
+  width: 52px; height: 52px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
+  display: grid; place-items: center;
+  margin-bottom: 18px;
+}
+.badge_danger {
+  background: #fef2f2;
+  color: #dc2626;
+  box-shadow: 0 0 0 6px rgba(239,68,68,0.06), 0 0 0 12px rgba(239,68,68,0.03);
+}
+.badge_warning {
+  background: #fffbeb;
+  color: #d97706;
+  box-shadow: 0 0 0 6px rgba(245,158,11,0.06), 0 0 0 12px rgba(245,158,11,0.03);
 }
 
-.danger .iconWrap,
-.iconWrap.danger {
-  background: var(--red-light);
-  color: var(--red);
-}
-
-.warning .iconWrap,
-.iconWrap.warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--amber);
-}
+.text { margin-bottom: 24px; }
 
 .title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 17px; font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   letter-spacing: -0.01em;
 }
-
-.message {
-  font-size: 14px;
+.msg {
+  font-size: 13.5px;
   color: var(--text-tertiary);
-  line-height: 1.5;
-  margin-bottom: 24px;
-  max-width: 320px;
-  margin-left: auto;
-  margin-right: auto;
+  line-height: 1.55;
+  max-width: 280px; margin: 0 auto;
 }
 
 .actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
+  width: 100%;
+  display: flex; flex-direction: column; gap: 10px;
 }
 
-.cancelBtn {
-  flex: 1;
-  padding: 10px 20px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 500;
-  transition: var(--transition-fast);
+.btn {
+  width: 100%; padding: 13px;
+  border: none; border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+  min-height: 44px;
+  display: grid; place-items: center;
 }
+.btn:hover:not(:disabled) { filter: brightness(1.1); transform: scale(1.01); }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.cancelBtn:hover:not(:disabled) {
+.btn_danger { background: #ef4444; }
+.btn_warning { background: #f59e0b; }
+
+.btnGhost {
+  width: 100%; padding: 12px;
+  border: none; border-radius: 12px;
+  font-size: 13.5px; font-weight: 500;
   background: var(--bg-tertiary);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
+.btnGhost:hover:not(:disabled) { background: var(--bg-secondary); color: var(--text-primary); }
+.btnGhost:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.cancelBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.confirmBtn {
-  flex: 1;
-  padding: 10px 20px;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 14px;
-  font-weight: 600;
-  transition: var(--transition-fast);
-}
-
-.confirmBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.confirm_danger {
-  background: #f87171;
-  color: white;
-}
-
-.confirm_danger:hover:not(:disabled) {
-  background: #ef4444;
-}
-
-.confirm_warning {
-  background: var(--amber);
-  color: white;
-}
-
-.confirm_warning:hover:not(:disabled) {
-  background: #d97706;
-}
-
-@media (max-width: 768px) {
-  .overlay {
-    padding: 16px;
-  }
-
-  .dialog {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .overlay {
-    padding: 12px;
-    align-items: flex-end;
-  }
-
-  .dialog {
-    padding: 24px 20px 16px;
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius) var(--radius);
-  }
-
-  .actions {
-    flex-direction: column-reverse;
-  }
-
-  .title {
-    font-size: 16px;
-  }
-
-  .message {
-    font-size: 13px;
-  }
-}
-
-.spinner {
+.spin {
   display: block;
   width: 16px; height: 16px;
-  border: 2.5px solid rgba(255,255,255,0.3);
+  border: 2.5px solid rgba(255,255,255,0.25);
   border-top-color: #fff;
   border-radius: 50%;
-  animation: spinConfirm 0.6s linear infinite;
+  animation: sp 0.5s linear infinite;
   margin: 0 auto;
 }
-@keyframes spinConfirm { to { transform: rotate(360deg); } }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .modal { max-width: 100%; border-radius: 18px; }
+  .body { padding: 24px 18px 18px; }
+}

@@ -260,15 +260,17 @@ export default function App() {
     setStreamingId(null)
     setInput('')
     setActivePage('chat')
+    window.history.pushState(null, '', '/chat')
   }
 
   const handleSelectSession = async (id) => {
-    if (id === sessionId) return
+    if (id === sessionId && activePage === 'chat') return
     setSessionId(id)
     setMessages([])
     setStreamingId(null)
     setLoadingMessages(true)
     setActivePage('chat')
+    window.history.pushState(null, '', '/chat')
     try {
       const msgs = await getMessages(id)
       setMessages(msgs.map((m) => ({ id: crypto.randomUUID(), ...m })))
@@ -339,11 +341,16 @@ export default function App() {
       variant: 'danger',
       onConfirm: async () => {
         setDeleteLoading(true)
-        await deleteMCP(id)
-        await refreshMCPs()
-        setDeleteLoading(false)
+        await new Promise((r) => setTimeout(r, 1000))
+        setMcps((prev) => prev.filter((m) => m.id !== id))
         setConfirmDialog(null)
+        setDeleteLoading(false)
         toast('Deleted', 'info')
+        try {
+          await deleteMCP(id)
+        } catch {
+          await refreshMCPs()
+        }
       },
     })
   }
@@ -481,6 +488,9 @@ export default function App() {
             sessions={sessions}
             connectedCount={connectedCount}
             onNavigate={handleNavigate}
+            onNewChat={handleNewChat}
+            onSelectSession={handleSelectSession}
+            onOpenRegister={() => setShowRegister(true)}
             user={user}
             loading={dataLoading}
           />

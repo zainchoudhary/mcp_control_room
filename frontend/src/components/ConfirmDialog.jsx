@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { AlertTriangle, Trash2, LogOut } from 'lucide-react'
+import { Trash2, LogOut, AlertTriangle } from 'lucide-react'
 import styles from './ConfirmDialog.module.css'
 
 const ICONS = {
@@ -39,27 +39,26 @@ export function ConfirmDialog({
       ref={overlayRef}
       onClick={(e) => { if (e.target === overlayRef.current && !loading) onCancel() }}
     >
-      <div className={styles.dialog}>
-        <div className={`${styles.iconWrap} ${styles[variant]}`}>
-          <Icon size={24} />
-        </div>
-        <h3 className={styles.title}>{title}</h3>
-        <p className={styles.message}>{message}</p>
-        <div className={styles.actions}>
-          <button
-            className={styles.cancelBtn}
-            onClick={onCancel}
-            disabled={loading}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            className={`${styles.confirmBtn} ${styles[`confirm_${variant}`]}`}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? <span className={styles.spinner} /> : confirmLabel}
-          </button>
+      <div className={styles.modal}>
+        
+        <div className={styles.body}>
+          <div className={`${styles.badge} ${styles[`badge_${variant}`]}`}>
+            <Icon size={20} strokeWidth={2.5} />
+          </div>
+          
+          <div className={styles.text}>
+            <h2 className={styles.title}>{title}</h2>
+            <p className={styles.msg}>{message}</p>
+          </div>
+
+          <div className={styles.actions}>
+            <button className={`${styles.btn} ${styles[`btn_${variant}`]}`} onClick={onConfirm} disabled={loading}>
+              {loading ? <span className={styles.spin} /> : confirmLabel}
+            </button>
+            <button className={styles.btnGhost} onClick={onCancel} disabled={loading}>
+              {cancelLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>

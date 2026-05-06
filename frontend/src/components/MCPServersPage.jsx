@@ -18,6 +18,12 @@ export function MCPServersPage({
 }) {
   const [selectedMcp, setSelectedMcp] = useState(null)
 
+  useEffect(() => {
+    if (selectedMcp && !mcps.find((m) => m.id === selectedMcp.id)) {
+      setSelectedMcp(null)
+    }
+  }, [mcps, selectedMcp])
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -71,7 +77,7 @@ export function MCPServersPage({
           onConnect={onConnect}
           onDisconnect={onDisconnect}
           onProbe={onProbe}
-          onDelete={(id, name) => { setSelectedMcp(null); onDelete(id, name) }}
+          onDelete={(id, name) => { onDelete(id, name) }}
           isToggling={togglingMcp === selectedMcp.id}
         />
       )}
@@ -189,13 +195,13 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
   }, [mcp.id])
 
   useEffect(() => {
-    const handleEsc = (e) => { if (e.key === 'Escape') onClose() }
+    const handleEsc = (e) => { if (e.key === 'Escape' && !isToggling) onClose() }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
+  }, [onClose, isToggling])
 
   const handleOverlayClick = (e) => {
-    if (e.target === overlayRef.current) onClose()
+    if (e.target === overlayRef.current && !isToggling) onClose()
   }
 
   const handleToggle = () => {
@@ -233,7 +239,7 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
               </span>
             </div>
           </div>
-          <button className={styles.closeBtn} onClick={onClose}>
+          <button className={styles.closeBtn} onClick={onClose} disabled={isToggling}>
             <X size={18} />
           </button>
         </div>
@@ -330,12 +336,13 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
           <button
             className={`${styles.footerBtn} ${styles.footerBtnDanger}`}
             onClick={() => onDelete(mcp.id, mcp.name)}
+            disabled={isToggling}
           >
             <Trash2 size={14} />
             <span>Delete Server</span>
           </button>
           <div className={styles.footerRight}>
-            <button className={styles.footerBtn} onClick={onClose}>
+            <button className={styles.footerBtn} onClick={onClose} disabled={isToggling}>
               Cancel
             </button>
             <button

@@ -11,7 +11,7 @@ function getGreeting() {
   return 'Good Evening'
 }
 
-export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user, loading }) {
+export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, user, loading }) {
   const disconnectedCount = mcps.length - connectedCount
   const healthPercent = mcps.length ? Math.round((connectedCount / mcps.length) * 100) : 0
 
@@ -52,14 +52,14 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user
       desc: 'Start an AI conversation',
       icon: Sparkles,
       color: 'green',
-      onClick: () => onNavigate('chat'),
+      onClick: onNewChat,
     },
     {
       label: 'Add Server',
       desc: 'Register an MCP server',
       icon: Plus,
       color: 'blue',
-      onClick: () => onNavigate('mcp-servers'),
+      onClick: () => { onNavigate('mcp-servers'); onOpenRegister() },
     },
     {
       label: 'Manage Servers',
@@ -113,7 +113,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user
               : `You have ${connectedCount} server${connectedCount !== 1 ? 's' : ''} connected and ready to assist you.`}
           </p>
           {mcps.length > 0 && connectedCount > 0 && (
-            <button className={styles.welcomeAction} onClick={() => onNavigate('chat')}>
+            <button className={styles.welcomeAction} onClick={onNewChat}>
               <Sparkles size={15} />
               <span>Start Chatting</span>
             </button>
@@ -232,7 +232,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user
               <div className={styles.cardEmpty}>
                 <MessageSquare size={28} className={styles.emptyIcon} />
                 <p>No conversations yet</p>
-                <button className={styles.emptyBtn} onClick={() => onNavigate('chat')}>
+                <button className={styles.emptyBtn} onClick={onNewChat}>
                   <Sparkles size={14} />
                   <span>Start Chatting</span>
                 </button>
@@ -243,7 +243,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, user
                   <button
                     key={s.id}
                     className={styles.chatRow}
-                    onClick={() => onNavigate('chat')}
+                    onClick={() => onSelectSession(s.id)}
                   >
                     <div className={styles.chatRowDot} />
                     <span className={styles.chatRowTitle}>{s.title || 'New conversation'}</span>

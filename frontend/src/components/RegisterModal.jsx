@@ -11,11 +11,11 @@ export function RegisterModal({ onClose, onRegister }) {
   useEffect(() => {
     nameRef.current?.focus()
     const handleKey = (e) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !loading) onClose()
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  }, [onClose, loading])
 
   const update = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
 
@@ -43,7 +43,7 @@ export function RegisterModal({ onClose, onRegister }) {
   }
 
   return (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && !loading && onClose()}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
@@ -104,7 +104,7 @@ export function RegisterModal({ onClose, onRegister }) {
           {error && <div className={styles.error}>{error}</div>}
 
           <div className={styles.actions}>
-            <button type="button" className={styles.btnCancel} onClick={onClose}>Cancel</button>
+            <button type="button" className={styles.btnCancel} onClick={onClose} disabled={loading}>Cancel</button>
             <button type="submit" className={styles.btnSubmit} disabled={loading}>
               {loading ? <span className={styles.spinner} /> : 'Register Server'}
             </button>
