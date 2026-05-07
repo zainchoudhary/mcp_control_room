@@ -13,6 +13,7 @@ import {
   probeMCP,
   streamChat,
   getGmailStatus,
+  getWeeklyStats,
 } from './api.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
@@ -69,6 +70,7 @@ export default function App() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
+  const [weeklyStats, setWeeklyStats] = useState(null)
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -80,9 +82,10 @@ export default function App() {
         if (cancelled) return
         if (u) {
           setUser(u)
-          setDataLoading(true)
-          await Promise.all([refreshMCPs(), refreshSessions()])
-          if (!cancelled) setDataLoading(false)
+          setDataLoading(false)
+          refreshMCPs()
+          refreshSessions()
+          refreshStats()
         } else {
           setUser(null)
           setDataLoading(false)
@@ -92,6 +95,12 @@ export default function App() {
       .finally(() => { if (!cancelled) setAuthChecked(true) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(refreshStats, 30000)
+    return () => clearInterval(interval)
+  }, [user])
 
   useEffect(() => {
     if (!authChecked) return
@@ -133,14 +142,15 @@ export default function App() {
 
   const handleAuth = async (userData) => {
     setUser(userData)
-    setDataLoading(true)
+    setDataLoading(false)
     const savedPage = getPageFromUrl()
     setActivePage(savedPage)
     if (!APP_PAGES.includes(window.location.pathname.replace(/^\/+/, ''))) {
       window.history.replaceState(null, '', '/dashboard')
     }
-    await Promise.all([refreshMCPs(), refreshSessions()])
-    setDataLoading(false)
+    refreshMCPs()
+    refreshSessions()
+    refreshStats()
   }
 
   const [logoutLoading, setLogoutLoading] = useState(false)
@@ -196,6 +206,13 @@ export default function App() {
     } catch (err) {
       toast(err.message, 'error')
     }
+  }
+
+  const refreshStats = async () => {
+    try {
+      const data = await getWeeklyStats()
+      setWeeklyStats(data)
+    } catch { /* silent */ }
   }
 
 
@@ -531,6 +548,7 @@ export default function App() {
             onSelectMcp={(mcp) => { setInitialSelectedMcp(mcp); handleNavigate('mcp-servers') }}
             user={user}
             loading={dataLoading}
+            weeklyStats={weeklyStats}
           />
         )}
 

@@ -4,7 +4,6 @@ import {
   Zap, ArrowRight, Brain, Gauge, Shield, Lightbulb, Rocket,
 } from 'lucide-react'
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { getWeeklyStats } from '../api'
 import styles from './DashboardPage.module.css'
 
 function getGreeting() {
@@ -14,24 +13,6 @@ function getGreeting() {
   return 'Good Evening'
 }
 
-function useWeeklyStats() {
-  const [stats, setStats] = useState(null)
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        const data = await getWeeklyStats()
-        if (!cancelled) setStats(data)
-      } catch (e) {
-        console.error('Failed to load weekly stats', e)
-      }
-    }
-    load()
-    const interval = setInterval(load, 30000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [])
-  return stats
-}
 
 function AnimatedCounter({ value, duration = 1200 }) {
   const [display, setDisplay] = useState(0)
@@ -122,15 +103,13 @@ function BarChart({ data }) {
   )
 }
 
-export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, onSelectMcp, user, loading }) {
+export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, onSelectMcp, user, loading, weeklyStats }) {
   const disconnectedCount = mcps.length - connectedCount
   const healthPercent = mcps.length ? Math.round((connectedCount / mcps.length) * 100) : 0
 
   const firstName = user?.full_name?.split(' ')[0] || user?.username || 'there'
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-
-  const weeklyStats = useWeeklyStats()
 
   const barData = useMemo(() => {
     if (!weeklyStats?.days) {
