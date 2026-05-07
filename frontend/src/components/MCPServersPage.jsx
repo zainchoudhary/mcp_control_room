@@ -149,10 +149,12 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen
           </button>
           {menuOpen && (
             <div className={styles.dotsMenu}>
-              <button className={styles.dotsMenuItem} onClick={handleToggle}>
-                {mcp.connected ? <PowerOff size={14} /> : <Power size={14} />}
-                <span>{mcp.connected ? 'Disconnect' : 'Connect'}</span>
-              </button>
+              {mcp.connected && (
+                <button className={styles.dotsMenuItem} onClick={handleToggle}>
+                  <PowerOff size={14} />
+                  <span>Disconnect</span>
+                </button>
+              )}
               <button className={`${styles.dotsMenuItem} ${styles.dotsMenuDanger}`} onClick={handleDelete}>
                 <Trash2 size={14} />
                 <span>Delete</span>
@@ -366,20 +368,22 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
             <button className={styles.footerBtn} onClick={onClose} disabled={isToggling}>
               Cancel
             </button>
-            <button
-              className={`${styles.footerBtn} ${mcp.connected ? styles.footerBtnDisconnect : styles.footerBtnConnect}`}
-              onClick={handleToggle}
-              disabled={isToggling}
-            >
-              {isToggling ? (
-                <Loader2 size={14} className={styles.toggleSpinner} />
-              ) : (
-                <>
-                  {mcp.connected ? <WifiOff size={14} /> : <Wifi size={14} />}
-                  <span>{mcp.connected ? 'Disconnect' : 'Connect'}</span>
-                </>
-              )}
-            </button>
+            {mcp.connected && (
+              <button
+                className={`${styles.footerBtn} ${styles.footerBtnDisconnect}`}
+                onClick={handleToggle}
+                disabled={isToggling}
+              >
+                {isToggling ? (
+                  <Loader2 size={14} className={styles.toggleSpinner} />
+                ) : (
+                  <>
+                    <WifiOff size={14} />
+                    <span>Disconnect</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

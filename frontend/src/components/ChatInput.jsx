@@ -10,8 +10,7 @@ export function ChatInput({
   connectedCount,
   onOpenRegister,
   mcps,
-  onConnect,
-  onDisconnect,
+  onToggle,
   togglingMcp,
 }) {
   const textareaRef = useRef(null)
@@ -134,8 +133,7 @@ export function ChatInput({
                           <ConnectorRow
                             key={mcp.id}
                             mcp={mcp}
-                            onConnect={onConnect}
-                            onDisconnect={onDisconnect}
+                            onToggle={onToggle}
                             isToggling={togglingMcp === mcp.id}
                           />
                         ))
@@ -176,11 +174,10 @@ export function ChatInput({
   )
 }
 
-function ConnectorRow({ mcp, onConnect, onDisconnect, isToggling }) {
+function ConnectorRow({ mcp, onToggle, isToggling }) {
   const handleToggle = () => {
     if (isToggling) return
-    if (mcp.connected) onDisconnect(mcp.id)
-    else onConnect(mcp.id)
+    onToggle(mcp.id)
   }
 
   return (
@@ -196,9 +193,6 @@ function ConnectorRow({ mcp, onConnect, onDisconnect, isToggling }) {
         </div>
         <div className={styles.connDetails}>
           <span className={styles.connName}>{mcp.name}</span>
-          <span className={styles.connStatus}>
-            {isToggling ? (mcp.connected ? 'Disconnecting...' : 'Connecting...') : mcp.connected ? 'Connected' : 'Disconnected'}
-          </span>
         </div>
       </div>
       <button

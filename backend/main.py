@@ -198,8 +198,44 @@ async def api_disconnect_mcp(
     mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
+
+    mcp_name = (mcp.get("name", "") or "").lower()
+    mcp_url = (mcp.get("url", "") or "").lower()
+    is_gmail = "gmail" in mcp_name or "9002" in mcp_url
+
+    token_revoked = False
+    if is_gmail:
+        token_revoked = await revoke_user_gmail(user["id"], db)
+
     await set_mcp_connection(db, mcp_id, user["id"], False)
-    return {"id": mcp_id, "connected": False}
+    return {"id": mcp_id, "connected": False, "token_revoked": token_revoked}
+
+
+@app.post("/api/mcps/{mcp_id}/toggle")
+async def api_toggle_mcp(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle MCP connection on/off without revoking tokens. Used by chat panel."""
+    mcp = await get_mcp(db, mcp_id, user["id"])
+    if not mcp:
+        raise HTTPException(status_code=404, detail="MCP not found.")
+
+    new_state = not mcp.get("connected", False)
+
+    if new_state:
+        mcp_name = (mcp.get("name", "") or "").lower()
+        mcp_url = (mcp.get("url", "") or "").lower()
+        is_gmail = "gmail" in mcp_name or "9002" in mcp_url
+        if is_gmail:
+            gmail_status = await get_user_gmail_status(user["id"], db)
+            if not gmail_status:
+                auth_url = generate_auth_url(user["id"])
+                return {"id": mcp_id, "connected": False, "needs_auth": True, "auth_url": auth_url}
+
+    await set_mcp_connection(db, mcp_id, user["id"], new_state)
+    return {"id": mcp_id, "connected": new_state}
 
 
 @app.post("/api/mcps/{mcp_id}/probe")

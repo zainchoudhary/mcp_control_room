@@ -9,6 +9,7 @@ import {
   deleteMCP,
   connectMCP,
   disconnectMCP,
+  toggleMCP,
   probeMCP,
   streamChat,
   getGmailStatus,
@@ -349,6 +350,21 @@ export default function App() {
     } finally { setTogglingMcp(null) }
   }
 
+  const onToggle = async (id) => {
+    setTogglingMcp(id)
+    try {
+      const result = await toggleMCP(id)
+      if (result && result.needs_auth && result.auth_url) {
+        window.open(result.auth_url, '_blank', 'width=600,height=700,scrollbars=yes')
+        toast('Please complete Gmail authentication in the opened window', 'info')
+        setTogglingMcp(null)
+        return
+      }
+      await refreshMCPs()
+      toast(result.connected ? 'Connected' : 'Disconnected', result.connected ? 'success' : 'info')
+    } finally { setTogglingMcp(null) }
+  }
+
   const onProbe = async (id) => probeMCP(id)
 
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -596,8 +612,7 @@ export default function App() {
               connectedCount={connectedCount}
               onOpenRegister={() => setShowRegister(true)}
               mcps={mcps}
-              onConnect={onConnect}
-              onDisconnect={onDisconnect}
+              onToggle={onToggle}
               togglingMcp={togglingMcp}
             />
           </div>

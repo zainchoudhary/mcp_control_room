@@ -29,6 +29,7 @@ export const registerMCP = (body) => request('/mcps', { method: 'POST', body: JS
 export const deleteMCP = (id) => request(`/mcps/${id}`, { method: 'DELETE' })
 export const connectMCP = (id) => request(`/mcps/${id}/connect`, { method: 'POST' })
 export const disconnectMCP = (id) => request(`/mcps/${id}/disconnect`, { method: 'POST' })
+export const toggleMCP = (id) => request(`/mcps/${id}/toggle`, { method: 'POST' })
 export const probeMCP = (id) => request(`/mcps/${id}/probe`, { method: 'POST' })
 
 // Gmail OAuth
