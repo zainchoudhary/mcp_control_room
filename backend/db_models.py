@@ -4,7 +4,7 @@ db_models.py - SQLAlchemy ORM models for PostgreSQL (Neon).
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db_config import Base
@@ -65,6 +65,34 @@ class MCP(Base):
             "icon": self.icon,
             "connected": self.connected,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class GmailToken(Base):
+    __tablename__ = "gmail_tokens"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_gmail_tokens_user_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    gmail_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    scopes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship(backref="gmail_token")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "email": self.gmail_email,
+            "has_token": bool(self.access_token),
+            "token_expiry": self.token_expiry.isoformat() if self.token_expiry else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 

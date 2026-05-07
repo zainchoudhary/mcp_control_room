@@ -11,6 +11,7 @@ import {
   disconnectMCP,
   probeMCP,
   streamChat,
+  getGmailStatus,
 } from './api.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
@@ -107,6 +108,19 @@ export default function App() {
       }
     }
   }, [authChecked, user])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('gmail_linked') === 'true') {
+      const email = params.get('email') || 'your Gmail'
+      toast(`Gmail connected: ${email}`, 'success')
+      refreshMCPs()
+      window.history.replaceState(null, '', window.location.pathname)
+    } else if (params.get('gmail_error')) {
+      toast(`Gmail auth failed: ${params.get('gmail_error')}`, 'error')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -314,7 +328,13 @@ export default function App() {
   const onConnect = async (id) => {
     setTogglingMcp(id)
     try {
-      await connectMCP(id)
+      const result = await connectMCP(id)
+      if (result && result.needs_auth && result.auth_url) {
+        window.open(result.auth_url, '_blank', 'width=600,height=700,scrollbars=yes')
+        toast('Please complete Gmail authentication in the opened window', 'info')
+        setTogglingMcp(null)
+        return
+      }
       await refreshMCPs()
       toast('Connected', 'success')
     } finally { setTogglingMcp(null) }

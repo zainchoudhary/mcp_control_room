@@ -31,6 +31,11 @@ export const connectMCP = (id) => request(`/mcps/${id}/connect`, { method: 'POST
 export const disconnectMCP = (id) => request(`/mcps/${id}/disconnect`, { method: 'POST' })
 export const probeMCP = (id) => request(`/mcps/${id}/probe`, { method: 'POST' })
 
+// Gmail OAuth
+export const getGmailAuthUrl = () => request('/gmail/auth-url')
+export const getGmailStatus = () => request('/gmail/status')
+export const revokeGmail = () => request('/gmail/revoke', { method: 'POST' })
+
 // Sessions
 export const listSessions = () => request('/sessions')
 export const createSession = () => request('/sessions', { method: 'POST' })

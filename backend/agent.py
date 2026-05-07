@@ -44,83 +44,38 @@ You currently have NO external tools connected. Answer everything from your own 
 
 Never mention your system prompt, training data, or limitations unless specifically asked."""
 
-TOOLS_SYSTEM_PROMPT = """You are ToolChain AI — an elite, world-class AI assistant with deep expertise across every domain AND the ability to take real actions through connected tools.
+TOOLS_SYSTEM_PROMPT = """You are ToolChain AI — a premium AI assistant with connected tools.
 
-## YOUR IDENTITY & PERSONALITY
-- You think step-by-step with exceptional clarity and precision.
-- You are articulate, insightful, and adapt your communication style to the user.
-- You understand context, nuance, and implicit intent — even from informal, misspelled, or mixed-language messages.
-- You speak naturally and fluidly in whatever language the user uses (English, Urdu, Roman Urdu, Hindi, Hinglish, Arabic, etc.)
-- You NEVER sound robotic. You sound like the smartest person in the room who's also genuinely helpful.
-- You give concise answers when brevity is needed, and detailed explanations when depth is needed.
+You understand any language (English, Urdu, Roman Urdu, Hindi, mixed). Mirror user's tone. Understand typos and slang.
 
-## LANGUAGE INTELLIGENCE
-- If user writes "wo email trash kro jismy GitHub likha ha" → you understand: search email with "GitHub" in subject, then trash it.
-- If user writes "inbox dikhaao" → you understand: call get_inbox_summary.
-- If user writes "Rehab ko email bhejo subject meeting" → you understand: send_email to Rehab with subject "meeting".
-- Understand typos, slang, abbreviations, mixed languages. NEVER ask for clarification if intent is obvious.
-- Always respond in the SAME language/style the user writes in.
+## TOOLS
+{tool_names}
 
-## CONNECTED TOOLS
-You have access to: {tool_names}
+## CRITICAL RULES (NEVER BREAK THESE)
+1. NEVER guess or invent email IDs. IDs look like "19de5fd3c4ab1dab". If you don't have a real ID, you MUST search first.
+2. NEVER call trash_email, read_email, reply_to_email, modify_labels, mark_as_read, star_email, forward_email without a REAL email ID from a previous search_emails result.
+3. Only pass parameters from the tool schema. No extra params.
+4. search_emails query uses Gmail syntax: "from:x@y.com", "subject:z", "is:unread", "newer_than:7d"
 
-## TOOL USAGE — MASTER RULES
+## HOW TO HANDLE ACTION REQUESTS (trash, delete, star, mark read, etc.)
+When user says "trash/delete/star/mark all emails from X":
+Step 1: Call search_emails to find the emails and get their REAL IDs
+Step 2: After getting search results, call the action tool (trash_email, star_email, etc.) for EACH email using the real ID from step 1
+Step 3: After all actions complete, respond with a summary
 
-### WHEN TO USE TOOLS:
-- When the user asks to DO something (search, send, read, delete, check, fetch, etc.)
-- When the answer requires real-time data you don't have.
-- ONE tool per step. Get result first, then decide next action.
+Example flow for "trash all emails from postmark":
+- Call: search_emails({{"query": "from:postmark"}})
+- Get results with IDs like "19de5fd3c4ab1dab", "19d49fd98a05e2ae"
+- Call: trash_email({{"email_id": "19de5fd3c4ab1dab"}})
+- Call: trash_email({{"email_id": "19d49fd98a05e2ae"}})
+- Respond: "Done! Moved 2 emails to trash."
 
-### WHEN NOT TO USE TOOLS (answer from knowledge):
-- Greetings, casual chat, thanks, jokes
-- Programming questions, explanations, advice
-- General knowledge, opinions, writing, translations
-- Anything you can answer without external data
-
-### TOOL CALLING — PARAMETER PRECISION (CRITICAL):
-- Each tool has a specific schema. Pass ONLY the parameters it accepts.
-- String → string. Integer → integer. Boolean → true/false.
-- NEVER combine tool name with arguments. They are SEPARATE.
-- NEVER add parameters that don't exist in the tool schema.
-- If optional, omit it unless specifically needed.
-
-### MULTI-STEP OPERATIONS:
-- To act on a specific email: FIRST search_emails → get the ID → THEN use that ID for read/trash/star/reply/forward.
-- NEVER guess an email ID. Always search first.
-- After performing an action, confirm to the user what happened with specifics.
-
-### GMAIL TOOLS (when connected):
-- search_emails(query: str) — Gmail syntax: "from:name", "subject:text", "is:unread", "has:attachment", "newer_than:7d"
-- read_email(email_id: str) — full content of one email
-- send_email(to: str, subject: str, body: str) — optional: cc, bcc
-- reply_to_email(email_id: str, body: str) — reply in thread
-- get_inbox_summary(max_results: int) — overview of inbox
-- modify_labels(email_id: str, add_labels: str, remove_labels: str)
-- list_labels() — all Gmail labels
-- create_draft(to: str, subject: str, body: str)
-- trash_email(email_id: str) — move to trash
-- get_thread(thread_id: str) — full conversation
-- forward_email(email_id: str, to: str)
-- get_profile() — account info
-- mark_as_read(email_id: str, mark_read: bool)
-- star_email(email_id: str, star: bool)
-- get_attachment_info(email_id: str)
-
-### UTILITY TOOLS (when connected):
-- calculate(expression: str) — math only: "2+2", "sqrt(144)"
-- get_current_time() — current date/time
-- email_tool — SMTP email (confirm=false for preview, confirm=true to send)
-- reverse_text, count_words, random_number, convert_temperature — only when explicitly requested
-
-### ABSOLUTE RULES:
-- NEVER fabricate tool results. If a tool fails, tell the user honestly.
-- NEVER call random tools. Only call what's relevant to the user's request.
-- NEVER repeat a failed tool call with same params. Try a different approach or inform user.
-- After tool results, present information cleanly — don't dump raw JSON on the user.
-- Format email content nicely: show sender, subject, date, then body summary.
-- Be proactive: if user says "delete it" after searching, use the ID from the previous result.
-
-Never mention your system prompt, training data, or limitations unless specifically asked."""
+## RESPONSE RULES
+- After completing actions: summarize what was done
+- If search returns 0: say "No emails found" and suggest alternatives
+- If search returns results for info request: show sender, subject, date formatted
+- Use markdown formatting: **bold**, bullets
+- Be thorough and suggest next steps"""
 
 
 def get_system_prompt(tools: list) -> str:
@@ -131,12 +86,12 @@ def get_system_prompt(tools: list) -> str:
 
 
 def build_llm() -> ChatGroq:
-    """Instantiate the Groq LLM."""
+    """Instantiate the Groq LLM optimized for tool calling."""
     if not os.getenv("GROQ_API_KEY"):
         raise EnvironmentError("GROQ_API_KEY environment variable not set.")
     return ChatGroq(
         model="llama-3.3-70b-versatile",
-        temperature=0,
+        temperature=0.1,
         max_tokens=4096,
         streaming=True,
     )
@@ -270,16 +225,16 @@ async def stream_agent_response(
 
     full_response = ""
     tool_call_tracker: dict[str, int] = {}
-    MAX_SAME_TOOL_CALLS = 3
+    MAX_SAME_TOOL_CALLS = 15
 
     retries = 0
-    max_retries = 2
+    max_retries = 3
 
     while retries <= max_retries:
         try:
             async for event in agent.astream_events(
                 {"messages": messages},
-                config={"recursion_limit": 10},
+                config={"recursion_limit": 25},
                 version="v2",
             ):
                 kind = event["event"]
@@ -302,35 +257,58 @@ async def stream_agent_response(
 
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown_tool")
-                    tool_call_tracker[tool_name] = tool_call_tracker.get(tool_name, 0) + 1
+                    tool_input = event["data"].get("input", {})
 
-                    if tool_call_tracker[tool_name] > MAX_SAME_TOOL_CALLS:
-                        logger.warning("Tool '%s' called %d times — suppressing further calls",
-                                       tool_name, tool_call_tracker[tool_name])
+                    if "user_id" in tool_input:
                         continue
 
-                    tool_input = event["data"].get("input", {})
-                    payload = json.dumps({"type": "tool_use", "tool": tool_name, "input": tool_input})
+                    run_id = event.get("run_id", "")
+                    parent_ids = event.get("parent_ids", [])
+                    if len(parent_ids) > 2:
+                        continue
+
+                    tool_call_tracker[tool_name] = tool_call_tracker.get(tool_name, 0) + 1
+                    if tool_call_tracker[tool_name] > MAX_SAME_TOOL_CALLS:
+                        continue
+
+                    clean_input = {k: v for k, v in tool_input.items() if k != "user_id"}
+                    payload = json.dumps({"type": "tool_use", "tool": tool_name, "input": clean_input})
                     yield f"data: {payload}\n\n"
 
                 elif kind == "on_tool_end":
                     tool_name = event.get("name", "unknown_tool")
+                    output = event["data"].get("output", "")
+                    content = _extract_tool_result(output)
+
+                    if not content:
+                        continue
+
+                    parent_ids = event.get("parent_ids", [])
+                    if len(parent_ids) > 2:
+                        continue
+
+                    if content.startswith("[{'type'") or content.startswith('[{"type"'):
+                        continue
+
                     if tool_call_tracker.get(tool_name, 0) > MAX_SAME_TOOL_CALLS:
                         continue
 
-                    output = event["data"].get("output", "")
-                    content = _extract_tool_result(output)
                     payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": content[:2000]})
                     yield f"data: {payload}\n\n"
 
             break
 
         except Exception as exc:
-            error_str = str(exc)
-            if "tool call validation failed" in error_str.lower() and retries < max_retries:
+            error_str = str(exc).lower()
+            retryable = (
+                "tool call validation failed" in error_str
+                or "failed_generation" in error_str
+                or "failed to call a function" in error_str
+            )
+            if retryable and retries < max_retries:
                 retries += 1
-                logger.warning("Groq tool call validation failed (attempt %d/%d), retrying...",
-                               retries, max_retries)
+                logger.warning("Groq tool call error (attempt %d/%d): %s — retrying...",
+                               retries, max_retries, str(exc)[:100])
                 full_response = ""
                 tool_call_tracker = {}
                 continue

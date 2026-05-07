@@ -39,6 +39,12 @@ from mcp_manager import get_mcp_tools, probe_mcp
 from agent import stream_agent_response
 from auth_routes import router as auth_router
 from auth_utils import get_current_user
+from gmail_oauth import (
+    generate_auth_url,
+    exchange_code_for_token,
+    get_user_gmail_status,
+    revoke_user_gmail,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -169,6 +175,16 @@ async def api_connect_mcp(
     mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
+
+    mcp_name = (mcp.get("name", "") or "").lower()
+    mcp_url = (mcp.get("url", "") or "").lower()
+    is_gmail = "gmail" in mcp_name or "9002" in mcp_url
+    if is_gmail:
+        gmail_status = await get_user_gmail_status(user["id"], db)
+        if not gmail_status:
+            auth_url = generate_auth_url(user["id"])
+            return {"id": mcp_id, "connected": False, "needs_auth": True, "auth_url": auth_url}
+
     await set_mcp_connection(db, mcp_id, user["id"], True)
     return {"id": mcp_id, "connected": True}
 
@@ -198,6 +214,70 @@ async def api_probe_mcp(
         raise HTTPException(status_code=404, detail="MCP not found.")
     result = await probe_mcp(mcp["url"], mcp["transport"])
     return result
+
+
+# ─── Routes: Gmail OAuth (Per-User) ──────────────────────────────────────────
+
+@app.get("/api/gmail/auth-url")
+async def api_gmail_auth_url(
+    user: dict = Depends(get_current_user),
+):
+    """Generate Google OAuth URL for the current user to link their Gmail."""
+    try:
+        url = generate_auth_url(user["id"])
+        return {"auth_url": url}
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/gmail/callback")
+async def api_gmail_callback(
+    code: str,
+    state: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    OAuth2 callback from Google. Exchanges code for tokens and stores per-user.
+    Redirects to frontend with success/error status.
+    """
+    try:
+        result = await exchange_code_for_token(code, state, db)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"/mcp-servers?gmail_linked=true&email={result['email']}",
+            status_code=302,
+        )
+    except Exception as e:
+        logger.error("Gmail OAuth callback failed: %s", e)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"/mcp-servers?gmail_error={str(e)[:100]}",
+            status_code=302,
+        )
+
+
+@app.get("/api/gmail/status")
+async def api_gmail_status(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if the current user has linked their Gmail account."""
+    status = await get_user_gmail_status(user["id"], db)
+    if status:
+        return {"linked": True, **status}
+    return {"linked": False}
+
+
+@app.post("/api/gmail/revoke")
+async def api_gmail_revoke(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unlink/revoke Gmail access for the current user."""
+    revoked = await revoke_user_gmail(user["id"], db)
+    if revoked:
+        return {"message": "Gmail access revoked successfully"}
+    raise HTTPException(status_code=404, detail="No Gmail account linked")
 
 
 # ─── Routes: Sessions ────────────────────────────────────────────────────────
@@ -275,14 +355,15 @@ async def api_chat_stream(
         title = body.message[:80] + ("..." if len(body.message) > 80 else "")
         await update_session_title(db, body.session_id, title)
 
-    connected_mcps = await get_connected_mcps(db, user["id"])
+    current_user_id = user["id"]
+    connected_mcps = await get_connected_mcps(db, current_user_id)
     session_id = body.session_id
     user_message = body.message
 
     async def event_generator():
         full_response_parts = []
 
-        async with get_mcp_tools(connected_mcps) as tools:
+        async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
             async for sse_chunk in stream_agent_response(user_message, history, tools):
                 yield sse_chunk
 
