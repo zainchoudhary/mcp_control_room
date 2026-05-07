@@ -37,6 +37,9 @@ export const getGmailAuthUrl = () => request('/gmail/auth-url')
 export const getGmailStatus = () => request('/gmail/status')
 export const revokeGmail = () => request('/gmail/revoke', { method: 'POST' })
 
+// Stats
+export const getWeeklyStats = () => request('/stats/weekly')
+
 // Sessions
 export const listSessions = () => request('/sessions')
 export const createSession = () => request('/sessions', { method: 'POST' })

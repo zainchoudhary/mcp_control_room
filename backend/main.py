@@ -252,6 +252,76 @@ async def api_probe_mcp(
     return result
 
 
+# ─── Routes: Dashboard Stats ─────────────────────────────────────────────────
+
+@app.get("/api/stats/weekly")
+async def api_weekly_stats(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get daily chat/message counts for the last 7 days (real-time stats)."""
+    from sqlalchemy import func, cast, Date, select
+    from db_models import Message, ChatSession
+    from datetime import datetime, timedelta
+
+    today = datetime.utcnow().date()
+    week_ago = today - timedelta(days=6)
+
+    msg_result = await db.execute(
+        select(
+            cast(Message.created_at, Date).label("day"),
+            func.count(Message.id).label("count"),
+        )
+        .join(ChatSession, Message.session_id == ChatSession.id)
+        .where(
+            ChatSession.user_id == user["id"],
+            Message.role == "user",
+            cast(Message.created_at, Date) >= week_ago,
+        )
+        .group_by(cast(Message.created_at, Date))
+        .order_by(cast(Message.created_at, Date))
+    )
+    msg_rows = msg_result.all()
+
+    sess_result = await db.execute(
+        select(
+            cast(ChatSession.created_at, Date).label("day"),
+            func.count(ChatSession.id).label("count"),
+        )
+        .where(
+            ChatSession.user_id == user["id"],
+            cast(ChatSession.created_at, Date) >= week_ago,
+        )
+        .group_by(cast(ChatSession.created_at, Date))
+        .order_by(cast(ChatSession.created_at, Date))
+    )
+    sess_rows = sess_result.all()
+
+    msg_map = {str(row.day): row.count for row in msg_rows}
+    sess_map = {str(row.day): row.count for row in sess_rows}
+
+    days_data = []
+    for i in range(7):
+        d = week_ago + timedelta(days=i)
+        day_str = str(d)
+        day_label = d.strftime("%a")
+        days_data.append({
+            "day": day_label,
+            "date": day_str,
+            "messages": msg_map.get(day_str, 0),
+            "sessions": sess_map.get(day_str, 0),
+        })
+
+    total_messages = sum(d["messages"] for d in days_data)
+    total_sessions = sum(d["sessions"] for d in days_data)
+
+    return {
+        "days": days_data,
+        "total_messages": total_messages,
+        "total_sessions": total_sessions,
+    }
+
+
 # ─── Routes: Gmail OAuth (Per-User) ──────────────────────────────────────────
 
 @app.get("/api/gmail/auth-url")
