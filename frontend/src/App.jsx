@@ -297,7 +297,9 @@ export default function App() {
           )
         }
         if (event.type === 'error') {
-          toast(event.content || 'Stream error', 'error')
+          const msg = event.content || 'Stream error'
+          const isRetryable = msg.includes('failed_generation') || msg.includes('tool call validation') || msg.includes('failed to call a function')
+          if (!isRetryable) toast(msg, 'error')
         }
       }
     } catch (err) {

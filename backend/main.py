@@ -512,10 +512,15 @@ async def api_chat_stream(
                     import json
                     try:
                         data = json.loads(sse_chunk[6:])
-                        if data.get("type") == "token":
+                        evt_type = data.get("type")
+                        if evt_type == "token":
                             full_response_parts.append(data.get("content", ""))
-                        elif data.get("type") == "done" and data.get("content"):
-                            full_response_parts = [data.get("content", "")]
+                        elif evt_type == "tool_use":
+                            line = f'Tool: {data["tool"]}({json.dumps(data.get("input", {}))})\n'
+                            full_response_parts.append(line)
+                        elif evt_type == "tool_result":
+                            line = f'Result: {data["tool"]} -> {data.get("content", "")}\n'
+                            full_response_parts.append(line)
                     except Exception:
                         pass
 
