@@ -9,10 +9,8 @@ import {
   deleteMCP,
   connectMCP,
   disconnectMCP,
-  toggleMCP,
   probeMCP,
   streamChat,
-  getGmailStatus,
   getWeeklyStats,
 } from './api.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
@@ -71,6 +69,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
+  const [enabledMcpIds, setEnabledMcpIds] = useState(new Set())
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -83,9 +82,6 @@ export default function App() {
         if (u) {
           setUser(u)
           setDataLoading(false)
-          refreshMCPs()
-          refreshSessions()
-          refreshStats()
         } else {
           setUser(null)
           setDataLoading(false)
@@ -95,12 +91,6 @@ export default function App() {
       .finally(() => { if (!cancelled) setAuthChecked(true) })
     return () => { cancelled = true }
   }, [])
-
-  useEffect(() => {
-    if (!user) return
-    const interval = setInterval(refreshStats, 30000)
-    return () => clearInterval(interval)
-  }, [user])
 
   useEffect(() => {
     if (!authChecked) return
@@ -120,16 +110,18 @@ export default function App() {
   }, [authChecked, user])
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('gmail_linked') === 'true') {
-      const email = params.get('email') || 'your Gmail'
-      toast(`Gmail connected: ${email}`, 'success')
-      refreshMCPs()
-      window.history.replaceState(null, '', window.location.pathname)
-    } else if (params.get('gmail_error')) {
-      toast(`Gmail auth failed: ${params.get('gmail_error')}`, 'error')
-      window.history.replaceState(null, '', window.location.pathname)
+    const handleOAuthMessage = (event) => {
+      if (!event.data || typeof event.data !== 'object') return
+      if (event.data.type === 'gmail_auth_complete') {
+        const email = event.data.email || 'your Gmail'
+        toast(`Gmail connected: ${email}`, 'success')
+        refreshMCPs()
+      } else if (event.data.type === 'gmail_auth_error') {
+        toast(`Gmail auth failed: ${event.data.error || 'Unknown error'}`, 'error')
+      }
     }
+    window.addEventListener('message', handleOAuthMessage)
+    return () => window.removeEventListener('message', handleOAuthMessage)
   }, [])
 
   useEffect(() => {
@@ -144,13 +136,10 @@ export default function App() {
     setUser(userData)
     setDataLoading(false)
     const savedPage = getPageFromUrl()
-    setActivePage(savedPage)
+    setActivePage(APP_PAGES.includes(savedPage) ? savedPage : 'dashboard')
     if (!APP_PAGES.includes(window.location.pathname.replace(/^\/+/, ''))) {
       window.history.replaceState(null, '', '/dashboard')
     }
-    refreshMCPs()
-    refreshSessions()
-    refreshStats()
   }
 
   const [logoutLoading, setLogoutLoading] = useState(false)
@@ -180,7 +169,12 @@ export default function App() {
     })
   }
 
-  const connectedCount = useMemo(() => mcps.filter((m) => m.connected).length, [mcps])
+  const connectedMcps = useMemo(() => mcps.filter((m) => m.connected), [mcps])
+  const connectedCount = connectedMcps.length
+  const chatEnabledCount = useMemo(
+    () => connectedMcps.filter((m) => enabledMcpIds.has(m.id)).length,
+    [connectedMcps, enabledMcpIds],
+  )
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -190,30 +184,62 @@ export default function App() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  const refreshMCPs = async () => {
+  const refreshMCPs = useCallback(async () => {
     try {
       const data = await listMCPs()
       setMcps(data)
+      const connectedIds = new Set(data.filter((m) => m.connected).map((m) => m.id))
+      setEnabledMcpIds((prev) => {
+        const next = new Set()
+        connectedIds.forEach((id) => {
+          next.add(id)
+        })
+        return next
+      })
     } catch (err) {
       toast(err.message, 'error')
     }
-  }
+  }, [])
 
-  const refreshSessions = async () => {
+  const refreshSessions = useCallback(async () => {
     try {
       const data = await listSessions()
       setSessions(data)
     } catch (err) {
       toast(err.message, 'error')
     }
-  }
+  }, [])
 
-  const refreshStats = async () => {
+  const refreshStats = useCallback(async () => {
     try {
       const data = await getWeeklyStats()
       setWeeklyStats(data)
     } catch { /* silent */ }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!user || activePage !== 'dashboard') return
+    refreshStats()
+    refreshMCPs()
+    refreshSessions()
+  }, [user, activePage])
+
+  useEffect(() => {
+    if (!user || activePage !== 'dashboard') return
+    const interval = setInterval(refreshStats, 30000)
+    return () => clearInterval(interval)
+  }, [user, activePage])
+
+  useEffect(() => {
+    if (!user || activePage !== 'mcp-servers') return
+    refreshMCPs()
+  }, [user, activePage])
+
+  useEffect(() => {
+    if (!user || activePage !== 'chat') return
+    refreshSessions()
+    refreshMCPs()
+  }, [user, activePage])
 
 
   const ensureSession = async () => {
@@ -246,7 +272,7 @@ export default function App() {
         )
       }
 
-      for await (const event of streamChat(sid, text)) {
+      for await (const event of streamChat(sid, text, [...enabledMcpIds])) {
         if (event.type === 'token') {
           setMessages((prev) =>
             prev.map((m) =>
@@ -349,7 +375,6 @@ export default function App() {
       const result = await connectMCP(id)
       if (result && result.needs_auth && result.auth_url) {
         window.open(result.auth_url, '_blank', 'width=600,height=700,scrollbars=yes')
-        toast('Please complete Gmail authentication in the opened window', 'info')
         setTogglingMcp(null)
         return
       }
@@ -367,19 +392,13 @@ export default function App() {
     } finally { setTogglingMcp(null) }
   }
 
-  const onToggle = async (id) => {
-    setTogglingMcp(id)
-    try {
-      const result = await toggleMCP(id)
-      if (result && result.needs_auth && result.auth_url) {
-        window.open(result.auth_url, '_blank', 'width=600,height=700,scrollbars=yes')
-        toast('Please complete Gmail authentication in the opened window', 'info')
-        setTogglingMcp(null)
-        return
-      }
-      await refreshMCPs()
-      toast(result.connected ? 'Connected' : 'Disconnected', result.connected ? 'success' : 'info')
-    } finally { setTogglingMcp(null) }
+  const onChatToggle = (id) => {
+    setEnabledMcpIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const onProbe = async (id) => probeMCP(id)
@@ -561,6 +580,7 @@ export default function App() {
             onDelete={onDelete}
             onOpenRegister={() => setShowRegister(true)}
             togglingMcp={togglingMcp}
+            busy={!!togglingMcp || deleteLoading}
             connectedCount={connectedCount}
             initialSelectedMcp={initialSelectedMcp}
             onClearInitialMcp={() => setInitialSelectedMcp(null)}
@@ -627,11 +647,11 @@ export default function App() {
               onChange={setInput}
               onSend={send}
               sending={sending}
-              connectedCount={connectedCount}
+              connectedCount={chatEnabledCount}
               onOpenRegister={() => setShowRegister(true)}
-              mcps={mcps}
-              onToggle={onToggle}
-              togglingMcp={togglingMcp}
+              mcps={connectedMcps}
+              enabledIds={enabledMcpIds}
+              onToggle={onChatToggle}
             />
           </div>
         )}

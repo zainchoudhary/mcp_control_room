@@ -48,11 +48,11 @@ export const deleteSessionApi = (id) => request(`/sessions/${id}`, { method: 'DE
 export const getMessages = (id) => request(`/sessions/${id}/messages`)
 
 // Chat Stream
-export async function* streamChat(sessionId, message) {
+export async function* streamChat(sessionId, message, mcpIds = []) {
   const res = await fetch(`${BASE}/chat/stream`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ session_id: sessionId, message }),
+    body: JSON.stringify({ session_id: sessionId, message, mcp_ids: mcpIds }),
   })
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

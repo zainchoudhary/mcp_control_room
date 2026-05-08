@@ -2,14 +2,13 @@
 mcp_manager.py - Manages live MCP client connections and tool resolution.
 Uses langchain-mcp-adapters MultiServerMCPClient for SSE/stdio transports.
 
-Supports per-user tool injection: Gmail tools get user_id auto-injected.
+Supports per-user credential injection: Gmail tools get OAuth credentials
+auto-injected so the LLM never sees tokens.
 """
 import asyncio
 import logging
 import re
-from typing import Optional
 from contextlib import asynccontextmanager
-from functools import partial
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import StructuredTool
@@ -22,6 +21,8 @@ GMAIL_TOOL_NAMES = {
     "trash_email", "get_thread", "forward_email", "get_profile",
     "mark_as_read", "star_email", "get_attachment_info",
 }
+
+CREDENTIAL_FIELDS = {"access_token", "refresh_token", "client_id", "client_secret"}
 
 
 def build_server_config(mcps: list) -> dict:
@@ -53,14 +54,13 @@ def _sanitize_tools(tools: list) -> list:
     return tools
 
 
-def _wrap_gmail_tool_with_user_id(tool, user_id: str):
+def _wrap_gmail_tool_with_credentials(tool, gmail_creds: dict):
     """
-    Wrap a Gmail MCP tool so that user_id is automatically injected.
-    The LLM never sees or provides user_id — it's hidden from the schema.
-    Handles both dict-based schemas (from MCP adapters) and Pydantic models.
+    Wrap a Gmail MCP tool so that OAuth credentials are automatically injected.
+    The LLM never sees access_token/refresh_token/client_id/client_secret.
+    They are stripped from the schema and injected at call time.
     """
     from pydantic import create_model, Field
-    from typing import Optional as Opt
 
     schema = tool.args_schema
     new_schema = None
@@ -72,7 +72,7 @@ def _wrap_gmail_tool_with_user_id(tool, user_id: str):
         type_map = {"string": str, "integer": int, "boolean": bool, "number": float}
 
         for field_name, field_def in properties.items():
-            if field_name == "user_id":
+            if field_name in CREDENTIAL_FIELDS:
                 continue
             py_type = type_map.get(field_def.get("type", "string"), str)
             title = field_def.get("title", field_name)
@@ -89,7 +89,7 @@ def _wrap_gmail_tool_with_user_id(tool, user_id: str):
     elif schema and hasattr(schema, "model_fields"):
         fields = {}
         for field_name, field_info in schema.model_fields.items():
-            if field_name == "user_id":
+            if field_name in CREDENTIAL_FIELDS:
                 continue
             annotation = field_info.annotation
             if hasattr(annotation, "__origin__"):
@@ -101,11 +101,11 @@ def _wrap_gmail_tool_with_user_id(tool, user_id: str):
         new_schema = create_model(f"{tool.name}_Args", **fields)
 
     async def wrapped_async(**kwargs):
-        kwargs["user_id"] = user_id
+        kwargs.update(gmail_creds)
         return await tool.ainvoke(kwargs)
 
     def wrapped_sync(**kwargs):
-        kwargs["user_id"] = user_id
+        kwargs.update(gmail_creds)
         return asyncio.get_event_loop().run_until_complete(tool.ainvoke(kwargs))
 
     wrapped_tool = StructuredTool(
@@ -118,32 +118,33 @@ def _wrap_gmail_tool_with_user_id(tool, user_id: str):
     return wrapped_tool
 
 
-def _inject_user_id_into_gmail_tools(tools: list, user_id: str) -> list:
+def _inject_credentials_into_gmail_tools(tools: list, gmail_creds: dict) -> list:
     """
-    For any Gmail tool in the list, wrap it to auto-inject user_id.
+    For any Gmail tool in the list, wrap it to auto-inject OAuth credentials.
     Non-Gmail tools pass through unchanged.
     """
     result = []
     for tool in tools:
         if tool.name in GMAIL_TOOL_NAMES:
-            wrapped = _wrap_gmail_tool_with_user_id(tool, user_id)
+            wrapped = _wrap_gmail_tool_with_credentials(tool, gmail_creds)
             result.append(wrapped)
-            logger.info("  Wrapped Gmail tool '%s' with user_id injection", tool.name)
+            logger.info("  Wrapped Gmail tool '%s' with credential injection", tool.name)
         else:
             result.append(tool)
     return result
 
 
 @asynccontextmanager
-async def get_mcp_tools(mcps: list, user_id: str = None):
+async def get_mcp_tools(mcps: list, user_id: str = None, gmail_creds: dict = None):
     """
     Async context manager that yields a list of LangChain-compatible tools
     loaded from the given MCP servers.
 
-    If user_id is provided, Gmail tools will be wrapped to auto-inject it.
+    If gmail_creds is provided, Gmail tools will be wrapped to auto-inject
+    OAuth credentials (access_token, refresh_token, client_id, client_secret).
 
     Usage:
-        async with get_mcp_tools(connected_mcps, user_id="...") as tools:
+        async with get_mcp_tools(connected_mcps, gmail_creds={...}) as tools:
             # use tools in agent
     """
     if not mcps:
@@ -162,8 +163,8 @@ async def get_mcp_tools(mcps: list, user_id: str = None):
         for t in tools:
             logger.info("  Tool: %s", t.name)
 
-        if user_id:
-            tools = _inject_user_id_into_gmail_tools(tools, user_id)
+        if gmail_creds:
+            tools = _inject_credentials_into_gmail_tools(tools, gmail_creds)
             for t in tools:
                 if t.name in GMAIL_TOOL_NAMES:
                     schema_fields = list(t.args_schema.model_fields.keys()) if t.args_schema else []

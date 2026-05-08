@@ -14,6 +14,7 @@ export function MCPServersPage({
   onDelete,
   onOpenRegister,
   togglingMcp,
+  busy,
   connectedCount,
   initialSelectedMcp,
   onClearInitialMcp,
@@ -44,7 +45,7 @@ export function MCPServersPage({
             {connectedCount > 0 && ` · ${connectedCount} connected`}
           </p>
         </div>
-        <button className={styles.addBtn} onClick={onOpenRegister}>
+        <button className={styles.addBtn} onClick={onOpenRegister} disabled={busy}>
           <Plus size={16} />
           <span>Register Server</span>
         </button>
@@ -59,7 +60,7 @@ export function MCPServersPage({
           <p className={styles.emptyText}>
             Register your first MCP server to enable tool-assisted AI conversations.
           </p>
-          <button className={styles.emptyBtn} onClick={onOpenRegister}>
+          <button className={styles.emptyBtn} onClick={onOpenRegister} disabled={busy}>
             <Plus size={16} />
             <span>Register Server</span>
           </button>
@@ -74,6 +75,7 @@ export function MCPServersPage({
               onDisconnect={onDisconnect}
               onDelete={onDelete}
               isToggling={togglingMcp === mcp.id}
+              busy={busy}
               onOpen={() => setSelectedMcp(mcp)}
             />
           ))}
@@ -89,15 +91,17 @@ export function MCPServersPage({
           onProbe={onProbe}
           onDelete={(id, name) => { onDelete(id, name) }}
           isToggling={togglingMcp === selectedMcp.id}
+          busy={busy}
         />
       )}
     </div>
   )
 }
 
-function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen }) {
+function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, onOpen }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const disabled = busy || isToggling
 
   useEffect(() => {
     if (!menuOpen) return
@@ -110,20 +114,22 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen
 
   const handleToggle = () => {
     setMenuOpen(false)
-    if (isToggling) return
+    if (disabled) return
     if (mcp.connected) onDisconnect(mcp.id)
     else onConnect(mcp.id)
   }
 
   const handleDelete = () => {
     setMenuOpen(false)
+    if (disabled) return
     onDelete(mcp.id, mcp.name)
   }
 
   return (
     <div
-      className={`${styles.card} ${mcp.connected ? styles.cardConnected : ''}`}
-      onClick={onOpen}
+      className={`${styles.card} ${mcp.connected ? styles.cardConnected : ''} ${disabled ? styles.cardBusy : ''}`}
+      onClick={disabled ? undefined : onOpen}
+      style={disabled ? { pointerEvents: isToggling ? 'auto' : 'none', opacity: isToggling ? 1 : 0.6 } : undefined}
     >
       <div className={styles.cardTop}>
         <div className={styles.cardIconWrap}>
@@ -144,15 +150,21 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen
             className={`${styles.dotsBtn} ${menuOpen ? styles.dotsBtnActive : ''}`}
             onClick={() => setMenuOpen((v) => !v)}
             title="Options"
+            disabled={disabled}
           >
             <MoreVertical size={16} />
           </button>
-          {menuOpen && (
+          {menuOpen && !disabled && (
             <div className={styles.dotsMenu}>
-              {mcp.connected && (
+              {mcp.connected ? (
                 <button className={styles.dotsMenuItem} onClick={handleToggle}>
                   <PowerOff size={14} />
                   <span>Disconnect</span>
+                </button>
+              ) : (
+                <button className={styles.dotsMenuItem} onClick={handleToggle}>
+                  <Power size={14} />
+                  <span>Connect</span>
                 </button>
               )}
               <button className={`${styles.dotsMenuItem} ${styles.dotsMenuDanger}`} onClick={handleDelete}>
@@ -189,12 +201,13 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, onOpen
 }
 
 
-function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onDelete, isToggling }) {
+function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onDelete, isToggling, busy }) {
   const [probing, setProbing] = useState(false)
   const [tools, setTools] = useState(null)
   const [probeError, setProbeError] = useState(null)
   const [copiedField, setCopiedField] = useState(null)
   const overlayRef = useRef(null)
+  const disabled = busy || isToggling
 
   useEffect(() => {
     let active = true
@@ -214,17 +227,17 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
   }, [mcp.id])
 
   useEffect(() => {
-    const handleEsc = (e) => { if (e.key === 'Escape' && !isToggling) onClose() }
+    const handleEsc = (e) => { if (e.key === 'Escape' && !disabled) onClose() }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose, isToggling])
+  }, [onClose, disabled])
 
   const handleOverlayClick = (e) => {
-    if (e.target === overlayRef.current && !isToggling) onClose()
+    if (e.target === overlayRef.current && !disabled) onClose()
   }
 
   const handleToggle = () => {
-    if (isToggling) return
+    if (disabled) return
     if (mcp.connected) onDisconnect(mcp.id)
     else onConnect(mcp.id)
   }
@@ -262,7 +275,7 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
               </span>
             </div>
           </div>
-          <button className={styles.closeBtn} onClick={onClose} disabled={isToggling}>
+          <button className={styles.closeBtn} onClick={onClose} disabled={disabled}>
             <X size={18} />
           </button>
         </div>
@@ -324,6 +337,7 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
                   <span>{probeError}</span>
                   <button
                     className={styles.retryBtn}
+                    disabled={disabled}
                     onClick={() => {
                       setProbing(true)
                       setProbeError(null)
@@ -359,20 +373,20 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
           <button
             className={`${styles.footerBtn} ${styles.footerBtnDanger}`}
             onClick={() => onDelete(mcp.id, mcp.name)}
-            disabled={isToggling}
+            disabled={disabled}
           >
             <Trash2 size={14} />
             <span>Delete Server</span>
           </button>
           <div className={styles.footerRight}>
-            <button className={styles.footerBtn} onClick={onClose} disabled={isToggling}>
+            <button className={styles.footerBtn} onClick={onClose} disabled={disabled}>
               Cancel
             </button>
-            {mcp.connected && (
+            {mcp.connected ? (
               <button
                 className={`${styles.footerBtn} ${styles.footerBtnDisconnect}`}
                 onClick={handleToggle}
-                disabled={isToggling}
+                disabled={disabled}
               >
                 {isToggling ? (
                   <Loader2 size={14} className={styles.toggleSpinner} />
@@ -380,6 +394,21 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
                   <>
                     <WifiOff size={14} />
                     <span>Disconnect</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                className={`${styles.footerBtn} ${styles.footerBtnConnect}`}
+                onClick={handleToggle}
+                disabled={disabled}
+              >
+                {isToggling ? (
+                  <Loader2 size={14} className={styles.toggleSpinner} />
+                ) : (
+                  <>
+                    <Wifi size={14} />
+                    <span>Connect</span>
                   </>
                 )}
               </button>

@@ -44,6 +44,7 @@ from gmail_oauth import (
     exchange_code_for_token,
     get_user_gmail_status,
     revoke_user_gmail,
+    get_user_gmail_credentials,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -92,6 +93,7 @@ class MCPCreate(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    mcp_ids: Optional[list[str]] = None
 
 
 # ─── Routes: Dashboard ───────────────────────────────────────────────────────
@@ -182,7 +184,7 @@ async def api_connect_mcp(
     if is_gmail:
         gmail_status = await get_user_gmail_status(user["id"], db)
         if not gmail_status:
-            auth_url = generate_auth_url(user["id"])
+            auth_url = generate_auth_url(user["id"], mcp_id)
             return {"id": mcp_id, "connected": False, "needs_auth": True, "auth_url": auth_url}
 
     await set_mcp_connection(db, mcp_id, user["id"], True)
@@ -344,22 +346,50 @@ async def api_gmail_callback(
 ):
     """
     OAuth2 callback from Google. Exchanges code for tokens and stores per-user.
-    Redirects to frontend with success/error status.
+    Auto-connects the MCP server, notifies the opener window, and closes the tab.
     """
+    from fastapi.responses import HTMLResponse
+
+    user_id = state
+    mcp_id = None
+    if ":" in state:
+        user_id, mcp_id = state.split(":", 1)
+
     try:
-        result = await exchange_code_for_token(code, state, db)
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(
-            url=f"/mcp-servers?gmail_linked=true&email={result['email']}",
-            status_code=302,
-        )
+        result = await exchange_code_for_token(code, user_id, db)
+
+        if mcp_id:
+            await set_mcp_connection(db, mcp_id, user_id, True)
+            logger.info("Auto-connected MCP %s for user %s after Gmail OAuth", mcp_id, user_id)
+
+        email = result.get("email", "")
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><title>Gmail Connected</title></head>
+<body>
+<script>
+  if (window.opener) {{
+    window.opener.postMessage({{ type: 'gmail_auth_complete', email: '{email}' }}, '*');
+  }}
+  window.close();
+</script>
+<p>Gmail connected successfully. This window will close automatically.</p>
+</body></html>""")
+
     except Exception as e:
         logger.error("Gmail OAuth callback failed: %s", e)
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(
-            url=f"/mcp-servers?gmail_error={str(e)[:100]}",
-            status_code=302,
-        )
+        error_msg = str(e)[:100].replace("'", "\\'")
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><title>Gmail Auth Failed</title></head>
+<body>
+<script>
+  if (window.opener) {{
+    window.opener.postMessage({{ type: 'gmail_auth_error', error: '{error_msg}' }}, '*');
+  }}
+  setTimeout(function() {{ window.close(); }}, 3000);
+</script>
+<p>Gmail authentication failed: {error_msg}</p>
+<p>This window will close in 3 seconds.</p>
+</body></html>""")
 
 
 @app.get("/api/gmail/status")
@@ -463,13 +493,18 @@ async def api_chat_stream(
 
     current_user_id = user["id"]
     connected_mcps = await get_connected_mcps(db, current_user_id)
+    if body.mcp_ids is not None:
+        allowed = set(body.mcp_ids)
+        connected_mcps = [m for m in connected_mcps if m["id"] in allowed]
     session_id = body.session_id
     user_message = body.message
+
+    gmail_creds = await get_user_gmail_credentials(current_user_id, db) if connected_mcps else None
 
     async def event_generator():
         full_response_parts = []
 
-        async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
+        async with get_mcp_tools(connected_mcps, gmail_creds=gmail_creds) as tools:
             async for sse_chunk in stream_agent_response(user_message, history, tools):
                 yield sse_chunk
 

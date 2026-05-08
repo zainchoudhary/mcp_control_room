@@ -58,8 +58,13 @@
   flex-shrink: 0;
 }
 
-.addBtn:hover {
+.addBtn:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Empty State ── */
@@ -115,8 +120,13 @@
   transition: var(--transition-fast);
 }
 
-.emptyBtn:hover {
+.emptyBtn:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.emptyBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Grid ── */
@@ -344,10 +354,15 @@
   transition: var(--transition-fast);
 }
 
-.dotsBtn:hover,
+.dotsBtn:hover:not(:disabled),
 .dotsBtnActive {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.dotsBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .dotsMenu {
@@ -551,9 +566,14 @@
   flex-shrink: 0;
 }
 
-.closeBtn:hover {
+.closeBtn:hover:not(:disabled) {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.closeBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Modal Body ── */
@@ -734,10 +754,15 @@
   flex-shrink: 0;
 }
 
-.retryBtn:hover {
+.retryBtn:hover:not(:disabled) {
   background: var(--bg-tertiary);
   border-color: var(--border-strong);
   color: var(--text-primary);
+}
+
+.retryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .toolsEmpty {
@@ -812,7 +837,7 @@
   transition: var(--transition-fast);
 }
 
-.footerBtn:hover {
+.footerBtn:hover:not(:disabled) {
   background: var(--bg-tertiary);
   border-color: var(--border-strong);
   color: var(--text-primary);
@@ -821,6 +846,7 @@
 .footerBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .footerBtnDanger {
@@ -828,7 +854,7 @@
   color: var(--red);
 }
 
-.footerBtnDanger:hover {
+.footerBtnDanger:hover:not(:disabled) {
   background: var(--red-light);
   border-color: var(--red);
   color: var(--red);
@@ -840,7 +866,7 @@
   color: white;
 }
 
-.footerBtnConnect:hover {
+.footerBtnConnect:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
   color: white;
@@ -851,7 +877,7 @@
   color: var(--red);
 }
 
-.footerBtnDisconnect:hover {
+.footerBtnDisconnect:hover:not(:disabled) {
   background: var(--red-light);
 }
 

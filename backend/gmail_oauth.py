@@ -37,6 +37,8 @@ CREDENTIALS_FILE = Path(__file__).parent / "gmail_credentials.json"
 
 OAUTH_REDIRECT_URI = os.getenv("GMAIL_OAUTH_REDIRECT_URI", "http://localhost:8000/api/gmail/callback")
 
+_pending_verifiers: dict[str, str] = {}
+
 
 def _load_client_config() -> dict:
     """Load OAuth2 client config from gmail_credentials.json."""
@@ -73,16 +75,22 @@ def _build_flow():
     )
 
 
-def generate_auth_url(user_id: str) -> str:
+def generate_auth_url(user_id: str, mcp_id: str = None) -> str:
     """Generate Google OAuth2 authorization URL for a user."""
     flow = _build_flow()
+
+    state = f"{user_id}:{mcp_id}" if mcp_id else user_id
 
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=user_id,
+        state=state,
     )
+
+    if hasattr(flow, "code_verifier") and flow.code_verifier:
+        _pending_verifiers[user_id] = flow.code_verifier
+
     return auth_url
 
 
@@ -91,6 +99,11 @@ async def exchange_code_for_token(code: str, user_id: str, db: AsyncSession) -> 
     from googleapiclient.discovery import build
 
     flow = _build_flow()
+
+    saved_verifier = _pending_verifiers.pop(user_id, None)
+    if saved_verifier:
+        flow.code_verifier = saved_verifier
+
     flow.fetch_token(code=code)
     creds = flow.credentials
 
@@ -203,3 +216,47 @@ async def get_user_gmail_service(user_id: str, db: AsyncSession):
         logger.info("Gmail token refreshed for user %s", user_id)
 
     return service, token_record.gmail_email
+
+
+async def get_user_gmail_credentials(user_id: str, db: AsyncSession) -> Optional[dict]:
+    """
+    Get raw OAuth credentials for a user to pass to the standalone Gmail MCP server.
+    Returns dict with access_token, refresh_token, client_id, client_secret or None.
+    Auto-refreshes expired tokens before returning.
+    """
+    result = await db.execute(
+        select(GmailToken).where(GmailToken.user_id == user_id)
+    )
+    token_record = result.scalar_one_or_none()
+    if not token_record:
+        return None
+
+    client_config = _load_client_config()
+
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
+    creds = Credentials(
+        token=token_record.access_token,
+        refresh_token=token_record.refresh_token,
+        token_uri=client_config.get("token_uri", "https://oauth2.googleapis.com/token"),
+        client_id=client_config["client_id"],
+        client_secret=client_config["client_secret"],
+        scopes=SCOPES,
+    )
+
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        token_record.access_token = creds.token
+        if creds.expiry:
+            token_record.token_expiry = creds.expiry.replace(tzinfo=None)
+        token_record.updated_at = datetime.utcnow()
+        await db.commit()
+        logger.info("Gmail token refreshed for user %s (credential fetch)", user_id)
+
+    return {
+        "access_token": token_record.access_token,
+        "refresh_token": token_record.refresh_token,
+        "client_id": client_config["client_id"],
+        "client_secret": client_config["client_secret"],
+    }

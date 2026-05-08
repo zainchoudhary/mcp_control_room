@@ -1,118 +1,85 @@
 #!/usr/bin/env python3
 """
-Gmail MCP Server — Per-user Gmail integration with Google OAuth2.
+Gmail MCP Server — Standalone, Anthropic MCP-standard compliant.
 
-Each tool accepts a `user_id` parameter to load that user's OAuth token from the database.
-The backend injects user_id automatically — the LLM never needs to provide it.
+This server is completely independent — no database, no external app dependencies.
+OAuth credentials (access_token, refresh_token, client_id, client_secret) are passed
+into each tool call. The calling application is responsible for storing and managing tokens.
 
-Run with:
-  python gmail_mcp_server.py
+Run:
+  python server.py                        # default port 9002
+  python server.py --port 9005            # custom port
+  MCP_PORT=9005 python server.py          # via env var
 
-The server exposes Gmail tools over MCP on port 9002.
+Protocol: MCP over SSE (Server-Sent Events)
 """
 
-import asyncio
+import argparse
 import base64
 import json
 import os
-import sys
-from datetime import datetime
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from pathlib import Path
-from typing import Optional
 
-from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-load_dotenv()
-
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.compose",
-    "https://www.googleapis.com/auth/gmail.labels",
-]
-
-CREDENTIALS_FILE = Path(__file__).parent / "gmail_credentials.json"
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://neondb_owner:npg_XwLWA9Omu4jF@ep-lively-waterfall-ani227tu-pooler.c-6.us-east-1.aws.neon.tech/neondb?ssl=require",
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+logger = logging.getLogger("gmail-mcp")
 
-SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://").replace("?ssl=require", "?sslmode=require")
+DEFAULT_PORT = int(os.getenv("MCP_PORT", "9002"))
 
-mcp = FastMCP("Gmail-MCP", host="127.0.0.1", port=9002)
-
-
-def _load_client_config() -> dict:
-    if not CREDENTIALS_FILE.exists():
-        raise RuntimeError(f"Gmail credentials file not found at: {CREDENTIALS_FILE}")
-    data = json.loads(CREDENTIALS_FILE.read_text())
-    if "installed" in data:
-        return data["installed"]
-    elif "web" in data:
-        return data["web"]
-    raise RuntimeError("Invalid gmail_credentials.json format")
+mcp = FastMCP("Gmail-MCP", host="127.0.0.1", port=DEFAULT_PORT)
 
 
-def _get_gmail_service_for_user(user_id: str):
+# ─── Credential Helpers ──────────────────────────────────────────────────────
+
+def _build_gmail_service(
+    access_token: str,
+    refresh_token: str,
+    client_id: str,
+    client_secret: str,
+    token_uri: str = "https://oauth2.googleapis.com/token",
+):
     """
-    Load OAuth token for the given user from the database and build Gmail service.
-    Auto-refreshes token if expired.
+    Build an authenticated Gmail API service from raw OAuth credentials.
+    Auto-refreshes if the access_token is expired.
+    Returns (service, refreshed_access_token).
     """
-    from sqlalchemy import create_engine, text
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
-    engine = create_engine(SYNC_DATABASE_URL, pool_pre_ping=True)
-
-    with engine.connect() as conn:
-        result = conn.execute(
-            text("SELECT access_token, refresh_token, token_expiry FROM gmail_tokens WHERE user_id = :uid"),
-            {"uid": user_id},
-        )
-        row = result.fetchone()
-
-    if not row:
-        raise RuntimeError(
-            "Gmail not authenticated for this user. "
-            "Please connect your Gmail account from Settings or the MCP Servers page."
-        )
-
-    access_token, refresh_token, token_expiry = row
-    client_config = _load_client_config()
-
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,
-        token_uri=client_config.get("token_uri", "https://oauth2.googleapis.com/token"),
-        client_id=client_config["client_id"],
-        client_secret=client_config["client_secret"],
-        scopes=SCOPES,
+        token_uri=token_uri,
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=[
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.send",
+            "https://www.googleapis.com/auth/gmail.modify",
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.labels",
+        ],
     )
 
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with engine.connect() as conn:
-            conn.execute(
-                text(
-                    "UPDATE gmail_tokens SET access_token = :token, "
-                    "token_expiry = :expiry, updated_at = NOW() WHERE user_id = :uid"
-                ),
-                {
-                    "token": creds.token,
-                    "expiry": creds.expiry.replace(tzinfo=None) if creds.expiry else None,
-                    "uid": user_id,
-                },
-            )
-            conn.commit()
 
-    engine.dispose()
-    return build("gmail", "v1", credentials=creds)
+    service = build("gmail", "v1", credentials=creds)
+    return service, creds.token
+
+
+def _get_header(headers: list, name: str) -> str:
+    for h in headers:
+        if h.get("name", "").lower() == name.lower():
+            return h.get("value", "")
+    return ""
 
 
 def _decode_body(payload) -> str:
@@ -122,14 +89,12 @@ def _decode_body(payload) -> str:
 
     parts = payload.get("parts", [])
     for part in parts:
-        mime = part.get("mimeType", "")
-        if mime == "text/plain":
+        if part.get("mimeType") == "text/plain":
             data = part.get("body", {}).get("data", "")
             if data:
                 return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
     for part in parts:
-        mime = part.get("mimeType", "")
-        if mime == "text/html":
+        if part.get("mimeType") == "text/html":
             data = part.get("body", {}).get("data", "")
             if data:
                 return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
@@ -141,26 +106,20 @@ def _decode_body(payload) -> str:
     return ""
 
 
-def _get_header(headers: list, name: str) -> str:
-    for h in headers:
-        if h.get("name", "").lower() == name.lower():
-            return h.get("value", "")
-    return ""
-
-
-# ═══════════════════════════════════════════════════════
-#  TOOL 1: Search Emails
-# ═══════════════════════════════════════════════════════
+# ─── Tools ────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def search_emails(user_id: str, query: str, max_results: int = 10) -> str:
+def search_emails(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    query: str, max_results: int = 10,
+) -> str:
     """
     Search emails using Gmail search syntax.
     Examples: 'from:someone@gmail.com', 'subject:meeting', 'is:unread', 'has:attachment',
     'after:2024/01/01', 'label:important', 'in:inbox newer_than:7d'
     """
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         results = service.users().messages().list(
             userId="me", q=query, maxResults=min(max_results, 50)
         ).execute()
@@ -173,7 +132,7 @@ def search_emails(user_id: str, query: str, max_results: int = 10) -> str:
         for msg in messages:
             detail = service.users().messages().get(
                 userId="me", id=msg["id"], format="metadata",
-                metadataHeaders=["From", "To", "Subject", "Date"]
+                metadataHeaders=["From", "To", "Subject", "Date"],
             ).execute()
             headers = detail.get("payload", {}).get("headers", [])
             emails.append({
@@ -192,15 +151,14 @@ def search_emails(user_id: str, query: str, max_results: int = 10) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 2: Read Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def read_email(user_id: str, email_id: str) -> str:
+def read_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str,
+) -> str:
     """Read the full content of an email by its ID. Get IDs from search_emails."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         msg = service.users().messages().get(userId="me", id=email_id, format="full").execute()
 
         headers = msg.get("payload", {}).get("headers", [])
@@ -234,12 +192,11 @@ def read_email(user_id: str, email_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 3: Send Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def send_email(user_id: str, to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> str:
+def send_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    to: str, subject: str, body: str, cc: str = "", bcc: str = "",
+) -> str:
     """
     Send an email from the user's Gmail account.
     - to: recipient email (comma-separated for multiple)
@@ -247,7 +204,7 @@ def send_email(user_id: str, to: str, subject: str, body: str, cc: str = "", bcc
     - body: email body text
     """
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         message = MIMEMultipart()
         message["to"] = to
         message["subject"] = subject
@@ -270,17 +227,18 @@ def send_email(user_id: str, to: str, subject: str, body: str, cc: str = "", bcc
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 4: Reply to Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def reply_to_email(user_id: str, email_id: str, body: str) -> str:
+def reply_to_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str, body: str,
+) -> str:
     """Reply to an existing email thread. Maintains the thread context."""
     try:
-        service = _get_gmail_service_for_user(user_id)
-        original = service.users().messages().get(userId="me", id=email_id, format="metadata",
-                                                   metadataHeaders=["From", "To", "Subject", "Message-ID"]).execute()
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
+        original = service.users().messages().get(
+            userId="me", id=email_id, format="metadata",
+            metadataHeaders=["From", "To", "Subject", "Message-ID"],
+        ).execute()
         headers = original.get("payload", {}).get("headers", [])
         reply_to = _get_header(headers, "From")
         subject = _get_header(headers, "Subject")
@@ -299,7 +257,7 @@ def reply_to_email(user_id: str, email_id: str, body: str) -> str:
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
         sent = service.users().messages().send(
-            userId="me", body={"raw": raw, "threadId": thread_id}
+            userId="me", body={"raw": raw, "threadId": thread_id},
         ).execute()
 
         return json.dumps({
@@ -312,23 +270,22 @@ def reply_to_email(user_id: str, email_id: str, body: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 5: Get Inbox Summary
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def get_inbox_summary(user_id: str, max_results: int = 15) -> str:
+def get_inbox_summary(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    max_results: int = 15,
+) -> str:
     """Get a summary of the most recent inbox emails with unread count."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
 
         unread = service.users().messages().list(
-            userId="me", q="is:unread in:inbox", maxResults=1
+            userId="me", q="is:unread in:inbox", maxResults=1,
         ).execute()
         unread_count = unread.get("resultSizeEstimate", 0)
 
         results = service.users().messages().list(
-            userId="me", q="in:inbox", maxResults=min(max_results, 30)
+            userId="me", q="in:inbox", maxResults=min(max_results, 30),
         ).execute()
         messages = results.get("messages", [])
 
@@ -336,7 +293,7 @@ def get_inbox_summary(user_id: str, max_results: int = 15) -> str:
         for msg in messages:
             detail = service.users().messages().get(
                 userId="me", id=msg["id"], format="metadata",
-                metadataHeaders=["From", "Subject", "Date"]
+                metadataHeaders=["From", "Subject", "Date"],
             ).execute()
             headers = detail.get("payload", {}).get("headers", [])
             is_unread = "UNREAD" in detail.get("labelIds", [])
@@ -359,18 +316,17 @@ def get_inbox_summary(user_id: str, max_results: int = 15) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 6: Manage Labels (Add/Remove)
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def modify_labels(user_id: str, email_id: str, add_labels: str = "", remove_labels: str = "") -> str:
+def modify_labels(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str, add_labels: str = "", remove_labels: str = "",
+) -> str:
     """
     Add or remove labels from an email.
     Common labels: INBOX, UNREAD, STARRED, IMPORTANT, SPAM, TRASH
     """
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         body = {}
         if add_labels:
             body["addLabelIds"] = [l.strip() for l in add_labels.split(",")]
@@ -388,15 +344,13 @@ def modify_labels(user_id: str, email_id: str, add_labels: str = "", remove_labe
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 7: List Labels
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def list_labels(user_id: str) -> str:
+def list_labels(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+) -> str:
     """List all available Gmail labels (system + custom)."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         results = service.users().labels().list(userId="me").execute()
         labels = results.get("labels", [])
 
@@ -413,15 +367,14 @@ def list_labels(user_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 8: Create Draft
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def create_draft(user_id: str, to: str, subject: str, body: str, cc: str = "") -> str:
+def create_draft(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    to: str, subject: str, body: str, cc: str = "",
+) -> str:
     """Create an email draft (saved but not sent)."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         message = MIMEMultipart()
         message["to"] = to
         message["subject"] = subject
@@ -431,7 +384,7 @@ def create_draft(user_id: str, to: str, subject: str, body: str, cc: str = "") -
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
         draft = service.users().drafts().create(
-            userId="me", body={"message": {"raw": raw}}
+            userId="me", body={"message": {"raw": raw}},
         ).execute()
 
         return json.dumps({
@@ -443,15 +396,14 @@ def create_draft(user_id: str, to: str, subject: str, body: str, cc: str = "") -
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 9: Delete/Trash Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def trash_email(user_id: str, email_id: str) -> str:
+def trash_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str,
+) -> str:
     """Move an email to trash. Can be recovered within 30 days."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         service.users().messages().trash(userId="me", id=email_id).execute()
         return json.dumps({
             "success": True,
@@ -461,17 +413,18 @@ def trash_email(user_id: str, email_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 10: Get Thread (Conversation)
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def get_thread(user_id: str, thread_id: str) -> str:
+def get_thread(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    thread_id: str,
+) -> str:
     """Get all messages in an email thread/conversation."""
     try:
-        service = _get_gmail_service_for_user(user_id)
-        thread = service.users().threads().get(userId="me", id=thread_id, format="metadata",
-                                                metadataHeaders=["From", "To", "Subject", "Date"]).execute()
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
+        thread = service.users().threads().get(
+            userId="me", id=thread_id, format="metadata",
+            metadataHeaders=["From", "To", "Subject", "Date"],
+        ).execute()
         messages = thread.get("messages", [])
 
         conversation = []
@@ -497,15 +450,14 @@ def get_thread(user_id: str, thread_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 11: Forward Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def forward_email(user_id: str, email_id: str, to: str, additional_message: str = "") -> str:
+def forward_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str, to: str, additional_message: str = "",
+) -> str:
     """Forward an email to another recipient with optional additional message."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         original = service.users().messages().get(userId="me", id=email_id, format="full").execute()
 
         headers = original.get("payload", {}).get("headers", [])
@@ -521,10 +473,8 @@ def forward_email(user_id: str, email_id: str, to: str, additional_message: str 
         if additional_message:
             forward_body += f"{additional_message}\n\n"
         forward_body += "---------- Forwarded message ----------\n"
-        forward_body += f"From: {orig_from}\n"
-        forward_body += f"Date: {orig_date}\n"
-        forward_body += f"Subject: {orig_subject}\n"
-        forward_body += f"To: {orig_to}\n\n"
+        forward_body += f"From: {orig_from}\nDate: {orig_date}\n"
+        forward_body += f"Subject: {orig_subject}\nTo: {orig_to}\n\n"
         forward_body += orig_body[:3000]
 
         message = MIMEMultipart()
@@ -544,15 +494,13 @@ def forward_email(user_id: str, email_id: str, to: str, additional_message: str 
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 12: Get Profile Info
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def get_profile(user_id: str) -> str:
+def get_profile(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+) -> str:
     """Get the authenticated Gmail user's profile information."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         profile = service.users().getProfile(userId="me").execute()
         return json.dumps({
             "success": True,
@@ -565,15 +513,14 @@ def get_profile(user_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 13: Mark as Read / Unread
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def mark_as_read(user_id: str, email_id: str, mark_read: bool = True) -> str:
+def mark_as_read(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str, mark_read: bool = True,
+) -> str:
     """Mark an email as read or unread."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         if mark_read:
             body = {"removeLabelIds": ["UNREAD"]}
         else:
@@ -586,15 +533,14 @@ def mark_as_read(user_id: str, email_id: str, mark_read: bool = True) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 14: Star / Unstar Email
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def star_email(user_id: str, email_id: str, star: bool = True) -> str:
+def star_email(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str, star: bool = True,
+) -> str:
     """Star or unstar an email."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         if star:
             body = {"addLabelIds": ["STARRED"]}
         else:
@@ -607,15 +553,14 @@ def star_email(user_id: str, email_id: str, star: bool = True) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  TOOL 15: Get Attachment
-# ═══════════════════════════════════════════════════════
-
 @mcp.tool()
-def get_attachment_info(user_id: str, email_id: str) -> str:
+def get_attachment_info(
+    access_token: str, refresh_token: str, client_id: str, client_secret: str,
+    email_id: str,
+) -> str:
     """List all attachments in an email with their details."""
     try:
-        service = _get_gmail_service_for_user(user_id)
+        service, _ = _build_gmail_service(access_token, refresh_token, client_id, client_secret)
         msg = service.users().messages().get(userId="me", id=email_id, format="full").execute()
 
         attachments = []
@@ -631,7 +576,7 @@ def get_attachment_info(user_id: str, email_id: str) -> str:
                 })
 
         if not attachments:
-            return json.dumps({"success": True, "message": "No attachments found in this email", "attachments": []})
+            return json.dumps({"success": True, "message": "No attachments found", "attachments": []})
 
         return json.dumps({
             "success": True,
@@ -643,42 +588,36 @@ def get_attachment_info(user_id: str, email_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-# ═══════════════════════════════════════════════════════
-#  Server Startup
-# ═══════════════════════════════════════════════════════
+# ─── Entry Point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("  Gmail MCP Server (Per-User OAuth)")
-    print("=" * 50)
-    print(f"  Port: 9002")
-    print(f"  Credentials: {CREDENTIALS_FILE}")
-    print(f"  Database: Connected (per-user tokens)")
+    parser = argparse.ArgumentParser(description="Gmail MCP Server (Standalone)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to run on")
+    args = parser.parse_args()
+
+    mcp.settings.port = args.port
+
+    print("=" * 55)
+    print("  Gmail MCP Server (Standalone)")
+    print("=" * 55)
+    print(f"  Port     : {args.port}")
+    print(f"  Transport: SSE")
+    print(f"  Database : NONE (fully standalone)")
     print()
-
-    if not CREDENTIALS_FILE.exists():
-        print("  WARNING: gmail_credentials.json not found!")
-        print("  Follow setup instructions. Server will start but tools will fail.")
-        print()
-
-    print("  Tools available (all per-user authenticated):")
-    print("    1.  search_emails       - Search with Gmail query syntax")
-    print("    2.  read_email          - Read full email content")
-    print("    3.  send_email          - Send new email")
-    print("    4.  reply_to_email      - Reply to an email thread")
-    print("    5.  get_inbox_summary   - Inbox overview with unread count")
-    print("    6.  modify_labels       - Add/remove labels")
-    print("    7.  list_labels         - List all labels")
-    print("    8.  create_draft        - Create email draft")
-    print("    9.  trash_email         - Move email to trash")
-    print("    10. get_thread          - Get full conversation thread")
-    print("    11. forward_email       - Forward email to someone")
-    print("    12. get_profile         - Get account profile info")
-    print("    13. mark_as_read        - Mark email read/unread")
-    print("    14. star_email          - Star/unstar an email")
-    print("    15. get_attachment_info  - List email attachments")
+    print("  Credentials are passed per-tool-call by the client.")
+    print("  This server has ZERO external dependencies on any app.")
+    print()
+    print("  Tools (15):")
+    tools = [
+        "search_emails", "read_email", "send_email", "reply_to_email",
+        "get_inbox_summary", "modify_labels", "list_labels", "create_draft",
+        "trash_email", "get_thread", "forward_email", "get_profile",
+        "mark_as_read", "star_email", "get_attachment_info",
+    ]
+    for i, t in enumerate(tools, 1):
+        print(f"    {i:2d}. {t}")
     print()
     print("  Starting server...")
-    print("=" * 50)
+    print("=" * 55)
 
     mcp.run(transport="sse")

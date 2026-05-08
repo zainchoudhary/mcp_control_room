@@ -10,8 +10,8 @@ export function ChatInput({
   connectedCount,
   onOpenRegister,
   mcps,
+  enabledIds,
   onToggle,
-  togglingMcp,
 }) {
   const textareaRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -97,7 +97,7 @@ export function ChatInput({
                     <div className={styles.plusMenuText}>
                       <span className={styles.plusMenuTitle}>Connectors</span>
                       <span className={styles.plusMenuHint}>
-                        {mcps.length === 0 ? 'No servers registered' : `${connectedCount} of ${mcps.length} connected`}
+                        {mcps.length === 0 ? 'No servers connected' : `${connectedCount} of ${mcps.length} enabled`}
                       </span>
                     </div>
                     <ChevronRight size={15} className={`${styles.plusMenuArrow} ${showConnectors ? styles.arrowRotated : ''}`} />
@@ -120,28 +120,23 @@ export function ChatInput({
                       {mcps.length === 0 ? (
                         <div className={styles.connPanelEmpty}>
                           <div className={styles.emptyIcon}><Plug size={22} /></div>
-                          <p>No servers registered</p>
-                          <button
-                            className={styles.emptyRegBtn}
-                            onClick={() => { setMenuOpen(false); setShowConnectors(false); onOpenRegister() }}
-                          >
-                            Register a server
-                          </button>
+                          <p>No servers connected</p>
+                          <p style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: 4 }}>Connect servers from the MCP Servers page</p>
                         </div>
                       ) : (
                         mcps.map((mcp) => (
                           <ConnectorRow
                             key={mcp.id}
                             mcp={mcp}
+                            enabled={enabledIds.has(mcp.id)}
                             onToggle={onToggle}
-                            isToggling={togglingMcp === mcp.id}
                           />
                         ))
                       )}
                     </div>
                     {mcps.length > 0 && (
                       <div className={styles.connPanelFooter}>
-                        {connectedCount} of {mcps.length} connected
+                        {connectedCount} of {mcps.length} enabled
                       </div>
                     )}
                   </div>
@@ -174,12 +169,7 @@ export function ChatInput({
   )
 }
 
-function ConnectorRow({ mcp, onToggle, isToggling }) {
-  const handleToggle = () => {
-    if (isToggling) return
-    onToggle(mcp.id)
-  }
-
+function ConnectorRow({ mcp, enabled, onToggle }) {
   return (
     <div className={styles.connRow}>
       <div className={styles.connInfo}>
@@ -189,21 +179,18 @@ function ConnectorRow({ mcp, onToggle, isToggling }) {
           ) : (
             <Server size={14} className={styles.connIconFallback} />
           )}
-          <div className={`${styles.connDot} ${mcp.connected ? styles.connDotOn : ''}`} />
+          <div className={`${styles.connDot} ${enabled ? styles.connDotOn : ''}`} />
         </div>
         <div className={styles.connDetails}>
           <span className={styles.connName}>{mcp.name}</span>
         </div>
       </div>
       <button
-        className={`${styles.switchTrack} ${mcp.connected ? styles.switchOn : ''} ${isToggling ? styles.switchToggling : ''}`}
-        onClick={handleToggle}
-        disabled={isToggling}
-        aria-label={mcp.connected ? 'Disconnect' : 'Connect'}
+        className={`${styles.switchTrack} ${enabled ? styles.switchOn : ''}`}
+        onClick={() => onToggle(mcp.id)}
+        aria-label={enabled ? 'Disable' : 'Enable'}
       >
-        <span className={styles.switchThumb}>
-          {isToggling && <Loader2 size={10} className={styles.thumbSpinner} />}
-        </span>
+        <span className={styles.switchThumb} />
       </button>
     </div>
   )
