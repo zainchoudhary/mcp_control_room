@@ -116,3 +116,15 @@ export async function* streamChat(sessionId, message, mcpIds = []) {
     }
   }
 }
+
+// Contact form (public, no auth)
+export const submitContact = (data) =>
+  fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(async (res) => {
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.detail || 'Failed to send message')
+    return json
+  })

@@ -5,7 +5,9 @@ import {
   Mail, Search, Database, FileText, Cloud, Lock,
   Users, Brain, Gauge, Play, Check,
   Activity, Sparkles, Shield, Code, Globe, ChevronRight,
+  User, Send, Loader2,
 } from 'lucide-react'
+import { submitContact } from '../api.js'
 import styles from './LandingPage.module.css'
 
 function useReveal(threshold = 0.15) {
@@ -52,6 +54,11 @@ export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
   const [flowRef, flowVis] = useReveal()
   const [howRef, howVis] = useReveal(0.1)
   const [ctaRef, ctaVis] = useReveal(0.2)
+  const [contactRef, contactVis] = useReveal(0.1)
+
+  const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', category: 'query', message: '' })
+  const [contactSending, setContactSending] = useState(false)
+  const [contactResult, setContactResult] = useState(null)
 
   return (
     <div className={styles.page}>
@@ -294,6 +301,90 @@ export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
         </div>
       </section>
 
+      {/* ══════ CONTACT US ══════ */}
+      <section ref={contactRef} className={`${styles.contactSection} ${contactVis ? styles.revealed : styles.hidden}`}>
+        <div className={styles.contactGlow} />
+        <div className={styles.contactGlow2} />
+        <div className={styles.contactHeader}>
+          <div className={styles.contactPill}><Mail size={13} /> Contact Us</div>
+          <h2 className={styles.contactTitle}>Let's Start a<br />Conversation</h2>
+          <p className={styles.contactSubtitle}>Have a question, complaint, or feedback? We'd love to hear from you.</p>
+        </div>
+        <div className={styles.contactInner}>
+          <div className={styles.contactInfo}>
+            <div className={styles.contactCard}>
+              <div className={styles.contactCardIcon}><Mail size={20} /></div>
+              <div>
+                <h4>Email Us</h4>
+                <p>ceo.toolchain@gmail.com</p>
+              </div>
+            </div>
+            <div className={styles.contactCard}>
+              <div className={styles.contactCardIcon}><MessageSquare size={20} /></div>
+              <div>
+                <h4>Response Time</h4>
+                <p>Usually within 24 hours</p>
+              </div>
+            </div>
+            <div className={styles.contactCard}>
+              <div className={styles.contactCardIcon}><Shield size={20} /></div>
+              <div>
+                <h4>Privacy First</h4>
+                <p>Your data stays safe with us</p>
+              </div>
+            </div>
+          </div>
+          <form className={styles.contactForm} onSubmit={async (e) => {
+            e.preventDefault()
+            setContactSending(true); setContactResult(null)
+            try {
+              const res = await submitContact(contactForm)
+              setContactResult({ type: 'success', text: res.message })
+              setContactForm({ name: '', email: '', subject: '', category: 'query', message: '' })
+            } catch (err) {
+              setContactResult({ type: 'error', text: err.message })
+            } finally { setContactSending(false) }
+          }}>
+            <div className={styles.contactFormTitle}>Send us a message</div>
+            <div className={styles.contactRow}>
+              <div className={styles.contactField}>
+                <User size={15} className={styles.contactFieldIcon} />
+                <input type="text" placeholder="Your name" value={contactForm.name} onChange={e => setContactForm(f => ({ ...f, name: e.target.value }))} required disabled={contactSending} />
+              </div>
+              <div className={styles.contactField}>
+                <Mail size={15} className={styles.contactFieldIcon} />
+                <input type="email" placeholder="Your email" value={contactForm.email} onChange={e => setContactForm(f => ({ ...f, email: e.target.value }))} required disabled={contactSending} />
+              </div>
+            </div>
+            <div className={styles.contactRow}>
+              <div className={styles.contactField}>
+                <FileText size={15} className={styles.contactFieldIcon} />
+                <input type="text" placeholder="Subject" value={contactForm.subject} onChange={e => setContactForm(f => ({ ...f, subject: e.target.value }))} required disabled={contactSending} />
+              </div>
+              <div className={styles.contactField}>
+                <select value={contactForm.category} onChange={e => setContactForm(f => ({ ...f, category: e.target.value }))} disabled={contactSending} className={styles.contactSelect}>
+                  <option value="query">General Query</option>
+                  <option value="feedback">Feedback</option>
+                  <option value="complaint">Complaint</option>
+                </select>
+              </div>
+            </div>
+            <div className={styles.contactField} style={{ width: '100%' }}>
+              <textarea placeholder="Write your message here..." rows={5} value={contactForm.message} onChange={e => setContactForm(f => ({ ...f, message: e.target.value }))} required disabled={contactSending} className={styles.contactTextarea} />
+            </div>
+            {contactResult && (
+              <div className={`${styles.contactMsg} ${contactResult.type === 'success' ? styles.contactMsgSuccess : styles.contactMsgError}`}>
+                {contactResult.type === 'success' ? <Check size={14} /> : null}
+                {contactResult.text}
+              </div>
+            )}
+            <button type="submit" className={styles.contactBtn} disabled={contactSending}>
+              {contactSending ? <Loader2 size={16} className={styles.contactSpinner} /> : <><Send size={15} /> Send Message</>}
+            </button>
+          </form>
+        </div>
+      </section>
+
       {/* ══════ FOOTER ══════ */}
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
@@ -302,10 +393,9 @@ export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
             <span className={styles.logoText}>ToolChain<span>AI</span></span>
           </div>
           <div className={styles.footerLinks}>
-            <span>Features</span>
-            <span>Docs</span>
-            <span>Pricing</span>
-            <span>Blog</span>
+            <span onClick={() => showcaseRef.current?.scrollIntoView({ behavior: 'smooth' })}>Features</span>
+            <span onClick={() => howRef.current?.scrollIntoView({ behavior: 'smooth' })}>How it Works</span>
+            <span onClick={() => contactRef.current?.scrollIntoView({ behavior: 'smooth' })}>Contact</span>
           </div>
           <span className={styles.footerCopy}>© 2026 ToolChain AI. All rights reserved.</span>
         </div>

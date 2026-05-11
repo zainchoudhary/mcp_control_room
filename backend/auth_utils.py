@@ -160,3 +160,54 @@ def send_reset_email(to_email: str, username: str, reset_token: str, frontend_ur
     except Exception as exc:
         logger.error("Failed to send reset email: %s", exc)
         raise RuntimeError("Failed to send reset email. Please try again later.")
+
+
+def send_contact_email(name: str, email: str, subject: str, category: str, message: str):
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    admin_email = os.getenv("CONTACT_EMAIL", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.error("SMTP credentials not configured")
+        raise RuntimeError("Email service not configured.")
+
+    cat_colors = {"complaint": "#ef4444", "feedback": "#f59e0b", "query": "#3b82f6"}
+    cat_color = cat_colors.get(category, "#6b7280")
+
+    html = f"""\
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+      <div style="text-align: center; margin-bottom: 28px;">
+        <div style="display: inline-block; background: linear-gradient(135deg, #10a37f, #0d8c6d); color: white; width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 20px; font-weight: 700;">T</div>
+        <h2 style="margin: 12px 0 0; color: #1a1a1a; font-size: 20px;">ToolChain AI — Contact</h2>
+      </div>
+      <div style="background: {cat_color}; color: white; display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px;">{category}</div>
+      <h3 style="color: #1a1a1a; font-size: 17px; margin: 0 0 16px;">{subject}</h3>
+      <table style="width: 100%; font-size: 13px; color: #444; border-collapse: collapse;">
+        <tr><td style="padding: 6px 0; color: #888; width: 70px;">From</td><td style="padding: 6px 0; font-weight: 500;">{name}</td></tr>
+        <tr><td style="padding: 6px 0; color: #888;">Email</td><td style="padding: 6px 0;"><a href="mailto:{email}" style="color: #10a37f; text-decoration: none;">{email}</a></td></tr>
+      </table>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;" />
+      <div style="background: #f9fafb; border-radius: 8px; padding: 16px; font-size: 14px; color: #333; line-height: 1.7; white-space: pre-wrap;">{message}</div>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+      <p style="color: #aaa; font-size: 11px; text-align: center;">ToolChain AI — Contact Form Submission</p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"[{category.upper()}] {subject}"
+    msg["From"] = smtp_user
+    msg["To"] = admin_email
+    msg["Reply-To"] = email
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, admin_email, msg.as_string())
+        logger.info("Contact form email sent from %s (%s)", name, email)
+    except Exception as exc:
+        logger.error("Failed to send contact email: %s", exc)
+        raise RuntimeError("Failed to send your message. Please try again later.")

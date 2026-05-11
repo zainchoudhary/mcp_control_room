@@ -43,7 +43,7 @@ from database import (
 from mcp_manager import get_mcp_tools, probe_mcp
 from agent import stream_agent_response
 from auth_routes import router as auth_router
-from auth_utils import get_current_user
+from auth_utils import get_current_user, send_contact_email
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -92,6 +92,36 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     mcp_ids: Optional[list[str]] = None
+
+
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    subject: str
+    category: str
+    message: str
+
+
+# ─── Routes: Public ──────────────────────────────────────────────────────────
+
+@app.post("/api/contact")
+async def api_contact(body: ContactRequest):
+    """Public contact form — sends email to admin."""
+    if not body.name.strip() or not body.email.strip() or not body.subject.strip() or not body.message.strip():
+        raise HTTPException(status_code=400, detail="All fields are required.")
+    if body.category not in ("complaint", "feedback", "query"):
+        raise HTTPException(status_code=400, detail="Invalid category.")
+    try:
+        send_contact_email(
+            name=body.name.strip(),
+            email=body.email.strip(),
+            subject=body.subject.strip(),
+            category=body.category,
+            message=body.message.strip(),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"message": "Your message has been sent. We'll get back to you soon!"}
 
 
 # ─── Routes: Dashboard ───────────────────────────────────────────────────────
