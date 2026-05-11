@@ -84,16 +84,6 @@ def build_llm() -> ChatGroq:
     )
 
 
-KNOWN_TOOL_NAMES = [
-    "calculate", "email_tool", "get_current_time",
-    "reverse_text", "count_words", "random_number",
-    "convert_temperature",
-    "search_emails", "read_email", "send_email", "reply_to_email",
-    "get_inbox_summary", "modify_labels", "list_labels", "create_draft",
-    "trash_email", "get_thread", "forward_email", "get_profile",
-    "mark_as_read", "star_email", "get_attachment_info",
-]
-
 TOOL_MENTION_MARKERS = [
     "available tools", "here are the available tools",
     "i have access to the following tools",
@@ -114,10 +104,7 @@ TOOL_ASK_MARKERS = [
 
 def _mentions_tools(text: str) -> bool:
     lower = text.lower()
-    if any(marker in lower for marker in TOOL_MENTION_MARKERS):
-        return True
-    tool_hits = sum(1 for name in KNOWN_TOOL_NAMES if name in lower)
-    return tool_hits >= 2
+    return any(marker in lower for marker in TOOL_MENTION_MARKERS)
 
 
 def _asks_about_tools(text: str) -> bool:
@@ -219,7 +206,7 @@ async def stream_agent_response(
     MAX_TOTAL_TOOL_CALLS = 20
     MAX_DUPLICATE_CALLS = 2
 
-    _secret_fields = {"user_id", "access_token", "refresh_token", "client_id", "client_secret"}
+    _secret_fields = {"user_id"}
 
     retries = 0
     max_retries = 3
@@ -322,6 +309,18 @@ async def stream_agent_response(
                 tool_call_tracker = {}
                 seen_calls = set()
                 total_tool_calls = 0
+
+                sequential_hint = HumanMessage(content=(
+                    "[SYSTEM: The previous attempt failed because you tried to call "
+                    "multiple tools at once. You MUST call only ONE tool at a time. "
+                    "Complete the first action fully, then move to the next one.]"
+                ))
+                if not any(
+                    isinstance(m, HumanMessage) and "[SYSTEM: The previous attempt" in m.content
+                    for m in messages
+                ):
+                    messages.append(sequential_hint)
+
                 continue
             else:
                 logger.error("Agent stream error: %s", exc, exc_info=True)

@@ -27,6 +27,8 @@ import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { SettingsModal } from './components/SettingsModal.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
+import { useLanguage } from './hooks/useLanguage.js'
+import { useAccentColor } from './hooks/useAccentColor.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
@@ -50,6 +52,8 @@ function getAuthModeFromUrl() {
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
+  const { language, setLanguage, t } = useLanguage()
+  const { accentId, setAccentColor } = useAccentColor()
   const savedUser = getSavedUser()
   const [user, setUser] = useState(() => savedUser)
   const [authChecked, setAuthChecked] = useState(!!savedUser)
@@ -108,21 +112,6 @@ export default function App() {
       }
     }
   }, [authChecked, user])
-
-  useEffect(() => {
-    const handleOAuthMessage = (event) => {
-      if (!event.data || typeof event.data !== 'object') return
-      if (event.data.type === 'gmail_auth_complete') {
-        const email = event.data.email || 'your Gmail'
-        toast(`Gmail connected: ${email}`, 'success')
-        refreshMCPs()
-      } else if (event.data.type === 'gmail_auth_error') {
-        toast(`Gmail auth failed: ${event.data.error || 'Unknown error'}`, 'error')
-      }
-    }
-    window.addEventListener('message', handleOAuthMessage)
-    return () => window.removeEventListener('message', handleOAuthMessage)
-  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -371,18 +360,60 @@ export default function App() {
 
   const [togglingMcp, setTogglingMcp] = useState(null)
 
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.data?.type === 'gmail_auth_complete') {
+        const email = event.data.email || ''
+        if (pendingConnectRef.current) {
+          const mcpId = pendingConnectRef.current
+          pendingConnectRef.current = null
+          connectMCP(mcpId, { skipAuth: true })
+            .then(() => refreshMCPs())
+            .then(() => toast(`Connected: ${email}`, 'success'))
+            .catch(() => toast('Connection failed after auth', 'error'))
+            .finally(() => setTogglingMcp(null))
+        }
+      }
+      if (event.data?.type === 'gmail_auth_error') {
+        toast(`Auth failed: ${event.data.error || 'Unknown error'}`, 'error')
+        pendingConnectRef.current = null
+        setTogglingMcp(null)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  const pendingConnectRef = useRef(null)
+
   const onConnect = async (id) => {
     setTogglingMcp(id)
     try {
       const result = await connectMCP(id)
-      if (result && result.needs_auth && result.auth_url) {
-        window.open(result.auth_url, '_blank', 'width=600,height=700,scrollbars=yes')
-        setTogglingMcp(null)
+      if (result?.needs_auth && result?.auth_url) {
+        pendingConnectRef.current = id
+        const w = 500, h = 600
+        const left = window.screenX + (window.outerWidth - w) / 2
+        const top = window.screenY + (window.outerHeight - h) / 2
+        const popup = window.open(result.auth_url, '_blank', `width=${w},height=${h},left=${left},top=${top}`)
+        const pollClose = setInterval(() => {
+          if (!popup || popup.closed) {
+            clearInterval(pollClose)
+            if (pendingConnectRef.current) {
+              pendingConnectRef.current = null
+              setTogglingMcp(null)
+            }
+          }
+        }, 500)
         return
       }
       await refreshMCPs()
       toast('Connected', 'success')
-    } finally { setTogglingMcp(null) }
+    } catch (err) {
+      toast(err.message || 'Connection failed', 'error')
+    } finally {
+      if (!pendingConnectRef.current) setTogglingMcp(null)
+    }
   }
 
   const onDisconnect = async (id) => {
@@ -449,10 +480,10 @@ export default function App() {
   }
 
   const suggestions = [
-    'What tools are available?',
-    'Tell me about the connected MCP servers',
-    'What can you help me with?',
-    'Run a quick test with available tools',
+    t('suggestion1'),
+    t('suggestion2'),
+    t('suggestion3'),
+    t('suggestion4'),
   ]
 
   if (!authChecked) {
@@ -461,6 +492,7 @@ export default function App() {
     if (path === '' || path === '/') {
       return (
         <LandingPage
+          isLoggedIn={false}
           onGetStarted={() => {
             window.history.pushState(null, '', '/signup')
             setActivePage('signup')
@@ -492,6 +524,7 @@ export default function App() {
     if (!showAuth) {
       return (
         <LandingPage
+          isLoggedIn={false}
           onGetStarted={() => {
             window.history.pushState(null, '', '/signup')
             setActivePage('signup')
@@ -515,6 +548,7 @@ export default function App() {
   if (activePage === 'landing') {
     return (
       <LandingPage
+        isLoggedIn={true}
         onGetStarted={() => {
           setActivePage('dashboard')
           window.history.pushState(null, '', '/dashboard')
@@ -544,6 +578,7 @@ export default function App() {
         onLogout={requestLogout}
         mcpCount={mcps.length}
         connectedCount={connectedCount}
+        t={t}
       />
 
       <div className={styles.mobileHeader}>
@@ -570,6 +605,7 @@ export default function App() {
             user={user}
             loading={dataLoading}
             weeklyStats={weeklyStats}
+            t={t}
           />
         )}
 
@@ -609,9 +645,9 @@ export default function App() {
                   <div className={styles.welcomeIcon}>
                     <Bot size={40} />
                   </div>
-                  <h1 className={styles.welcomeTitle}>ToolChain AI</h1>
+                  <h1 className={styles.welcomeTitle}>{t('toolchainAI')}</h1>
                   <p className={styles.welcomeSubtitle}>
-                    Connect MCP servers and chat with an AI agent that uses their tools.
+                    {t('welcomeSubtitle')}
                   </p>
                   <div className={styles.suggestions}>
                     {suggestions.map((s, i) => (
@@ -626,7 +662,7 @@ export default function App() {
                   </div>
                   {connectedCount > 0 && (
                     <p className={styles.connectedInfo}>
-                      {connectedCount} MCP server{connectedCount !== 1 ? 's' : ''} connected
+                      {t('connectedInfo').replace('{count}', connectedCount).replace('{s}', connectedCount !== 1 ? 's' : '')}
                     </p>
                   )}
                 </div>
@@ -654,6 +690,7 @@ export default function App() {
               mcps={connectedMcps}
               enabledIds={enabledMcpIds}
               onToggle={onChatToggle}
+              t={t}
             />
           </div>
         )}
@@ -668,6 +705,20 @@ export default function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onClose={() => setShowSettings(false)}
+          user={user}
+          onUserUpdated={(updatedUser) => {
+            setUser(updatedUser)
+            localStorage.setItem('toolchain_user', JSON.stringify(updatedUser))
+          }}
+          onSessionsDeleted={() => {
+            setSessions([])
+            setSessionId(null)
+            setMessages([])
+          }}
+          language={language}
+          onLanguageChange={setLanguage}
+          accentId={accentId}
+          onAccentChange={setAccentColor}
         />
       )}
 

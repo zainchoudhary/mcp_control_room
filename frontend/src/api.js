@@ -27,15 +27,13 @@ export const listMCPs = () => request('/mcps')
 export const getMCP = (id) => request(`/mcps/${id}`)
 export const registerMCP = (body) => request('/mcps', { method: 'POST', body: JSON.stringify(body) })
 export const deleteMCP = (id) => request(`/mcps/${id}`, { method: 'DELETE' })
-export const connectMCP = (id) => request(`/mcps/${id}/connect`, { method: 'POST' })
+export const connectMCP = (id, { skipAuth = false } = {}) => request(`/mcps/${id}/connect${skipAuth ? '?skip_auth=true' : ''}`, { method: 'POST' })
 export const disconnectMCP = (id) => request(`/mcps/${id}/disconnect`, { method: 'POST' })
 export const toggleMCP = (id) => request(`/mcps/${id}/toggle`, { method: 'POST' })
 export const probeMCP = (id) => request(`/mcps/${id}/probe`, { method: 'POST' })
-
-// Gmail OAuth
-export const getGmailAuthUrl = () => request('/gmail/auth-url')
-export const getGmailStatus = () => request('/gmail/status')
-export const revokeGmail = () => request('/gmail/revoke', { method: 'POST' })
+export const getMCPAuthStatus = (id) => request(`/mcps/${id}/auth/status`)
+export const getMCPAuthUrl = (id) => request(`/mcps/${id}/auth/url`)
+export const revokeMCPAuth = (id) => request(`/mcps/${id}/auth/revoke`, { method: 'POST' })
 
 // Stats
 export const getWeeklyStats = () => request('/stats/weekly')
@@ -46,6 +44,40 @@ export const createSession = () => request('/sessions', { method: 'POST' })
 export const updateSession = (id, body) => request(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 export const deleteSessionApi = (id) => request(`/sessions/${id}`, { method: 'DELETE' })
 export const getMessages = (id) => request(`/sessions/${id}/messages`)
+
+// Account
+export const changePassword = (currentPassword, newPassword, confirmPassword) =>
+  request('/auth/password', {
+    method: 'PUT',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword }),
+  })
+export const changeUsername = (newUsername) =>
+  request('/auth/username', {
+    method: 'PUT',
+    body: JSON.stringify({ new_username: newUsername }),
+  })
+
+// Bulk session actions
+export const deleteAllSessions = () => request('/sessions', { method: 'DELETE' })
+export const exportAllChats = async () => {
+  const token = getToken()
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${BASE}/sessions/export`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || `HTTP ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'toolchain_chats_export.docx'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 // Chat Stream
 export async function* streamChat(sessionId, message, mcpIds = []) {

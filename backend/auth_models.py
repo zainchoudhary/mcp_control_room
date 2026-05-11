@@ -144,6 +144,66 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Current password is required.")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str, info) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 128:
+            raise ValueError("Password must not exceed 128 characters.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit.")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", v):
+            raise ValueError("Password must contain at least one special character.")
+        current = info.data.get("current_password")
+        if current and v == current:
+            raise ValueError("New password must be different from your current password.")
+        return v
+
+    @field_validator("confirm_password")
+    @classmethod
+    def validate_confirm_password(cls, v: str, info) -> str:
+        password = info.data.get("new_password")
+        if password and v != password:
+            raise ValueError("Passwords do not match.")
+        return v
+
+
+class ChangeUsernameRequest(BaseModel):
+    new_username: str
+
+    @field_validator("new_username")
+    @classmethod
+    def validate_new_username(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters long.")
+        if len(v) > 30:
+            raise ValueError("Username must not exceed 30 characters.")
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9._-]*$", v):
+            raise ValueError(
+                "Username must start with a letter and contain only letters, "
+                "numbers, dots, hyphens, or underscores."
+            )
+        return v
+
+
 class UserResponse(BaseModel):
     id: str
     username: str

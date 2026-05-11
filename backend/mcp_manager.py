@@ -2,8 +2,9 @@
 mcp_manager.py - Manages live MCP client connections and tool resolution.
 Uses langchain-mcp-adapters MultiServerMCPClient for SSE/stdio transports.
 
-Supports per-user credential injection: Gmail tools get OAuth credentials
-auto-injected so the LLM never sees tokens.
+Fully generic — no MCP-specific logic. Works with any MCP server.
+Injects user_id transparently into tool calls so MCP servers can
+load per-user credentials without polluting the tool schema for the LLM.
 """
 import asyncio
 import logging
@@ -11,18 +12,10 @@ import re
 from contextlib import asynccontextmanager
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_core.tools import StructuredTool
 
 logger = logging.getLogger(__name__)
 
-GMAIL_TOOL_NAMES = {
-    "search_emails", "read_email", "send_email", "reply_to_email",
-    "get_inbox_summary", "modify_labels", "list_labels", "create_draft",
-    "trash_email", "get_thread", "forward_email", "get_profile",
-    "mark_as_read", "star_email", "get_attachment_info",
-}
-
-CREDENTIAL_FIELDS = {"access_token", "refresh_token", "client_id", "client_secret"}
+USER_ID_PARAM = "user_id"
 
 
 def build_server_config(mcps: list) -> dict:
@@ -54,97 +47,69 @@ def _sanitize_tools(tools: list) -> list:
     return tools
 
 
-def _wrap_gmail_tool_with_credentials(tool, gmail_creds: dict):
+def _inject_user_id(tools: list, user_id: str) -> list:
     """
-    Wrap a Gmail MCP tool so that OAuth credentials are automatically injected.
-    The LLM never sees access_token/refresh_token/client_id/client_secret.
-    They are stripped from the schema and injected at call time.
+    Monkey-patch MCP tools to inject user_id transparently.
+
+    langchain-mcp-adapters tools are StructuredTool instances where
+    args_schema is a plain dict (not a Pydantic class). We:
+      1. Remove user_id from the schema so the LLM never sees it
+      2. Patch the invoke/ainvoke methods to inject user_id at call time
     """
-    from pydantic import create_model, Field
+    if not user_id:
+        return tools
 
-    schema = tool.args_schema
-    new_schema = None
-
-    if isinstance(schema, dict):
-        properties = schema.get("properties", {})
-        required_fields = schema.get("required", [])
-        fields = {}
-        type_map = {"string": str, "integer": int, "boolean": bool, "number": float}
-
-        for field_name, field_def in properties.items():
-            if field_name in CREDENTIAL_FIELDS:
-                continue
-            py_type = type_map.get(field_def.get("type", "string"), str)
-            title = field_def.get("title", field_name)
-
-            if "default" in field_def:
-                fields[field_name] = (py_type, Field(default=field_def["default"], description=title))
-            elif field_name in required_fields:
-                fields[field_name] = (py_type, Field(description=title))
-            else:
-                fields[field_name] = (py_type, Field(default="", description=title))
-
-        new_schema = create_model(f"{tool.name}_Args", **fields)
-
-    elif schema and hasattr(schema, "model_fields"):
-        fields = {}
-        for field_name, field_info in schema.model_fields.items():
-            if field_name in CREDENTIAL_FIELDS:
-                continue
-            annotation = field_info.annotation
-            if hasattr(annotation, "__origin__"):
-                annotation = str
-            if field_info.is_required():
-                fields[field_name] = (annotation, Field(description=field_info.description or ""))
-            else:
-                fields[field_name] = (annotation, Field(default=field_info.default or "", description=field_info.description or ""))
-        new_schema = create_model(f"{tool.name}_Args", **fields)
-
-    async def wrapped_async(**kwargs):
-        kwargs.update(gmail_creds)
-        return await tool.ainvoke(kwargs)
-
-    def wrapped_sync(**kwargs):
-        kwargs.update(gmail_creds)
-        return asyncio.get_event_loop().run_until_complete(tool.ainvoke(kwargs))
-
-    wrapped_tool = StructuredTool(
-        name=tool.name,
-        description=tool.description,
-        func=wrapped_sync,
-        coroutine=wrapped_async,
-        args_schema=new_schema,
-    )
-    return wrapped_tool
-
-
-def _inject_credentials_into_gmail_tools(tools: list, gmail_creds: dict) -> list:
-    """
-    For any Gmail tool in the list, wrap it to auto-inject OAuth credentials.
-    Non-Gmail tools pass through unchanged.
-    """
-    result = []
+    patched = []
     for tool in tools:
-        if tool.name in GMAIL_TOOL_NAMES:
-            wrapped = _wrap_gmail_tool_with_credentials(tool, gmail_creds)
-            result.append(wrapped)
-            logger.info("  Wrapped Gmail tool '%s' with credential injection", tool.name)
-        else:
-            result.append(tool)
-    return result
+        args = getattr(tool, 'args', {})
+        if USER_ID_PARAM not in args:
+            patched.append(tool)
+            continue
+
+        logger.info("Patching tool '%s' to inject user_id=%s...", tool.name, user_id[:8])
+
+        if isinstance(tool.args_schema, dict):
+            tool.args_schema.get("properties", {}).pop(USER_ID_PARAM, None)
+            req = tool.args_schema.get("required", [])
+            if USER_ID_PARAM in req:
+                req.remove(USER_ID_PARAM)
+
+        original_coroutine = tool.coroutine
+        original_func = tool.func
+
+        def _make_patched_coroutine(orig_coro, uid):
+            async def patched_ainvoke(**kwargs):
+                kwargs[USER_ID_PARAM] = uid
+                return await orig_coro(**kwargs)
+            return patched_ainvoke
+
+        def _make_patched_func(orig_fn, uid):
+            def patched_invoke(**kwargs):
+                kwargs[USER_ID_PARAM] = uid
+                return orig_fn(**kwargs)
+            return patched_invoke
+
+        if original_coroutine:
+            tool.coroutine = _make_patched_coroutine(original_coroutine, user_id)
+        if original_func:
+            tool.func = _make_patched_func(original_func, user_id)
+
+        patched.append(tool)
+
+    return patched
 
 
 @asynccontextmanager
-async def get_mcp_tools(mcps: list, user_id: str = None, gmail_creds: dict = None):
+async def get_mcp_tools(mcps: list, user_id: str = ""):
     """
     Async context manager that yields a list of LangChain-compatible tools
     loaded from the given MCP servers.
 
-    If gmail_creds is provided, Gmail tools will be wrapped to auto-inject
-    OAuth credentials (access_token, refresh_token, client_id, client_secret).
+    If user_id is provided, it is injected transparently into all tool calls
+    that accept a user_id parameter (hidden from the LLM schema).
 
     Usage:
-        async with get_mcp_tools(connected_mcps, gmail_creds={...}) as tools:
+        async with get_mcp_tools(connected_mcps, user_id="abc") as tools:
             # use tools in agent
     """
     if not mcps:
@@ -152,23 +117,17 @@ async def get_mcp_tools(mcps: list, user_id: str = None, gmail_creds: dict = Non
         return
 
     server_config = build_server_config(mcps)
-    logger.info("Connecting to MCP servers: %s", list(server_config.keys()))
+    logger.info("Connecting to MCP servers: %s (user_id=%s)", list(server_config.keys()), user_id[:8] if user_id else "EMPTY")
 
     tools = []
     try:
         client = MultiServerMCPClient(server_config)
         tools = await client.get_tools()
         tools = _sanitize_tools(tools)
+        tools = _inject_user_id(tools, user_id)
         logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
         for t in tools:
             logger.info("  Tool: %s", t.name)
-
-        if gmail_creds:
-            tools = _inject_credentials_into_gmail_tools(tools, gmail_creds)
-            for t in tools:
-                if t.name in GMAIL_TOOL_NAMES:
-                    schema_fields = list(t.args_schema.model_fields.keys()) if t.args_schema else []
-                    logger.info("  AFTER WRAP - Tool '%s' schema fields: %s", t.name, schema_fields)
 
     except Exception as exc:
         logger.error("Failed to load MCP tools: %s", exc)

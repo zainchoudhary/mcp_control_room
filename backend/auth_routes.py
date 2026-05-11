@@ -7,8 +7,16 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_config import get_db
-from auth_models import SignupRequest, LoginRequest, AuthResponse, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
-from auth_database import create_user, get_user_by_email, email_exists, username_exists, update_user_password
+from auth_models import (
+    SignupRequest, LoginRequest, AuthResponse, UserResponse,
+    ForgotPasswordRequest, ResetPasswordRequest,
+    ChangePasswordRequest, ChangeUsernameRequest,
+)
+from auth_database import (
+    create_user, get_user_by_email, get_user_by_id,
+    email_exists, username_exists,
+    update_user_password, update_user_username,
+)
 from auth_utils import (
     hash_password, verify_password, create_access_token, get_current_user,
     create_reset_token, decode_reset_token, send_reset_email,
@@ -108,3 +116,55 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
 
     logger.info("Password reset successful for user: %s", user_id)
     return {"message": "Password has been reset successfully. You can now log in."}
+
+
+@router.put("/password")
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change password for the authenticated user."""
+    user = await get_user_by_id(db, current_user["id"])
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    full_user = await get_user_by_email(db, user["email"])
+    if not verify_password(body.current_password, full_user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    hashed = hash_password(body.new_password)
+    await update_user_password(db, current_user["id"], hashed)
+
+    logger.info("Password changed for user: %s", current_user["id"])
+    return {"message": "Password updated successfully."}
+
+
+@router.put("/username")
+async def change_username(
+    body: ChangeUsernameRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change username for the authenticated user."""
+    if body.new_username == current_user.get("username"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New username is the same as your current username.",
+        )
+
+    if await username_exists(db, body.new_username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This username is already taken.",
+        )
+
+    updated_user = await update_user_username(db, current_user["id"], body.new_username)
+    if updated_user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    logger.info("Username changed for user %s: %s → %s", current_user["id"], current_user.get("username"), body.new_username)
+    return {"message": "Username updated successfully.", "user": updated_user}

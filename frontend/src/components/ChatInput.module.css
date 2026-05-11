@@ -16,8 +16,8 @@
 }
 
 .container:focus-within {
-  border-color: rgba(16,163,127,0.35);
-  box-shadow: 0 0 0 2px rgba(16,163,127,0.06);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.06);
 }
 
 .inputArea {
@@ -493,7 +493,7 @@
 
 .sendActive:hover {
   background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgba(16,163,127,0.25);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
 }
 
 .spinner {

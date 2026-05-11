@@ -53,7 +53,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(16, 163, 127, 0.3), 0 0 60px rgba(16, 163, 127, 0.1);
+  box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(var(--accent-rgb), 0.2), 0 0 60px var(--accent-light);
   animation: orbPulse 2s ease-in-out infinite;
 }
 
@@ -78,7 +78,7 @@
   width: 66px;
   height: 66px;
   border-bottom-color: var(--accent);
-  border-left-color: rgba(16, 163, 127, 0.4);
+  border-left-color: rgba(var(--accent-rgb), 0.4);
   animation: ringRotate 2.5s linear infinite reverse;
   opacity: 0.5;
 }
@@ -86,7 +86,7 @@
 .loaderRing3 {
   width: 80px;
   height: 80px;
-  border-top-color: rgba(16, 163, 127, 0.3);
+  border-top-color: rgba(var(--accent-rgb), 0.15);
   animation: ringRotate 4s linear infinite;
   opacity: 0.3;
 }
@@ -104,7 +104,7 @@
   border-radius: 50%;
   background: var(--accent);
   animation: chainNodePulse 1.8s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(16, 163, 127, 0.5);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
 }
 
 .chainNode:nth-child(1) { animation-delay: 0s; }
@@ -116,7 +116,7 @@
 .chainLink {
   width: 20px;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), rgba(16, 163, 127, 0.3));
+  background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0.2));
   animation: chainLinkFlow 1.8s ease-in-out infinite;
   border-radius: 1px;
 }
@@ -145,10 +145,10 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
-  background: rgba(16, 163, 127, 0.1);
+  background: var(--accent-light);
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(16, 163, 127, 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
   animation: brandReveal 0.8s ease-out 0.3s both;
 }
 
@@ -163,7 +163,7 @@
 .loaderProgressBar {
   height: 100%;
   width: 30%;
-  background: linear-gradient(90deg, var(--accent), rgba(16, 163, 127, 0.5));
+  background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0.5));
   border-radius: 3px;
   animation: progressSlide 1.5s ease-in-out infinite;
 }
@@ -207,8 +207,8 @@
 }
 
 @keyframes orbPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(16, 163, 127, 0.3); }
-  50% { transform: scale(1.15); box-shadow: 0 0 30px var(--accent), 0 0 60px rgba(16, 163, 127, 0.4), 0 0 80px rgba(16, 163, 127, 0.1); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px var(--accent), 0 0 40px rgba(var(--accent-rgb), 0.2); }
+  50% { transform: scale(1.15); box-shadow: 0 0 30px var(--accent), 0 0 60px rgba(var(--accent-rgb), 0.4), 0 0 80px var(--accent-light); }
 }
 
 @keyframes ringRotate {
@@ -373,7 +373,7 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
-  box-shadow: 0 0 24px var(--accent-light), 0 0 48px rgba(16, 163, 127, 0.08);
+  box-shadow: 0 0 24px var(--accent-light), 0 0 48px rgba(var(--accent-rgb), 0.08);
 }
 
 .welcomeTitle {
@@ -414,7 +414,7 @@
 
 .suggestionBtn:hover {
   background: var(--accent-light);
-  border-color: var(--accent-border);
+  border-color: rgba(var(--accent-rgb), 0.15);
   color: var(--text-primary);
 }
 

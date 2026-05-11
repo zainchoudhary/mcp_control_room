@@ -13,6 +13,9 @@ Routes:
   POST /api/mcps/{id}/connect  → mark MCP as connected
   POST /api/mcps/{id}/disconnect → disconnect MCP
   POST /api/mcps/{id}/probe    → probe MCP for tools
+  GET  /api/mcps/{id}/auth/url → get OAuth URL from MCP server (generic proxy)
+  GET  /api/mcps/{id}/auth/status → check MCP auth status (generic proxy)
+  POST /api/mcps/{id}/auth/revoke → revoke MCP auth (generic proxy)
   POST /api/sessions           → create chat session
   GET  /api/sessions/{id}/messages → get session history
   POST /api/chat/stream        → SSE streaming chat endpoint
@@ -21,6 +24,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import httpx
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,18 +38,12 @@ from database import (
     set_mcp_connection, delete_mcp, get_connected_mcps,
     create_session, list_user_sessions, update_session_title,
     delete_session, save_message, get_session_messages,
+    get_all_user_sessions_with_messages, delete_all_user_sessions,
 )
 from mcp_manager import get_mcp_tools, probe_mcp
 from agent import stream_agent_response
 from auth_routes import router as auth_router
 from auth_utils import get_current_user
-from gmail_oauth import (
-    generate_auth_url,
-    exchange_code_for_token,
-    get_user_gmail_status,
-    revoke_user_gmail,
-    get_user_gmail_credentials,
-)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -110,6 +108,16 @@ async def serve_frontend():
     return FileResponse("../frontend/dist/index.html")
 
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _mcp_base_url(mcp_url: str) -> str:
+    """Extract base URL from MCP SSE endpoint (strip /sse suffix)."""
+    url = mcp_url.rstrip("/")
+    if url.endswith("/sse"):
+        url = url[:-4]
+    return url
+
+
 # ─── Routes: MCP Registry ────────────────────────────────────────────────────
 
 @app.get("/api/mcps")
@@ -171,6 +179,7 @@ async def api_delete_mcp(
 @app.post("/api/mcps/{mcp_id}/connect")
 async def api_connect_mcp(
     mcp_id: str,
+    skip_auth: bool = False,
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -178,14 +187,27 @@ async def api_connect_mcp(
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
 
-    mcp_name = (mcp.get("name", "") or "").lower()
-    mcp_url = (mcp.get("url", "") or "").lower()
-    is_gmail = "gmail" in mcp_name or "9002" in mcp_url
-    if is_gmail:
-        gmail_status = await get_user_gmail_status(user["id"], db)
-        if not gmail_status:
-            auth_url = generate_auth_url(user["id"], mcp_id)
-            return {"id": mcp_id, "connected": False, "needs_auth": True, "auth_url": auth_url}
+    if not skip_auth:
+        base = _mcp_base_url(mcp["url"])
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.get(f"{base}/auth/status", params={"user_id": user["id"]})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if not data.get("authenticated"):
+                        url_resp = await client.get(f"{base}/auth/url", params={"user_id": user["id"]})
+                        if url_resp.status_code == 200:
+                            auth_data = url_resp.json()
+                            return {
+                                "id": mcp_id,
+                                "connected": False,
+                                "needs_auth": True,
+                                "auth_url": auth_data.get("auth_url", ""),
+                            }
+        except (httpx.RequestError, httpx.HTTPStatusError):
+            pass
+        except Exception as e:
+            logging.warning("Auth check for MCP %s failed: %s", mcp_id, e)
 
     await set_mcp_connection(db, mcp_id, user["id"], True)
     return {"id": mcp_id, "connected": True}
@@ -201,16 +223,15 @@ async def api_disconnect_mcp(
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
 
-    mcp_name = (mcp.get("name", "") or "").lower()
-    mcp_url = (mcp.get("url", "") or "").lower()
-    is_gmail = "gmail" in mcp_name or "9002" in mcp_url
-
-    token_revoked = False
-    if is_gmail:
-        token_revoked = await revoke_user_gmail(user["id"], db)
+    base = _mcp_base_url(mcp["url"])
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post(f"{base}/auth/revoke", params={"user_id": user["id"]})
+    except Exception:
+        pass
 
     await set_mcp_connection(db, mcp_id, user["id"], False)
-    return {"id": mcp_id, "connected": False, "token_revoked": token_revoked}
+    return {"id": mcp_id, "connected": False}
 
 
 @app.post("/api/mcps/{mcp_id}/toggle")
@@ -219,23 +240,12 @@ async def api_toggle_mcp(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Toggle MCP connection on/off without revoking tokens. Used by chat panel."""
+    """Toggle MCP connection on/off. Used by chat panel."""
     mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
 
     new_state = not mcp.get("connected", False)
-
-    if new_state:
-        mcp_name = (mcp.get("name", "") or "").lower()
-        mcp_url = (mcp.get("url", "") or "").lower()
-        is_gmail = "gmail" in mcp_name or "9002" in mcp_url
-        if is_gmail:
-            gmail_status = await get_user_gmail_status(user["id"], db)
-            if not gmail_status:
-                auth_url = generate_auth_url(user["id"])
-                return {"id": mcp_id, "connected": False, "needs_auth": True, "auth_url": auth_url}
-
     await set_mcp_connection(db, mcp_id, user["id"], new_state)
     return {"id": mcp_id, "connected": new_state}
 
@@ -252,6 +262,74 @@ async def api_probe_mcp(
         raise HTTPException(status_code=404, detail="MCP not found.")
     result = await probe_mcp(mcp["url"], mcp["transport"])
     return result
+
+
+# ─── Routes: Generic MCP Auth Proxy ──────────────────────────────────────────
+# These forward auth requests to the MCP server's own HTTP auth routes.
+# The backend has ZERO knowledge of what kind of auth the MCP uses.
+
+@app.get("/api/mcps/{mcp_id}/auth/url")
+async def api_mcp_auth_url(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get OAuth URL from MCP server. Passes user_id so the MCP can track per-user tokens."""
+    mcp = await get_mcp(db, mcp_id, user["id"])
+    if not mcp:
+        raise HTTPException(status_code=404, detail="MCP not found.")
+
+    base = _mcp_base_url(mcp["url"])
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{base}/auth/url", params={"user_id": user["id"]})
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail="MCP server auth endpoint unreachable.")
+            return resp.json()
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot reach MCP auth: {e}")
+
+
+@app.get("/api/mcps/{mcp_id}/auth/status")
+async def api_mcp_auth_status(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if the current user is authenticated on this MCP server."""
+    mcp = await get_mcp(db, mcp_id, user["id"])
+    if not mcp:
+        raise HTTPException(status_code=404, detail="MCP not found.")
+
+    base = _mcp_base_url(mcp["url"])
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{base}/auth/status", params={"user_id": user["id"]})
+            if resp.status_code != 200:
+                return {"authenticated": False, "email": None}
+            return resp.json()
+    except httpx.RequestError:
+        return {"authenticated": False, "email": None}
+
+
+@app.post("/api/mcps/{mcp_id}/auth/revoke")
+async def api_mcp_auth_revoke(
+    mcp_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke auth for the current user on this MCP server."""
+    mcp = await get_mcp(db, mcp_id, user["id"])
+    if not mcp:
+        raise HTTPException(status_code=404, detail="MCP not found.")
+
+    base = _mcp_base_url(mcp["url"])
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(f"{base}/auth/revoke", params={"user_id": user["id"]})
+            return resp.json()
+    except httpx.RequestError:
+        return {"revoked": False}
 
 
 # ─── Routes: Dashboard Stats ─────────────────────────────────────────────────
@@ -324,98 +402,6 @@ async def api_weekly_stats(
     }
 
 
-# ─── Routes: Gmail OAuth (Per-User) ──────────────────────────────────────────
-
-@app.get("/api/gmail/auth-url")
-async def api_gmail_auth_url(
-    user: dict = Depends(get_current_user),
-):
-    """Generate Google OAuth URL for the current user to link their Gmail."""
-    try:
-        url = generate_auth_url(user["id"])
-        return {"auth_url": url}
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/gmail/callback")
-async def api_gmail_callback(
-    code: str,
-    state: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    OAuth2 callback from Google. Exchanges code for tokens and stores per-user.
-    Auto-connects the MCP server, notifies the opener window, and closes the tab.
-    """
-    from fastapi.responses import HTMLResponse
-
-    user_id = state
-    mcp_id = None
-    if ":" in state:
-        user_id, mcp_id = state.split(":", 1)
-
-    try:
-        result = await exchange_code_for_token(code, user_id, db)
-
-        if mcp_id:
-            await set_mcp_connection(db, mcp_id, user_id, True)
-            logger.info("Auto-connected MCP %s for user %s after Gmail OAuth", mcp_id, user_id)
-
-        email = result.get("email", "")
-        return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><title>Gmail Connected</title></head>
-<body>
-<script>
-  if (window.opener) {{
-    window.opener.postMessage({{ type: 'gmail_auth_complete', email: '{email}' }}, '*');
-  }}
-  window.close();
-</script>
-<p>Gmail connected successfully. This window will close automatically.</p>
-</body></html>""")
-
-    except Exception as e:
-        logger.error("Gmail OAuth callback failed: %s", e)
-        error_msg = str(e)[:100].replace("'", "\\'")
-        return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><title>Gmail Auth Failed</title></head>
-<body>
-<script>
-  if (window.opener) {{
-    window.opener.postMessage({{ type: 'gmail_auth_error', error: '{error_msg}' }}, '*');
-  }}
-  setTimeout(function() {{ window.close(); }}, 3000);
-</script>
-<p>Gmail authentication failed: {error_msg}</p>
-<p>This window will close in 3 seconds.</p>
-</body></html>""")
-
-
-@app.get("/api/gmail/status")
-async def api_gmail_status(
-    user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Check if the current user has linked their Gmail account."""
-    status = await get_user_gmail_status(user["id"], db)
-    if status:
-        return {"linked": True, **status}
-    return {"linked": False}
-
-
-@app.post("/api/gmail/revoke")
-async def api_gmail_revoke(
-    user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Unlink/revoke Gmail access for the current user."""
-    revoked = await revoke_user_gmail(user["id"], db)
-    if revoked:
-        return {"message": "Gmail access revoked successfully"}
-    raise HTTPException(status_code=404, detail="No Gmail account linked")
-
-
 # ─── Routes: Sessions ────────────────────────────────────────────────────────
 
 @app.get("/api/sessions")
@@ -434,6 +420,92 @@ async def api_create_session(
 ):
     session = await create_session(db, user["id"])
     return session
+
+
+@app.delete("/api/sessions", status_code=200)
+async def api_delete_all_sessions(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all chat sessions and their messages for the current user."""
+    count = await delete_all_user_sessions(db, user["id"])
+    return {"deleted": count}
+
+
+@app.get("/api/sessions/export")
+async def api_export_sessions(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all chat sessions as a Word .docx file."""
+    import io
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from datetime import datetime
+
+    sessions = await get_all_user_sessions_with_messages(db, user["id"])
+
+    doc = Document()
+    style = doc.styles["Normal"]
+    style.font.name = "Calibri"
+    style.font.size = Pt(11)
+
+    title_para = doc.add_heading("Chat Export \u2014 ToolChain AI", level=0)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    username = user.get("username") or user.get("email") or "User"
+    doc.add_paragraph(f"Exported by: {username}")
+    doc.add_paragraph(f"Date: {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}")
+    doc.add_paragraph(f"Total sessions: {len(sessions)}")
+
+    if not sessions:
+        doc.add_paragraph("\nNo chat sessions found.")
+    else:
+        for idx, session in enumerate(sessions, 1):
+            created = session.get("created_at", "")
+            if created:
+                try:
+                    dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+                    date_str = dt.strftime("%B %d, %Y")
+                except Exception:
+                    date_str = str(created)[:10]
+            else:
+                date_str = "Unknown date"
+
+            title_text = session.get("title") or f"Session {idx}"
+            doc.add_heading(f"{title_text} ({date_str})", level=2)
+
+            messages = session.get("messages", [])
+            if not messages:
+                doc.add_paragraph("(No messages)")
+            else:
+                for msg in messages:
+                    role = msg.get("role", "unknown")
+                    content = msg.get("content", "")
+                    label = "You" if role == "user" else "Assistant" if role == "assistant" else role.capitalize()
+
+                    p = doc.add_paragraph()
+                    run = p.add_run(f"[{label}]: ")
+                    run.bold = True
+                    if role == "user":
+                        run.font.color.rgb = RGBColor(0x33, 0x33, 0xCC)
+                    else:
+                        run.font.color.rgb = RGBColor(0x10, 0xA3, 0x7F)
+                    p.add_run(content)
+
+            if idx < len(sessions):
+                doc.add_paragraph("\u2500" * 50)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=toolchain_chats_export.docx"},
+    )
 
 
 @app.patch("/api/sessions/{session_id}")
@@ -491,7 +563,8 @@ async def api_chat_stream(
         title = body.message[:80] + ("..." if len(body.message) > 80 else "")
         await update_session_title(db, body.session_id, title)
 
-    current_user_id = user["id"]
+    current_user_id = str(user["id"])
+    logging.info("Chat stream: user_id=%s type=%s", current_user_id, type(current_user_id).__name__)
     connected_mcps = await get_connected_mcps(db, current_user_id)
     if body.mcp_ids is not None:
         allowed = set(body.mcp_ids)
@@ -499,12 +572,10 @@ async def api_chat_stream(
     session_id = body.session_id
     user_message = body.message
 
-    gmail_creds = await get_user_gmail_credentials(current_user_id, db) if connected_mcps else None
-
     async def event_generator():
         full_response_parts = []
 
-        async with get_mcp_tools(connected_mcps, gmail_creds=gmail_creds) as tools:
+        async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
             async for sse_chunk in stream_agent_response(user_message, history, tools):
                 yield sse_chunk
 

@@ -9,11 +9,11 @@
   overflow-y: auto;
   padding: 32px 40px 48px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(16,163,127,0.15) transparent;
+  scrollbar-color: rgba(var(--accent-rgb), 0.15) transparent;
 }
 .page::-webkit-scrollbar { width: 5px; }
 .page::-webkit-scrollbar-thumb {
-  background: rgba(16,163,127,0.2);
+  background: rgba(var(--accent-rgb), 0.15);
   border-radius: 10px;
 }
 .page::-webkit-scrollbar-track { background: transparent; }
@@ -28,8 +28,8 @@
   justify-content: space-between;
   gap: 24px;
   padding: 32px 36px;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(16,163,127,0.06) 50%, rgba(16,163,127,0.02) 100%);
-  border: 1px solid rgba(16,163,127,0.12);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(var(--accent-rgb), 0.06) 50%, rgba(var(--accent-rgb), 0.02) 100%);
+  border: 1px solid var(--accent-light);
   border-radius: 20px;
   margin-bottom: 28px;
   position: relative;
@@ -42,7 +42,7 @@
   position: absolute; top: -40%; right: -15%;
   width: 350px; height: 350px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(16,163,127,0.08) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.08) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -51,7 +51,7 @@
   position: absolute; bottom: -30%; left: -10%;
   width: 200px; height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(16,163,127,0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.05) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -77,7 +77,7 @@
 }
 
 .welcomeName {
-  background: linear-gradient(135deg, #10a37f, #059669);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -98,7 +98,7 @@
   padding: 10px 22px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(135deg, #10a37f, #059669);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: white;
   font-size: 13px;
   font-weight: 600;
@@ -106,12 +106,12 @@
   transition: all 0.25s ease;
   margin-top: 14px;
   width: fit-content;
-  box-shadow: 0 4px 16px rgba(16, 163, 127, 0.25);
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.25);
 }
 
 .welcomeAction:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(16, 163, 127, 0.35);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.35);
 }
 
 .welcomeAction:active {
@@ -133,8 +133,8 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: 100px;
-  background: rgba(16,163,127,0.04);
-  border: 1px solid rgba(16,163,127,0.12);
+  background: rgba(var(--accent-rgb), 0.04);
+  border: 1px solid rgba(var(--accent-rgb), 0.08);
   font-size: 12px;
   color: var(--text-primary);
   font-weight: 600;
@@ -224,9 +224,9 @@
 .statCard:nth-child(4) { animation-delay: 0.2s; }
 
 .statCard:hover {
-  border-color: rgba(16, 163, 127, 0.25);
+  border-color: rgba(var(--accent-rgb), 0.15);
   transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(16, 163, 127, 0.08);
+  box-shadow: 0 12px 32px rgba(var(--accent-rgb), 0.08);
 }
 
 @keyframes cardSlideUp {
@@ -252,8 +252,8 @@
 }
 
 .green .statIcon {
-  background: rgba(16, 163, 127, 0.12);
-  color: #10a37f;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .blue .statIcon {
@@ -320,7 +320,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(to right, rgba(16,163,127,0.2), transparent);
+  background: linear-gradient(to right, rgba(var(--accent-rgb), 0.15), transparent);
   margin-left: 8px;
 }
 
@@ -362,10 +362,10 @@
 .actionCard:nth-child(3) { animation-delay: 0.35s; }
 
 .actionCard:hover {
-  border-color: rgba(16,163,127,0.25);
+  border-color: rgba(var(--accent-rgb), 0.15);
   background: var(--bg-tertiary);
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(16, 163, 127, 0.06);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.08);
 }
 
 .actionCard:hover .actionArrow {
@@ -384,8 +384,8 @@
 }
 
 .green .actionIcon {
-  background: rgba(16, 163, 127, 0.12);
-  color: #10a37f;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .blue .actionIcon {
@@ -445,8 +445,8 @@
 }
 
 .card:hover {
-  border-color: rgba(16,163,127,0.2);
-  box-shadow: 0 8px 32px rgba(16, 163, 127, 0.05);
+  border-color: rgba(var(--accent-rgb), 0.15);
+  box-shadow: 0 8px 32px rgba(var(--accent-rgb), 0.06);
   transform: translateY(-2px);
 }
 
@@ -462,8 +462,8 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: rgba(16, 163, 127, 0.1);
-  color: #10a37f;
+  background: var(--accent-light);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -487,9 +487,9 @@
   align-items: center;
   gap: 4px;
   padding: 5px 14px;
-  border: 1px solid rgba(16,163,127,0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.1);
   border-radius: 100px;
-  background: rgba(16,163,127,0.03);
+  background: rgba(var(--accent-rgb), 0.05);
   color: var(--text-tertiary);
   font-size: 12px;
   font-weight: 500;
@@ -497,9 +497,9 @@
 }
 
 .cardAction:hover {
-  border-color: #10a37f;
-  color: #10a37f;
-  background: rgba(16,163,127,0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
 }
 
 .cardBody {
@@ -530,10 +530,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 18px;
-  border: 1px solid rgba(16,163,127,0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
   border-radius: 10px;
   background: transparent;
-  color: #10a37f;
+  color: var(--accent);
   font-size: 12px;
   font-weight: 600;
   margin-top: 4px;
@@ -541,10 +541,10 @@
 }
 
 .emptyBtn:hover {
-  background: #10a37f;
+  background: var(--accent);
   color: white;
-  border-color: #10a37f;
-  box-shadow: 0 4px 12px rgba(16, 163, 127, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.25);
 }
 
 /* ══════════════════════════════════════════
@@ -564,14 +564,14 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10a37f;
+  background: var(--accent);
 }
 
 .legendDot2 {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(16, 163, 127, 0.35);
+  background: rgba(var(--accent-rgb), 0.35);
   margin-left: 8px;
 }
 
@@ -610,7 +610,7 @@
   gap: 4px;
   font-size: 16px;
   font-weight: 700;
-  color: #10a37f;
+  color: var(--accent);
 }
 
 /* ══════════════════════════════════════════
@@ -689,14 +689,14 @@
 }
 
 .bar1 {
-  background: linear-gradient(180deg, #10a37f 0%, #059669 100%);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%);
   border-radius: 4px 4px 0 0;
   min-height: 2px;
   transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .bar2 {
-  background: rgba(16, 163, 127, 0.25);
+  background: rgba(var(--accent-rgb), 0.2);
   border-radius: 4px 4px 0 0;
   min-height: 2px;
   transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -731,7 +731,7 @@
 }
 
 .serverRow:hover {
-  background: rgba(16,163,127,0.05);
+  background: rgba(var(--accent-rgb), 0.05);
   transform: translateX(2px);
 }
 
@@ -772,9 +772,9 @@
 }
 
 .serverDotOn {
-  background: #10a37f;
+  background: var(--accent);
   opacity: 1;
-  box-shadow: 0 0 6px rgba(16, 163, 127, 0.5);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.5);
 }
 
 .serverName {
@@ -795,8 +795,8 @@
 }
 
 .serverBadgeOn {
-  background: rgba(16, 163, 127, 0.12);
-  color: #10a37f;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .serverBadgeOff {
@@ -888,8 +888,8 @@
 }
 
 .proCard:hover {
-  border-color: rgba(16, 163, 127, 0.2);
-  box-shadow: 0 8px 32px rgba(16, 163, 127, 0.05);
+  border-color: rgba(var(--accent-rgb), 0.15);
+  box-shadow: 0 8px 32px rgba(var(--accent-rgb), 0.06);
   transform: translateY(-2px);
 }
 
@@ -900,7 +900,7 @@
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(16, 163, 127, 0.06), transparent 60%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.08), transparent 60%);
   pointer-events: none;
 }
 
@@ -915,11 +915,11 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: rgba(16, 163, 127, 0.1);
+  background: var(--accent-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #10a37f;
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -955,19 +955,19 @@
 }
 
 .proTip:hover {
-  border-color: rgba(16, 163, 127, 0.2);
-  background: rgba(16, 163, 127, 0.04);
+  border-color: rgba(var(--accent-rgb), 0.12);
+  background: rgba(var(--accent-rgb), 0.04);
 }
 
 .proTipIcon {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: rgba(16, 163, 127, 0.1);
+  background: var(--accent-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #10a37f;
+  color: var(--accent);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -998,8 +998,8 @@
   padding: 10px 20px;
   border: none;
   border-radius: 10px;
-  background: rgba(16, 163, 127, 0.1);
-  color: #10a37f;
+  background: var(--accent-light);
+  color: var(--accent);
   font-size: 13px;
   font-weight: 600;
   margin-top: 4px;
@@ -1008,10 +1008,10 @@
 }
 
 .proCardBtn:hover {
-  background: #10a37f;
+  background: var(--accent);
   color: white;
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(16, 163, 127, 0.25);
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.25);
 }
 
 /* ══════════════════════════════════════════

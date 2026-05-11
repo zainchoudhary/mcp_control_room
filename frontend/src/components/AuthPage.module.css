@@ -24,7 +24,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(16, 163, 127, 0.25), transparent),
+    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(var(--accent-rgb), 0.15), transparent),
     radial-gradient(ellipse 500px 500px at 70% 80%, rgba(59, 130, 246, 0.15), transparent);
   animation: glowPulse 6s ease-in-out infinite alternate;
 }
@@ -45,7 +45,7 @@
 .orb1 {
   width: 300px;
   height: 300px;
-  background: #10a37f;
+  background: var(--accent);
   top: -60px;
   right: -40px;
   animation: orbFloat1 8s ease-in-out infinite;
@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #10a37f;
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -278,8 +278,8 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  background: rgba(16, 163, 127, 0.08);
-  border: 1px solid rgba(16, 163, 127, 0.2);
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
   border-radius: var(--radius);
   font-size: 13px;
   color: var(--accent);
@@ -540,18 +540,18 @@
   padding: 12px;
   border: none;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, #10a37f, #0d8c6d);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: white;
   font-size: 15px;
   font-weight: 600;
   transition: all 0.2s ease;
   margin-top: 4px;
-  box-shadow: 0 2px 12px rgba(16, 163, 127, 0.25);
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.2);
 }
 
 .submitBtn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(16, 163, 127, 0.35);
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.35);
 }
 
 .submitBtn:active:not(:disabled) {

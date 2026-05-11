@@ -142,7 +142,7 @@ export function AuthPage({ onAuth, initialMode }) {
     if (passed <= 2) return { level: 1, label: 'Weak', color: '#ef4444' }
     if (passed <= 3) return { level: 2, label: 'Fair', color: '#f59e0b' }
     if (passed <= 4) return { level: 3, label: 'Good', color: '#3b82f6' }
-    return { level: 4, label: 'Strong', color: '#10a37f' }
+    return { level: 4, label: 'Strong', color: 'var(--accent)' }
   })()
 
   return (

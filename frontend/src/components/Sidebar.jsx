@@ -21,6 +21,7 @@ export function Sidebar({
   onLogout,
   mcpCount,
   connectedCount,
+  t,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -43,10 +44,11 @@ export function Sidebar({
     setUserMenuOpen(false)
   }, [collapsed])
 
+  const tr = t || ((k) => k)
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'mcp-servers', label: 'MCP Servers', icon: Server, badge: mcpCount || null },
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
+    { id: 'dashboard', label: tr('dashboard'), icon: LayoutDashboard },
+    { id: 'mcp-servers', label: tr('mcpServers'), icon: Server, badge: mcpCount || null },
+    { id: 'chat', label: tr('chat'), icon: MessageSquare },
   ]
 
   return (
@@ -148,11 +150,11 @@ export function Sidebar({
                     <div className={styles.chatSub}>
                       <button className={styles.newChatBtn} onClick={onNewChat}>
                         <Plus size={14} />
-                        <span>New Chat</span>
+                        <span>{tr('newChat')}</span>
                       </button>
                       <div className={styles.sessions}>
                         {sessions.length === 0 ? (
-                          <div className={styles.empty}>No conversations yet</div>
+                          <div className={styles.empty}>{tr('noConversations')}</div>
                         ) : (
                           (() => {
                             const now = new Date()
@@ -180,7 +182,7 @@ export function Sidebar({
                                     onMouseEnter={() => setHoveredSession(s.id)}
                                     onMouseLeave={() => setHoveredSession(null)}
                                   >
-                                    <span className={styles.sessionTitle}>{s.title || 'New conversation'}</span>
+                                    <span className={styles.sessionTitle}>{s.title || tr('newConversation')}</span>
                                     {hoveredSession === s.id && (
                                       <button
                                         className={styles.deleteSessionBtn}
@@ -196,10 +198,10 @@ export function Sidebar({
                             )
 
                             return <>
-                              {renderGroup('Today', groups.today)}
-                              {renderGroup('Yesterday', groups.yesterday)}
-                              {renderGroup('This Week', groups.week)}
-                              {renderGroup('Older', groups.older)}
+                              {renderGroup(tr('today'), groups.today)}
+                              {renderGroup(tr('yesterday'), groups.yesterday)}
+                              {renderGroup(tr('thisWeek'), groups.week)}
+                              {renderGroup(tr('older'), groups.older)}
                             </>
                           })()
                         )}
@@ -214,7 +216,7 @@ export function Sidebar({
           <div className={styles.bottom}>
             <button className={styles.settingsBtn} onClick={onOpenSettings}>
               <Settings size={15} />
-              <span>Settings</span>
+              <span>{tr('settings')}</span>
             </button>
 
             {user && (
@@ -240,7 +242,7 @@ export function Sidebar({
                       onClick={() => { setUserMenuOpen(false); onLogout() }}
                     >
                       <LogOut size={14} />
-                      <span>Sign Out</span>
+                      <span>{tr('signOut')}</span>
                     </button>
                   </div>
                 )}

@@ -6,11 +6,11 @@ import {
 import { useMemo, useState, useEffect, useRef } from 'react'
 import styles from './DashboardPage.module.css'
 
-function getGreeting() {
+function getGreetingKey() {
   const h = new Date().getHours()
-  if (h < 12) return 'Good Morning'
-  if (h < 17) return 'Good Afternoon'
-  return 'Good Evening'
+  if (h < 12) return 'goodMorning'
+  if (h < 17) return 'goodAfternoon'
+  return 'goodEvening'
 }
 
 
@@ -103,7 +103,8 @@ function BarChart({ data }) {
   )
 }
 
-export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, onSelectMcp, user, loading, weeklyStats }) {
+export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNewChat, onSelectSession, onOpenRegister, onSelectMcp, user, loading, weeklyStats, t: _t }) {
+  const t = _t || ((k) => k)
   const disconnectedCount = mcps.length - connectedCount
   const healthPercent = mcps.length ? Math.round((connectedCount / mcps.length) * 100) : 0
 
@@ -163,17 +164,17 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
       <div className={styles.welcome}>
         <div className={styles.welcomeLeft}>
           <h1 className={styles.welcomeTitle}>
-            {getGreeting()}, <span className={styles.welcomeName}>{firstName}</span>
+            {t(getGreetingKey())}, <span className={styles.welcomeName}>{firstName}</span>
           </h1>
           <p className={styles.welcomeSub}>
-            Your AI workspace is {connectedCount > 0 ? 'active and ready' : 'waiting for connections'}. 
+            {connectedCount > 0 ? t('activeReady') : t('waitingConnections')}.{' '}
             {connectedCount > 0 
-              ? ` ${connectedCount} server${connectedCount !== 1 ? 's' : ''} connected and processing.`
-              : ' Connect an MCP server to get started.'}
+              ? t('serversConnected').replace('{count}', connectedCount).replace('{s}', connectedCount !== 1 ? 's' : '')
+              : t('connectToStart')}
           </p>
           <button className={styles.welcomeAction} onClick={onNewChat}>
             <Sparkles size={14} />
-            <span>New Chat</span>
+            <span>{t('newChat')}</span>
             <ArrowRight size={13} />
           </button>
         </div>
@@ -184,7 +185,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
           </div>
           <div className={styles.welcomeStatus}>
             <span className={`${styles.welcomeStatusDot} ${connectedCount > 0 ? styles.welcomeStatusDotOn : ''}`} />
-            <span>{connectedCount > 0 ? 'Systems Online' : 'Offline'}</span>
+            <span>{connectedCount > 0 ? t('systemsOnline') : t('offline')}</span>
           </div>
         </div>
       </div>
@@ -194,24 +195,24 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={`${styles.statCard} ${styles.green}`}>
           <div className={styles.statTop}>
             <div className={styles.statIcon}><Server size={17} /></div>
-            <span className={styles.statLabel}>MCP Servers</span>
+            <span className={styles.statLabel}>{t('mcpServers')}</span>
           </div>
           <div className={styles.statValue}><AnimatedCounter value={mcps.length} /></div>
           <div className={styles.statSub}>
-            {connectedCount} connected, {disconnectedCount} offline
+            {connectedCount} {t('active').toLowerCase()}, {disconnectedCount} {t('offline').toLowerCase()}
           </div>
           <div className={styles.statSparkWrap}>
-            <MiniSparkline data={sparkSessions} color="#10a37f" />
+            <MiniSparkline data={sparkSessions} color="var(--accent)" />
           </div>
         </div>
 
         <div className={`${styles.statCard} ${styles.blue}`}>
           <div className={styles.statTop}>
             <div className={styles.statIcon}><MessageSquare size={17} /></div>
-            <span className={styles.statLabel}>Messages</span>
+            <span className={styles.statLabel}>{t('messages')}</span>
           </div>
           <div className={styles.statValue}><AnimatedCounter value={weeklyStats?.total_messages ?? 0} /></div>
-          <div className={styles.statSub}>This week</div>
+          <div className={styles.statSub}>{t('thisWeek')}</div>
           <div className={styles.statSparkWrap}>
             <MiniSparkline data={sparkMessages} color="#3b82f6" />
           </div>
@@ -220,10 +221,10 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={`${styles.statCard} ${styles.violet}`}>
           <div className={styles.statTop}>
             <div className={styles.statIcon}><Brain size={17} /></div>
-            <span className={styles.statLabel}>Sessions</span>
+            <span className={styles.statLabel}>{t('sessions')}</span>
           </div>
           <div className={styles.statValue}><AnimatedCounter value={weeklyStats?.total_sessions ?? 0} /></div>
-          <div className={styles.statSub}>This week</div>
+          <div className={styles.statSub}>{t('thisWeek')}</div>
           <div className={styles.statSparkWrap}>
             <MiniSparkline data={sparkSessions} color="#8b5cf6" />
           </div>
@@ -232,10 +233,10 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={`${styles.statCard} ${styles.amber}`}>
           <div className={styles.statTop}>
             <div className={styles.statIcon}><Gauge size={17} /></div>
-            <span className={styles.statLabel}>Health</span>
+            <span className={styles.statLabel}>{t('health')}</span>
           </div>
           <div className={styles.statValue}><AnimatedCounter value={healthPercent} />%</div>
-          <div className={styles.statSub}>{connectedCount}/{mcps.length} servers running</div>
+          <div className={styles.statSub}>{t('serversRunning').replace('{connected}', connectedCount).replace('{total}', mcps.length)}</div>
           <div className={styles.statSparkWrap}>
             <MiniSparkline data={[healthPercent, healthPercent, healthPercent, healthPercent, healthPercent, healthPercent, healthPercent]} color="#f59e0b" />
           </div>
@@ -245,14 +246,14 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
       {/* ══════ Quick Actions ══════ */}
       <div className={styles.sectionHeader}>
         <Zap size={14} />
-        <span className={styles.sectionTitle}>Quick Actions</span>
+        <span className={styles.sectionTitle}>{t('quickActions')}</span>
       </div>
       <div className={styles.actionsGrid}>
         <button className={`${styles.actionCard} ${styles.green}`} onClick={onNewChat}>
           <div className={styles.actionIcon}><Sparkles size={18} /></div>
           <div className={styles.actionText}>
-            <span className={styles.actionLabel}>New Chat</span>
-            <span className={styles.actionDesc}>Start a conversation with AI</span>
+            <span className={styles.actionLabel}>{t('newChat')}</span>
+            <span className={styles.actionDesc}>{t('startConversation')}</span>
           </div>
           <ChevronRight size={16} className={styles.actionArrow} />
         </button>
@@ -260,8 +261,8 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <button className={`${styles.actionCard} ${styles.blue}`} onClick={() => { onNavigate('mcp-servers'); onOpenRegister() }}>
           <div className={styles.actionIcon}><Plus size={18} /></div>
           <div className={styles.actionText}>
-            <span className={styles.actionLabel}>Add Server</span>
-            <span className={styles.actionDesc}>Register a new MCP server</span>
+            <span className={styles.actionLabel}>{t('addServer')}</span>
+            <span className={styles.actionDesc}>{t('registerNewMcp')}</span>
           </div>
           <ChevronRight size={16} className={styles.actionArrow} />
         </button>
@@ -269,8 +270,8 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <button className={`${styles.actionCard} ${styles.violet}`} onClick={() => onNavigate('mcp-servers')}>
           <div className={styles.actionIcon}><Shield size={18} /></div>
           <div className={styles.actionText}>
-            <span className={styles.actionLabel}>Manage Servers</span>
-            <span className={styles.actionDesc}>View and configure MCPs</span>
+            <span className={styles.actionLabel}>{t('manageServers')}</span>
+            <span className={styles.actionDesc}>{t('viewConfigureMcps')}</span>
           </div>
           <ChevronRight size={16} className={styles.actionArrow} />
         </button>
@@ -279,7 +280,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
       {/* ══════ Activity Chart + Lists ══════ */}
       <div className={styles.sectionHeader}>
         <Activity size={14} />
-        <span className={styles.sectionTitle}>Activity Overview</span>
+        <span className={styles.sectionTitle}>{t('activityOverview')}</span>
       </div>
 
       <div className={styles.cardsGrid}>
@@ -287,30 +288,30 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderIcon}><Activity size={15} /></div>
-            <span className={styles.cardTitle}>Weekly Activity</span>
+            <span className={styles.cardTitle}>{t('weeklyActivity')}</span>
             <div className={styles.chartLegend}>
               <span className={styles.legendDot1} />
-              <span>Messages</span>
+              <span>{t('messages')}</span>
               <span className={styles.legendDot2} />
-              <span>Sessions</span>
+              <span>{t('sessions')}</span>
             </div>
           </div>
           <div className={styles.cardBody}>
             <div className={styles.chartSummaryRow}>
               <div className={styles.chartStat}>
                 <span className={styles.chartStatValue}><AnimatedCounter value={weeklyStats?.total_messages ?? 0} /></span>
-                <span className={styles.chartStatLabel}>Total Messages</span>
+                <span className={styles.chartStatLabel}>{t('totalMessages')}</span>
               </div>
               <div className={styles.chartStat}>
                 <span className={styles.chartStatValue}><AnimatedCounter value={weeklyStats?.total_sessions ?? 0} /></span>
-                <span className={styles.chartStatLabel}>Total Sessions</span>
+                <span className={styles.chartStatLabel}>{t('totalSessions')}</span>
               </div>
               <div className={styles.chartStat}>
                 <div className={styles.chartStatTrend}>
                   <TrendingUp size={13} />
                   <span>{healthPercent}%</span>
                 </div>
-                <span className={styles.chartStatLabel}>Uptime</span>
+                <span className={styles.chartStatLabel}>{t('uptime')}</span>
               </div>
             </div>
             <BarChart data={barData} />
@@ -321,18 +322,18 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderIcon}><Plug size={15} /></div>
-            <span className={styles.cardTitle}>MCP Servers</span>
+            <span className={styles.cardTitle}>{t('mcpServers')}</span>
             <button className={styles.cardAction} onClick={() => onNavigate('mcp-servers')}>
-              View All <ChevronRight size={12} />
+              {t('viewAll')} <ChevronRight size={12} />
             </button>
           </div>
           <div className={styles.cardBody}>
             {mcps.length === 0 ? (
               <div className={styles.cardEmpty}>
                 <Server size={28} className={styles.emptyIcon} />
-                <p>No servers registered yet</p>
+                <p>{t('noServersRegistered')}</p>
                 <button className={styles.emptyBtn} onClick={() => { onNavigate('mcp-servers'); onOpenRegister() }}>
-                  <Plus size={13} /> Register Server
+                  <Plus size={13} /> {t('registerServer')}
                 </button>
               </div>
             ) : (
@@ -349,11 +350,11 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
                     </div>
                     <span className={styles.serverName}>{mcp.name}</span>
                     <span className={`${styles.serverBadge} ${mcp.connected ? styles.serverBadgeOn : styles.serverBadgeOff}`}>
-                      {mcp.connected ? 'Active' : 'Offline'}
+                      {mcp.connected ? t('active') : t('offline')}
                     </span>
                   </div>
                 ))}
-                {mcps.length > 5 && <span className={styles.moreText}>+{mcps.length - 5} more servers</span>}
+                {mcps.length > 5 && <span className={styles.moreText}>{t('moreServers').replace('{count}', mcps.length - 5)}</span>}
               </div>
             )}
           </div>
@@ -363,18 +364,18 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <div className={`${styles.cardHeaderIcon} ${styles.cardHeaderIconViolet}`}><MessageSquare size={15} /></div>
-            <span className={styles.cardTitle}>Recent Chats</span>
+            <span className={styles.cardTitle}>{t('recentChats')}</span>
             <button className={styles.cardAction} onClick={() => onNavigate('chat')}>
-              View All <ChevronRight size={12} />
+              {t('viewAll')} <ChevronRight size={12} />
             </button>
           </div>
           <div className={styles.cardBody}>
             {sessions.length === 0 ? (
               <div className={styles.cardEmpty}>
                 <MessageSquare size={28} className={styles.emptyIcon} />
-                <p>No conversations yet</p>
+                <p>{t('noConversations')}</p>
                 <button className={styles.emptyBtn} onClick={onNewChat}>
-                  <Sparkles size={13} /> Start Chat
+                  <Sparkles size={13} /> {t('startChat')}
                 </button>
               </div>
             ) : (
@@ -382,7 +383,7 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
                 {sessions.slice(0, 5).map((s) => (
                   <button key={s.id} className={styles.chatRow} onClick={() => onSelectSession(s.id)}>
                     <span className={styles.chatRowDot} />
-                    <span className={styles.chatRowTitle}>{s.title || 'New conversation'}</span>
+                    <span className={styles.chatRowTitle}>{s.title || t('newConversation')}</span>
                     <ChevronRight size={13} className={styles.chatRowArrow} />
                   </button>
                 ))}
@@ -397,35 +398,35 @@ export function DashboardPage({ mcps, sessions, connectedCount, onNavigate, onNe
           <div className={styles.proCardHeader}>
             <div className={styles.proCardIcon}><Rocket size={20} /></div>
             <div>
-              <h3 className={styles.proCardTitle}>AI Power Tips</h3>
-              <p className={styles.proCardSub}>Get more from ToolChain AI</p>
+              <h3 className={styles.proCardTitle}>{t('aiPowerTips')}</h3>
+              <p className={styles.proCardSub}>{t('getMoreFromAi')}</p>
             </div>
           </div>
           <div className={styles.proTips}>
             <div className={styles.proTip}>
               <div className={styles.proTipIcon}><Lightbulb size={14} /></div>
               <div className={styles.proTipText}>
-                <span className={styles.proTipLabel}>Multi-language Support</span>
-                <span className={styles.proTipDesc}>Chat in English, Urdu, Hindi or mixed — AI understands all</span>
+                <span className={styles.proTipLabel}>{t('multiLanguageSupport')}</span>
+                <span className={styles.proTipDesc}>{t('multiLanguageDesc')}</span>
               </div>
             </div>
             <div className={styles.proTip}>
               <div className={styles.proTipIcon}><Zap size={14} /></div>
               <div className={styles.proTipText}>
-                <span className={styles.proTipLabel}>Bulk Actions</span>
-                <span className={styles.proTipDesc}>Say "trash all emails from X" — AI handles multi-step tasks</span>
+                <span className={styles.proTipLabel}>{t('bulkActions')}</span>
+                <span className={styles.proTipDesc}>{t('bulkActionsDesc')}</span>
               </div>
             </div>
             <div className={styles.proTip}>
               <div className={styles.proTipIcon}><Brain size={14} /></div>
               <div className={styles.proTipText}>
-                <span className={styles.proTipLabel}>Smart Search</span>
-                <span className={styles.proTipDesc}>Use Gmail syntax: "from:x@y.com", "newer_than:7d"</span>
+                <span className={styles.proTipLabel}>{t('smartSearch')}</span>
+                <span className={styles.proTipDesc}>{t('smartSearchDesc')}</span>
               </div>
             </div>
           </div>
           <button className={styles.proCardBtn} onClick={onNewChat}>
-            Try it now <ArrowRight size={14} />
+            {t('tryItNow')} <ArrowRight size={14} />
           </button>
         </div>
       </div>

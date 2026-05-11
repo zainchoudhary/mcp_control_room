@@ -66,3 +66,15 @@ async def update_user_password(db: AsyncSession, user_id: str, hashed_password: 
     if user:
         user.password = hashed_password
         await db.commit()
+
+
+async def update_user_username(db: AsyncSession, user_id: str, new_username: str) -> dict:
+    """Update a user's username and return updated user dict."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user:
+        user.username = new_username
+        await db.commit()
+        await db.refresh(user)
+        return user.to_dict()
+    return None

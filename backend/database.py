@@ -2,8 +2,9 @@
 database.py - MCP registry, sessions, and messages persistence layer (SQLAlchemy + PostgreSQL).
 """
 from typing import Optional
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from db_models import MCP, ChatSession, Message
 
@@ -123,3 +124,35 @@ async def get_session_messages(db: AsyncSession, session_id: str) -> list:
         .order_by(Message.created_at)
     )
     return [row.to_dict() for row in result.scalars().all()]
+
+
+async def get_all_user_sessions_with_messages(db: AsyncSession, user_id: str) -> list:
+    """Fetch all sessions with their messages for export."""
+    result = await db.execute(
+        select(ChatSession)
+        .options(selectinload(ChatSession.messages))
+        .where(ChatSession.user_id == user_id)
+        .order_by(ChatSession.created_at.desc())
+    )
+    sessions = result.scalars().all()
+    out = []
+    for s in sessions:
+        msgs = sorted(s.messages, key=lambda m: m.created_at)
+        out.append({
+            **s.to_dict(),
+            "messages": [m.to_dict() for m in msgs],
+        })
+    return out
+
+
+async def delete_all_user_sessions(db: AsyncSession, user_id: str) -> int:
+    """Bulk delete all sessions (and cascaded messages) for a user. Returns count deleted."""
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.user_id == user_id)
+    )
+    sessions = result.scalars().all()
+    count = len(sessions)
+    for s in sessions:
+        await db.delete(s)
+    await db.commit()
+    return count

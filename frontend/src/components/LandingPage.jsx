@@ -46,7 +46,7 @@ function Counter({ end, suffix = '', prefix = '' }) {
   return <span ref={ref}>{prefix}{count}{suffix}</span>
 }
 
-export function LandingPage({ onGetStarted, onSignIn }) {
+export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
   const [trustedRef, trustedVis] = useReveal()
   const [showcaseRef, showcaseVis] = useReveal()
   const [flowRef, flowVis] = useReveal()
@@ -62,8 +62,14 @@ export function LandingPage({ onGetStarted, onSignIn }) {
           <span className={styles.logoText}>ToolChain<span>AI</span></span>
         </div>
         <div className={styles.navRight}>
-          <button className={styles.navLink} onClick={onSignIn}>Log in</button>
-          <button className={styles.navCta} onClick={onGetStarted}>Get started</button>
+          {isLoggedIn ? (
+            <button className={styles.navCta} onClick={onGetStarted}>Go to Dashboard</button>
+          ) : (
+            <>
+              <button className={styles.navLink} onClick={onSignIn}>Log in</button>
+              <button className={styles.navCta} onClick={onGetStarted}>Get started</button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -82,12 +88,20 @@ export function LandingPage({ onGetStarted, onSignIn }) {
             deploying, and scaling AI agents that actually do things.
           </p>
           <div className={styles.heroActions}>
-            <button className={styles.heroBtn} onClick={onGetStarted}>
-              Get started <ArrowRight size={16} />
-            </button>
-            <button className={styles.heroBtnSec} onClick={onSignIn}>
-              Sign in
-            </button>
+            {isLoggedIn ? (
+              <button className={styles.heroBtn} onClick={onGetStarted}>
+                Go to Dashboard <ArrowRight size={16} />
+              </button>
+            ) : (
+              <>
+                <button className={styles.heroBtn} onClick={onGetStarted}>
+                  Get started <ArrowRight size={16} />
+                </button>
+                <button className={styles.heroBtnSec} onClick={onSignIn}>
+                  Sign in
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -263,12 +277,20 @@ export function LandingPage({ onGetStarted, onSignIn }) {
         <h2>Start building with<br />AI tools today.</h2>
         <p>Free forever. No credit card. Deploy in under 2 minutes.</p>
         <div className={styles.ctaBtns}>
-          <button className={styles.ctaBtn} onClick={onGetStarted}>
-            Get started <ArrowRight size={15} />
-          </button>
-          <button className={styles.ctaBtnGhost} onClick={onSignIn}>
-            Sign in to dashboard
-          </button>
+          {isLoggedIn ? (
+            <button className={styles.ctaBtn} onClick={onGetStarted}>
+              Go to Dashboard <ArrowRight size={15} />
+            </button>
+          ) : (
+            <>
+              <button className={styles.ctaBtn} onClick={onGetStarted}>
+                Get started <ArrowRight size={15} />
+              </button>
+              <button className={styles.ctaBtnGhost} onClick={onSignIn}>
+                Sign in to dashboard
+              </button>
+            </>
+          )}
         </div>
       </section>
 

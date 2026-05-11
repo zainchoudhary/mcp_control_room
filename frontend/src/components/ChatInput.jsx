@@ -12,7 +12,9 @@ export function ChatInput({
   mcps,
   enabledIds,
   onToggle,
+  t: _t,
 }) {
+  const t = _t || ((k) => k)
   const textareaRef = useRef(null)
   const wrapperRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -65,7 +67,7 @@ export function ChatInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message ToolChain AI..."
+            placeholder={t('typeMessage')}
             className={styles.textarea}
             rows={1}
             disabled={sending}
