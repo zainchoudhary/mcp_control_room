@@ -56,6 +56,11 @@ export const changeUsername = (newUsername) =>
     method: 'PUT',
     body: JSON.stringify({ new_username: newUsername }),
   })
+export const deleteAccount = (password) =>
+  request('/auth/account', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  })
 
 // Bulk session actions
 export const deleteAllSessions = () => request('/sessions', { method: 'DELETE' })

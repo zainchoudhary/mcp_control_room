@@ -45,7 +45,6 @@ async function authRequest(path, body) {
 
 async function signup({ username, email, password, confirm_password, full_name }) {
   const data = await authRequest('/signup', { username, email, password, confirm_password, full_name })
-  setAuth(data.access_token, data.user)
   return data
 }
 

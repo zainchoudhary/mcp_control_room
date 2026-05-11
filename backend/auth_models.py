@@ -204,6 +204,10 @@ class ChangeUsernameRequest(BaseModel):
         return v
 
 
+class DeleteAccountRequest(BaseModel):
+    password: str
+
+
 class UserResponse(BaseModel):
     id: str
     username: str

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { X as XIcon, Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets } from 'lucide-react'
-import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats } from '../api.js'
+import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount } from '../api.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
 import { ACCENT_COLORS } from '../hooks/useAccentColor.js'
 import styles from './SettingsModal.module.css'
@@ -171,8 +171,28 @@ function GeneralTab({ theme, onToggleTheme, busy, language, onLanguageChange, ac
   )
 }
 
-function AccountTab({ user }) {
-  const [open, setOpen] = useState(false)
+function AccountTab({ user, onLogout, busy, onBusyChange }) {
+  const [openPanel, setOpenPanel] = useState(null)
+  const [deletePw, setDeletePw] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteMsg, setDeleteMsg] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeletePw, setShowDeletePw] = useState(false)
+
+  const canDelete = deletePw.trim() && deleteConfirm === 'DELETE'
+
+  const handleDeleteAccount = async () => {
+    if (!deletePw.trim()) { setDeleteMsg('Please enter your password.'); return }
+    if (deleteConfirm !== 'DELETE') { setDeleteMsg('Please type DELETE to confirm.'); return }
+    setDeleting(true); setDeleteMsg(null); onBusyChange?.(true)
+    try {
+      await apiDeleteAccount(deletePw)
+      setDeleteMsg(null)
+      onLogout?.()
+    } catch (err) {
+      setDeleteMsg(err.message || 'Failed to delete account.')
+    } finally { setDeleting(false); onBusyChange?.(false) }
+  }
 
   return (
     <div className={styles.section}>
@@ -183,18 +203,18 @@ function AccountTab({ user }) {
 
       <div className={styles.optionBlock}>
         <button
-          className={`${styles.optionRow} ${open ? styles.optionRowActive : ''}`}
-          onClick={() => setOpen(!open)}
+          className={`${styles.optionRow} ${openPanel === 'info' ? styles.optionRowActive : ''}`}
+          onClick={() => setOpenPanel(openPanel === 'info' ? null : 'info')}
         >
           <div className={styles.optionIcon}><UserCircle size={16} /></div>
           <div className={styles.optionText}>
             <span className={styles.optionLabel}>Personal Information</span>
             <span className={styles.optionHint}>{user?.full_name || user?.username || 'View your details'}</span>
           </div>
-          <ChevronRight size={16} className={`${styles.optionChevron} ${open ? styles.optionChevronOpen : ''}`} />
+          <ChevronRight size={16} className={`${styles.optionChevron} ${openPanel === 'info' ? styles.optionChevronOpen : ''}`} />
         </button>
 
-        {open && (
+        {openPanel === 'info' && (
           <div className={styles.optionPanel}>
             <div className={styles.profileCard}>
               <div className={styles.profileDetails}>
@@ -220,6 +240,93 @@ function AccountTab({ user }) {
                     {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
                   </span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.optionBlock} style={{ marginTop: 24 }}>
+        <button
+          className={`${styles.optionRow} ${openPanel === 'delete' ? styles.deleteRowActive : ''}`}
+          onClick={() => { setOpenPanel(openPanel === 'delete' ? null : 'delete'); setDeletePw(''); setDeleteConfirm(''); setDeleteMsg(null) }}
+          disabled={busy}
+        >
+          <div className={styles.deleteIcon}><Trash2 size={16} /></div>
+          <div className={styles.optionText}>
+            <span className={styles.deleteLabel}>Delete Account</span>
+            <span className={styles.optionHint}>Permanently remove your account and all data</span>
+          </div>
+          <ChevronRight size={16} className={`${styles.optionChevron} ${openPanel === 'delete' ? styles.optionChevronOpen : ''}`} />
+        </button>
+
+        {openPanel === 'delete' && (
+          <div className={styles.deletePanel}>
+            <div className={styles.deleteCard}>
+              <div className={styles.deleteWarningBanner}>
+                <AlertTriangle size={16} />
+                <span>Deleting your account is permanent. You will lose all your data immediately.</span>
+              </div>
+
+              <div className={styles.deleteCardBody}>
+                <p className={styles.deleteBodyLabel}>The following will be permanently deleted:</p>
+                <ul className={styles.deleteList}>
+                  <li>All chat sessions and messages</li>
+                  <li>Connected MCP servers and configurations</li>
+                  <li>Your account credentials and profile</li>
+                </ul>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Your password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className={`${styles.formInput} ${styles.deleteFieldInput}`}
+                      style={{ width: '100%', paddingRight: 36 }}
+                      type={showDeletePw ? 'text' : 'password'}
+                      value={deletePw}
+                      onChange={e => { setDeletePw(e.target.value); setDeleteMsg(null) }}
+                      placeholder="Enter your password"
+                      disabled={deleting}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeletePw(!showDeletePw)}
+                      style={{
+                        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: deleting ? 'not-allowed' : 'pointer', padding: 4,
+                      }}
+                      tabIndex={-1}
+                    >
+                      {showDeletePw ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Type <strong className={styles.deleteKeyword}>DELETE</strong> to confirm</label>
+                  <input
+                    className={`${styles.formInput} ${styles.deleteFieldInput}`}
+                    style={{ width: '100%' }}
+                    type="text"
+                    value={deleteConfirm}
+                    onChange={e => { setDeleteConfirm(e.target.value); setDeleteMsg(null) }}
+                    placeholder="DELETE"
+                    disabled={deleting}
+                  />
+                </div>
+
+                {deleteMsg && <span className={`${styles.formMsgPlain} ${styles.formMsgPlainError} ${styles.deleteMsgSmall}`}>{deleteMsg}</span>}
+              </div>
+
+              <div className={styles.deleteCardFooter}>
+                <button className={styles.deleteCancelBtn} onClick={() => { setOpenPanel(null); setDeletePw(''); setDeleteConfirm(''); setDeleteMsg(null) }} disabled={deleting}>Cancel</button>
+                <button
+                  className={styles.deleteAccountBtn}
+                  onClick={handleDeleteAccount}
+                  disabled={deleting || !canDelete}
+                >
+                  {deleting ? <Loader2 size={15} className={styles.spinner} /> : 'Delete Account'}
+                </button>
               </div>
             </div>
           </div>
@@ -686,7 +793,7 @@ function ChatSessionsTab({ onSessionsDeleted, busy, onBusyChange }) {
   )
 }
 
-export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdated, onSessionsDeleted, language, onLanguageChange, accentId, onAccentChange }) {
+export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdated, onSessionsDeleted, onLogout, language, onLanguageChange, accentId, onAccentChange }) {
   const overlayRef = useRef(null)
   const [activeTab, setActiveTab] = useState('general')
   const [busy, setBusy] = useState(false)
@@ -757,7 +864,7 @@ export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdat
               />
             )}
             {activeTab === 'account' && (
-              <AccountTab user={user} />
+              <AccountTab user={user} onLogout={onLogout} busy={busy} onBusyChange={setBusy} />
             )}
             {activeTab === 'security' && (
               <SecurityTab user={user} onUserUpdated={onUserUpdated} busy={busy} onBusyChange={handleBusyChange} />

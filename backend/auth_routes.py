@@ -10,12 +10,12 @@ from db_config import get_db
 from auth_models import (
     SignupRequest, LoginRequest, AuthResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
-    ChangePasswordRequest, ChangeUsernameRequest,
+    ChangePasswordRequest, ChangeUsernameRequest, DeleteAccountRequest,
 )
 from auth_database import (
     create_user, get_user_by_email, get_user_by_id,
     email_exists, username_exists,
-    update_user_password, update_user_username,
+    update_user_password, update_user_username, delete_user_account,
 )
 from auth_utils import (
     hash_password, verify_password, create_access_token, get_current_user,
@@ -168,3 +168,22 @@ async def change_username(
 
     logger.info("Username changed for user %s: %s → %s", current_user["id"], current_user.get("username"), body.new_username)
     return {"message": "Username updated successfully.", "user": updated_user}
+
+
+@router.delete("/account")
+async def delete_account(
+    body: DeleteAccountRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete the authenticated user's account and all data."""
+    full_user = await get_user_by_email(db, current_user["email"])
+    if not full_user or not verify_password(body.password, full_user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is incorrect.",
+        )
+
+    await delete_user_account(db, current_user["id"])
+    logger.info("Account deleted: %s (%s)", current_user.get("username"), current_user["email"])
+    return {"message": "Account deleted successfully."}

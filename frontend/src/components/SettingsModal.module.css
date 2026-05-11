@@ -984,3 +984,135 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── Delete Account ───────────────────────────────────────── */
+
+.deleteIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  flex-shrink: 0;
+}
+.deleteLabel {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #ef4444;
+}
+.deleteRowActive {
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+
+.deletePanel {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.deleteCard {
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.deleteWarningBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.deleteWarningBanner svg {
+  flex-shrink: 0;
+}
+
+.deleteCardBody {
+  padding: 16px;
+}
+.deleteBodyLabel {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+.deleteList {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+  padding-left: 18px;
+  line-height: 1.8;
+}
+.deleteList li::marker {
+  color: #ef4444;
+}
+.deleteKeyword {
+  color: #ef4444;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.deleteFieldInput {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+.deleteFieldInput:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
+}
+.deleteMsgSmall {
+  font-size: 11.5px;
+  margin-top: 8px;
+}
+
+.deleteCardFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.02);
+}
+
+.deleteCancelBtn {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.deleteCancelBtn:hover {
+  background: var(--bg-hover);
+}
+
+.deleteAccountBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #ef4444;
+  color: #fff;
+  transition: background 0.15s, opacity 0.15s;
+}
+.deleteAccountBtn:hover:not(:disabled) {
+  background: #dc2626;
+}
+.deleteAccountBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

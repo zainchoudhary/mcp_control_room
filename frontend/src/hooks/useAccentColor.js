@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
-const STORAGE_KEY = 'toolchain_accent'
+const STORAGE_PREFIX = 'toolchain_accent_'
+const DEFAULT_HEX = '#10a37f'
 
 export const ACCENT_COLORS = [
-  { id: 'default', label: 'Default', hex: '#10a37f' },
+  { id: 'default', label: 'Default', hex: DEFAULT_HEX },
   { id: 'blue', label: 'Blue', hex: '#3b82f6' },
   { id: 'violet', label: 'Violet', hex: '#8b5cf6' },
   { id: 'pink', label: 'Pink', hex: '#ec4899' },
@@ -42,24 +43,40 @@ function applyAccent(hex) {
   root.style.setProperty('--green-light', `rgba(${rgb}, 0.12)`)
 }
 
-function getInitialAccent() {
-  const stored = localStorage.getItem(STORAGE_KEY)
+function getUserAccent(userId) {
+  if (!userId) return 'default'
+  const stored = localStorage.getItem(STORAGE_PREFIX + userId)
   const found = ACCENT_COLORS.find((c) => c.id === stored)
   return found ? found.id : 'default'
 }
 
-export function useAccentColor() {
-  const [accentId, setAccentIdState] = useState(getInitialAccent)
+export function useAccentColor(userId) {
+  const [accentId, setAccentIdState] = useState(() => getUserAccent(userId))
+  const prevUserId = useRef(userId)
 
   useEffect(() => {
+    if (prevUserId.current !== userId) {
+      prevUserId.current = userId
+      const userAccent = getUserAccent(userId)
+      setAccentIdState(userAccent)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      applyAccent(DEFAULT_HEX)
+      return
+    }
     const color = ACCENT_COLORS.find((c) => c.id === accentId) || ACCENT_COLORS[0]
     applyAccent(color.hex)
-  }, [accentId])
+  }, [accentId, userId])
 
   const setAccentColor = useCallback((id) => {
     setAccentIdState(id)
-    localStorage.setItem(STORAGE_KEY, id)
-  }, [])
+    if (userId) {
+      localStorage.setItem(STORAGE_PREFIX + userId, id)
+    }
+  }, [userId])
 
   return { accentId, setAccentColor }
 }

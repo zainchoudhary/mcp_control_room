@@ -2,10 +2,10 @@
 auth_database.py - User authentication persistence layer (SQLAlchemy + MySQL).
 """
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models import User
+from db_models import User, MCP, ChatSession, Message
 
 
 async def create_user(
@@ -78,3 +78,25 @@ async def update_user_username(db: AsyncSession, user_id: str, new_username: str
         await db.refresh(user)
         return user.to_dict()
     return None
+
+
+async def delete_user_account(db: AsyncSession, user_id: str):
+    """Permanently delete a user and all their data (sessions, messages, MCPs, legacy tables)."""
+    sessions = await db.execute(select(ChatSession.id).where(ChatSession.user_id == user_id))
+    session_ids = [row[0] for row in sessions.fetchall()]
+
+    if session_ids:
+        await db.execute(delete(Message).where(Message.session_id.in_(session_ids)))
+
+    await db.execute(delete(ChatSession).where(ChatSession.user_id == user_id))
+    await db.execute(delete(MCP).where(MCP.user_id == user_id))
+
+    legacy_tables = ["gmail_tokens"]
+    for table_name in legacy_tables:
+        try:
+            await db.execute(text(f"DELETE FROM {table_name} WHERE user_id = :uid"), {"uid": user_id})
+        except Exception:
+            pass
+
+    await db.execute(delete(User).where(User.id == user_id))
+    await db.commit()

@@ -126,8 +126,10 @@ export function AuthPage({ onAuth, initialMode }) {
         setTimeout(() => switchMode('login'), 3000)
       } else if (mode === 'signup') {
         const { signup } = await import('../auth.js')
-        const data = await signup({ username: form.username.trim(), email: form.email.trim(), password: form.password, confirm_password: form.confirm_password, full_name: form.full_name.trim() || null })
-        onAuth(data.user, data.access_token)
+        await signup({ username: form.username.trim(), email: form.email.trim(), password: form.password, confirm_password: form.confirm_password, full_name: form.full_name.trim() || null })
+        setSuccessMessage('Account created successfully! Please sign in.')
+        setForm({ username: '', email: '', password: '', confirm_password: '', full_name: '' })
+        setTimeout(() => switchMode('login'), 2000)
       } else {
         const { login } = await import('../auth.js')
         const data = await login({ email: form.email.trim(), password: form.password })

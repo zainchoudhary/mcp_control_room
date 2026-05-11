@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
-const STORAGE_KEY = 'toolchain_language'
+const STORAGE_PREFIX = 'toolchain_language_'
 
 export const LANGUAGES = [
   { id: 'en', label: 'English', flag: '🇺🇸' },
@@ -290,20 +290,37 @@ const translations = {
   },
 }
 
-function getInitialLanguage() {
-  const stored = localStorage.getItem(STORAGE_KEY)
+function getUserLanguage(userId) {
+  if (!userId) return 'en'
+  const stored = localStorage.getItem(STORAGE_PREFIX + userId)
   if (stored && translations[stored]) return stored
   return 'en'
 }
 
-export function useLanguage() {
-  const [language, setLanguageState] = useState(getInitialLanguage)
+export function useLanguage(userId) {
+  const [language, setLanguageState] = useState(() => getUserLanguage(userId))
+  const prevUserId = useRef(userId)
+
+  useEffect(() => {
+    if (prevUserId.current !== userId) {
+      prevUserId.current = userId
+      const lang = getUserLanguage(userId)
+      setLanguageState(lang)
+      document.documentElement.setAttribute('dir', ['ar', 'ur'].includes(lang) ? 'rtl' : 'ltr')
+    }
+  }, [userId])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('dir', ['ar', 'ur'].includes(language) ? 'rtl' : 'ltr')
+  }, [language])
 
   const setLanguage = useCallback((lang) => {
     setLanguageState(lang)
-    localStorage.setItem(STORAGE_KEY, lang)
+    if (userId) {
+      localStorage.setItem(STORAGE_PREFIX + userId, lang)
+    }
     document.documentElement.setAttribute('dir', ['ar', 'ur'].includes(lang) ? 'rtl' : 'ltr')
-  }, [])
+  }, [userId])
 
   const t = useCallback((key) => {
     return translations[language]?.[key] || translations.en[key] || key

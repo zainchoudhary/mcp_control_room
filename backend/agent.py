@@ -210,10 +210,12 @@ async def stream_agent_response(
 
     retries = 0
     max_retries = 3
+    use_tools = True
 
     while retries <= max_retries:
         try:
-            async for event in agent.astream_events(
+            current_agent = agent if use_tools else create_react_agent(llm, [])
+            async for event in current_agent.astream_events(
                 {"messages": messages},
                 config={"recursion_limit": 25},
                 version="v2",
@@ -310,16 +312,25 @@ async def stream_agent_response(
                 seen_calls = set()
                 total_tool_calls = 0
 
-                sequential_hint = HumanMessage(content=(
-                    "[SYSTEM: The previous attempt failed because you tried to call "
-                    "multiple tools at once. You MUST call only ONE tool at a time. "
-                    "Complete the first action fully, then move to the next one.]"
-                ))
-                if not any(
-                    isinstance(m, HumanMessage) and "[SYSTEM: The previous attempt" in m.content
-                    for m in messages
-                ):
-                    messages.append(sequential_hint)
+                if retries >= 2 and use_tools:
+                    use_tools = False
+                    messages = [SystemMessage(content=get_system_prompt([]))] + [
+                        m for m in messages
+                        if not isinstance(m, SystemMessage)
+                        and not (isinstance(m, HumanMessage) and "[SYSTEM:" in m.content)
+                    ]
+                    logger.info("Retry %d: dropping tools, responding as plain chat", retries)
+                else:
+                    sequential_hint = HumanMessage(content=(
+                        "[SYSTEM: The previous attempt failed because you tried to call "
+                        "multiple tools at once. You MUST call only ONE tool at a time. "
+                        "Complete the first action fully, then move to the next one.]"
+                    ))
+                    if not any(
+                        isinstance(m, HumanMessage) and "[SYSTEM: The previous attempt" in m.content
+                        for m in messages
+                    ):
+                        messages.append(sequential_hint)
 
                 continue
             else:

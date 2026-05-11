@@ -51,11 +51,11 @@ function getAuthModeFromUrl() {
 }
 
 export default function App() {
-  const { theme, toggleTheme } = useTheme()
-  const { language, setLanguage, t } = useLanguage()
-  const { accentId, setAccentColor } = useAccentColor()
   const savedUser = getSavedUser()
   const [user, setUser] = useState(() => savedUser)
+  const { theme, toggleTheme } = useTheme()
+  const { language, setLanguage, t } = useLanguage(user?.id)
+  const { accentId, setAccentColor } = useAccentColor(user?.id)
   const [authChecked, setAuthChecked] = useState(!!savedUser)
   const [activePage, setActivePage] = useState(getPageFromUrl)
   const [mcps, setMcps] = useState([])
@@ -715,6 +715,7 @@ export default function App() {
             setSessionId(null)
             setMessages([])
           }}
+          onLogout={() => { logout(); window.location.reload() }}
           language={language}
           onLanguageChange={setLanguage}
           accentId={accentId}
