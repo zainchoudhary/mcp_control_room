@@ -138,6 +138,7 @@ async def probe_mcp(url: str, transport: str = "sse", timeout: float = 8.0) -> d
     """
     Probe an MCP endpoint to verify it's reachable and fetch its tool list.
     Returns {"ok": bool, "tools": [...], "error": str|None}
+    Tools include full metadata: name, description, and JSON-Schema parameters.
     """
     dummy_name = "_probe_"
     config = {dummy_name: {"url": url, "transport": transport}}
@@ -145,9 +146,62 @@ async def probe_mcp(url: str, transport: str = "sse", timeout: float = 8.0) -> d
         async with asyncio.timeout(timeout):
             client = MultiServerMCPClient(config)
             tools = await client.get_tools()
-            tool_names = [t.name for t in tools]
-            return {"ok": True, "tools": tool_names, "error": None}
+            tool_defs = []
+            for t in tools:
+                name = _sanitize_tool_name(getattr(t, 'name', '') or '')
+                desc = getattr(t, 'description', '') or ''
+                raw = getattr(t, 'args_schema', None)
+                if isinstance(raw, dict):
+                    schema = raw
+                elif raw is not None and hasattr(raw, 'model_json_schema'):
+                    schema = raw.model_json_schema()
+                elif raw is not None and hasattr(raw, 'schema') and callable(raw.schema):
+                    schema = raw.schema()
+                else:
+                    schema = {}
+                schema.pop("title", None)
+                schema.pop("$defs", None)
+                logger.info("Probe tool: name=%s desc=%s schema_keys=%s", name, desc[:50], list(schema.keys()))
+                tool_defs.append({
+                    "name": name,
+                    "description": desc,
+                    "parameters": schema,
+                })
+            return {"ok": True, "tools": tool_defs, "error": None}
     except asyncio.TimeoutError:
         return {"ok": False, "tools": [], "error": f"Connection timed out after {timeout}s"}
     except Exception as exc:
         return {"ok": False, "tools": [], "error": str(exc)}
+
+
+async def execute_tool(
+    mcp: dict, tool_name: str, args: dict, user_id: str = "", timeout: float = 30.0,
+) -> dict:
+    """
+    Directly invoke a single tool on an MCP server and return the result.
+    Bypasses the LLM agent entirely — useful for testing tools.
+    """
+    server_config = build_server_config([mcp])
+    try:
+        async with asyncio.timeout(timeout):
+            client = MultiServerMCPClient(server_config)
+            tools = await client.get_tools()
+            tools = _sanitize_tools(tools)
+
+            target = None
+            for t in tools:
+                if t.name == tool_name:
+                    target = t
+                    break
+            if not target:
+                return {"ok": False, "result": None, "error": f"Tool '{tool_name}' not found"}
+
+            if user_id:
+                args[USER_ID_PARAM] = user_id
+
+            result = await target.ainvoke(args)
+            return {"ok": True, "result": result, "error": None}
+    except asyncio.TimeoutError:
+        return {"ok": False, "result": None, "error": f"Tool execution timed out after {timeout}s"}
+    except Exception as exc:
+        return {"ok": False, "result": None, "error": str(exc)}

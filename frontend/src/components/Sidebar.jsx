@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings,
+  Settings, Wrench,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -48,6 +48,7 @@ export function Sidebar({
   const navItems = [
     { id: 'dashboard', label: tr('dashboard'), icon: LayoutDashboard },
     { id: 'mcp-servers', label: tr('mcpServers'), icon: Server, badge: mcpCount || null },
+    { id: 'tool-execution', label: tr('toolExecution'), icon: Wrench },
     { id: 'chat', label: tr('chat'), icon: MessageSquare },
   ]
 

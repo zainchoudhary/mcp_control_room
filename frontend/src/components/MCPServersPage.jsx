@@ -357,12 +357,15 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
                 <div className={styles.toolsEmpty}>No tools found on this server.</div>
               ) : tools ? (
                 <div className={styles.toolsGrid}>
-                  {tools.map((t) => (
-                    <div key={t} className={styles.toolItem}>
-                      <Wrench size={12} className={styles.toolItemIcon} />
-                      <span>{t}</span>
-                    </div>
-                  ))}
+                  {tools.map((t) => {
+                    const name = typeof t === 'string' ? t : t.name
+                    return (
+                      <div key={name} className={styles.toolItem}>
+                        <Wrench size={12} className={styles.toolItemIcon} />
+                        <span>{name}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : null}
             </div>

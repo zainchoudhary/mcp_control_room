@@ -17,6 +17,7 @@ import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
 import { DashboardPage } from './components/DashboardPage.jsx'
 import { MCPServersPage } from './components/MCPServersPage.jsx'
+import { ToolExecutionPage } from './components/ToolExecutionPage.jsx'
 import { ChatMessage } from './components/ChatMessage.jsx'
 import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
@@ -32,7 +33,7 @@ import { useAccentColor } from './hooks/useAccentColor.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
-const APP_PAGES = ['dashboard', 'mcp-servers', 'chat']
+const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat']
 const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
@@ -73,6 +74,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
+  const [toolExecState, setToolExecState] = useState({ mcpId: null, toolName: null, tools: null, formCache: {} })
   const userId = user?.id || 'anon'
   const disabledKeyRef = useRef(`toolchain_disabled_mcps_${userId}`)
   const loadDisabled = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } }
@@ -668,6 +670,20 @@ export default function App() {
             connectedCount={connectedCount}
             initialSelectedMcp={initialSelectedMcp}
             onClearInitialMcp={() => setInitialSelectedMcp(null)}
+          />
+        )}
+
+        {activePage === 'tool-execution' && (
+          <ToolExecutionPage
+            connectedMcps={connectedMcps}
+            onNavigate={handleNavigate}
+            onRunViaAgent={(prompt) => {
+              handleNavigate('chat')
+              handleNewChat().then(() => setInput(prompt))
+            }}
+            t={t}
+            persistedState={toolExecState}
+            onStateChange={setToolExecState}
           />
         )}
 

@@ -40,7 +40,7 @@ from database import (
     delete_session, save_message, get_session_messages,
     get_all_user_sessions_with_messages, delete_all_user_sessions,
 )
-from mcp_manager import get_mcp_tools, probe_mcp
+from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
 from auth_routes import router as auth_router
 from auth_utils import get_current_user, send_contact_email
@@ -102,6 +102,10 @@ class ContactRequest(BaseModel):
     message: str
 
 
+class ToolExecuteRequest(BaseModel):
+    args: dict = {}
+
+
 # ─── Routes: Public ──────────────────────────────────────────────────────────
 
 @app.post("/api/contact")
@@ -129,6 +133,7 @@ async def api_contact(body: ContactRequest):
 @app.get("/", include_in_schema=False)
 @app.get("/dashboard", include_in_schema=False)
 @app.get("/mcp-servers", include_in_schema=False)
+@app.get("/tool-execution", include_in_schema=False)
 @app.get("/chat", include_in_schema=False)
 @app.get("/login", include_in_schema=False)
 @app.get("/signup", include_in_schema=False)
@@ -291,6 +296,27 @@ async def api_probe_mcp(
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
     result = await probe_mcp(mcp["url"], mcp["transport"])
+    return result
+
+
+@app.post("/api/mcps/{mcp_id}/tools/{tool_name}/execute")
+async def api_execute_tool(
+    mcp_id: str,
+    tool_name: str,
+    body: ToolExecuteRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Directly invoke a single tool on the MCP server (bypasses the agent)."""
+    mcp = await get_mcp(db, mcp_id, user["id"])
+    if not mcp:
+        raise HTTPException(status_code=404, detail="MCP not found.")
+    if not mcp.get("connected"):
+        raise HTTPException(status_code=400, detail="MCP is not connected.")
+
+    result = await execute_tool(mcp, tool_name, body.args, user_id=str(user["id"]))
+    if not result["ok"]:
+        raise HTTPException(status_code=422, detail=result["error"])
     return result
 
 

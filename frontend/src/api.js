@@ -31,6 +31,11 @@ export const connectMCP = (id, { skipAuth = false } = {}) => request(`/mcps/${id
 export const disconnectMCP = (id) => request(`/mcps/${id}/disconnect`, { method: 'POST' })
 export const toggleMCP = (id) => request(`/mcps/${id}/toggle`, { method: 'POST' })
 export const probeMCP = (id) => request(`/mcps/${id}/probe`, { method: 'POST' })
+export const executeTool = (mcpId, toolName, args = {}) =>
+  request(`/mcps/${mcpId}/tools/${encodeURIComponent(toolName)}/execute`, {
+    method: 'POST',
+    body: JSON.stringify({ args }),
+  })
 export const getMCPAuthStatus = (id) => request(`/mcps/${id}/auth/status`)
 export const getMCPAuthUrl = (id) => request(`/mcps/${id}/auth/url`)
 export const revokeMCPAuth = (id) => request(`/mcps/${id}/auth/revoke`, { method: 'POST' })
