@@ -298,6 +298,20 @@ async def stream_agent_response(
 
         except Exception as exc:
             error_str = str(exc).lower()
+
+            if "recursion limit" in error_str or "graphrecursionerror" in error_str:
+                logger.warning("Recursion limit hit — agent looped too many times: %s", str(exc)[:120])
+                user_msg = (
+                    "I got stuck in a loop trying to complete your request. "
+                    "Try breaking it into smaller steps or rephrasing your message."
+                )
+                if full_response.strip():
+                    payload = json.dumps({"type": "token", "content": "\n\n" + user_msg})
+                else:
+                    payload = json.dumps({"type": "error", "content": user_msg})
+                yield f"data: {payload}\n\n"
+                break
+
             retryable = (
                 "tool call validation failed" in error_str
                 or "failed_generation" in error_str

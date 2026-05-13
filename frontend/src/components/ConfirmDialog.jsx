@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { Trash2, LogOut, AlertTriangle } from 'lucide-react'
+import { Trash2, LogOut, AlertTriangle, Unplug } from 'lucide-react'
 import styles from './ConfirmDialog.module.css'
 
 const ICONS = {
   delete: Trash2,
   logout: LogOut,
   warning: AlertTriangle,
+  disconnect: Unplug,
 }
 
 export function ConfirmDialog({

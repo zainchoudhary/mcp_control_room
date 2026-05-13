@@ -44,9 +44,50 @@ function CodeBlock({ language, children }) {
   )
 }
 
+function prettify(raw) {
+  if (typeof raw === 'object') return JSON.stringify(raw, null, 2)
+  if (typeof raw !== 'string') return String(raw)
+  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+}
+
+function ToolJson({ text, variant }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className={styles.toolBody}>
+      <div className={styles.toolBodyBar}>
+        <span className={styles.toolBodyLang}>{variant === 'input' ? 'arguments' : 'response'}</span>
+        <button className={styles.toolCopyBtn} onClick={handleCopy}>
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          <span>{copied ? 'Copied!' : 'Copy'}</span>
+        </button>
+      </div>
+      <SyntaxHighlighter
+        language="json"
+        style={vscDarkPlus}
+        customStyle={{
+          margin: 0,
+          padding: '14px 16px',
+          background: '#1a1a1a',
+          borderRadius: '0 0 8px 8px',
+          fontSize: '12.5px',
+          lineHeight: 1.55,
+        }}
+        wrapLongLines
+      >
+        {text}
+      </SyntaxHighlighter>
+    </div>
+  )
+}
+
 function ToolCall({ tool, input }) {
   const [expanded, setExpanded] = useState(false)
-  const inputStr = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
+  const inputStr = prettify(input)
 
   return (
     <div className={styles.toolCall}>
@@ -55,15 +96,14 @@ function ToolCall({ tool, input }) {
         <span className={styles.toolName}>{tool}</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      {expanded && (
-        <pre className={styles.toolInput}>{inputStr}</pre>
-      )}
+      {expanded && <ToolJson text={inputStr} variant="input" />}
     </div>
   )
 }
 
 function ToolResult({ tool, content }) {
   const [expanded, setExpanded] = useState(false)
+  const contentStr = prettify(content)
 
   return (
     <div className={styles.toolResult}>
@@ -72,9 +112,7 @@ function ToolResult({ tool, content }) {
         <span>{tool} returned</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      {expanded && (
-        <pre className={styles.toolOutput}>{content}</pre>
-      )}
+      {expanded && <ToolJson text={contentStr} variant="result" />}
     </div>
   )
 }

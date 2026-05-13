@@ -73,7 +73,16 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
+  const userId = user?.id || 'anon'
+  const disabledKeyRef = useRef(`toolchain_disabled_mcps_${userId}`)
+  const loadDisabled = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } }
+  const saveDisabled = (s) => localStorage.setItem(disabledKeyRef.current, JSON.stringify([...s]))
   const [enabledMcpIds, setEnabledMcpIds] = useState(new Set())
+  const manuallyDisabledRef = useRef(loadDisabled(disabledKeyRef.current))
+  useEffect(() => {
+    disabledKeyRef.current = `toolchain_disabled_mcps_${userId}`
+    manuallyDisabledRef.current = loadDisabled(disabledKeyRef.current)
+  }, [userId])
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
@@ -178,10 +187,11 @@ export default function App() {
       const data = await listMCPs()
       setMcps(data)
       const connectedIds = new Set(data.filter((m) => m.connected).map((m) => m.id))
-      setEnabledMcpIds((prev) => {
+      setEnabledMcpIds(() => {
+        const disabled = manuallyDisabledRef.current
         const next = new Set()
         connectedIds.forEach((id) => {
-          next.add(id)
+          if (!disabled.has(id)) next.add(id)
         })
         return next
       })
@@ -360,21 +370,30 @@ export default function App() {
 
   const [togglingMcp, setTogglingMcp] = useState(null)
 
+  const finishAuthConnect = async (mcpId, label) => {
+    try {
+      await connectMCP(mcpId, { skipAuth: true })
+      await refreshMCPs()
+      toast(label ? `Connected: ${label}` : 'Connected', 'success')
+    } catch {
+      toast('Connection failed after auth', 'error')
+    } finally {
+      setTogglingMcp(null)
+    }
+  }
+
   useEffect(() => {
     const handler = (event) => {
-      if (event.data?.type === 'gmail_auth_complete') {
-        const email = event.data.email || ''
+      const t = event.data?.type
+      if (t === 'gmail_auth_complete' || t === 'mcp_auth_complete') {
+        const label = event.data.email || event.data.username || ''
         if (pendingConnectRef.current) {
           const mcpId = pendingConnectRef.current
           pendingConnectRef.current = null
-          connectMCP(mcpId, { skipAuth: true })
-            .then(() => refreshMCPs())
-            .then(() => toast(`Connected: ${email}`, 'success'))
-            .catch(() => toast('Connection failed after auth', 'error'))
-            .finally(() => setTogglingMcp(null))
+          finishAuthConnect(mcpId, label)
         }
       }
-      if (event.data?.type === 'gmail_auth_error') {
+      if (t === 'gmail_auth_error' || t === 'mcp_auth_error') {
         toast(`Auth failed: ${event.data.error || 'Unknown error'}`, 'error')
         pendingConnectRef.current = null
         setTogglingMcp(null)
@@ -400,8 +419,17 @@ export default function App() {
           if (!popup || popup.closed) {
             clearInterval(pollClose)
             if (pendingConnectRef.current) {
+              const mcpId = pendingConnectRef.current
               pendingConnectRef.current = null
-              setTogglingMcp(null)
+              connectMCP(mcpId)
+                .then(async (r) => {
+                  if (r?.connected) {
+                    await refreshMCPs()
+                    toast('Connected', 'success')
+                  }
+                })
+                .catch(() => {})
+                .finally(() => setTogglingMcp(null))
             }
           }
         }, 500)
@@ -416,20 +444,38 @@ export default function App() {
     }
   }
 
-  const onDisconnect = async (id) => {
-    setTogglingMcp(id)
-    try {
-      await disconnectMCP(id)
-      await refreshMCPs()
-      toast('Disconnected', 'info')
-    } finally { setTogglingMcp(null) }
+  const onDisconnect = (id) => {
+    const mcp = mcps.find((m) => m.id === id)
+    const name = mcp?.name || 'this server'
+    setConfirmDialog({
+      title: 'Disconnect Server',
+      message: `Disconnect "${name}"? You will need to re-authenticate to use it again.`,
+      confirmLabel: 'Disconnect',
+      icon: 'disconnect',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setTogglingMcp(id)
+        try {
+          await disconnectMCP(id)
+          await refreshMCPs()
+          toast('Disconnected', 'info')
+        } finally { setTogglingMcp(null) }
+      },
+    })
   }
 
   const onChatToggle = (id) => {
     setEnabledMcpIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+        manuallyDisabledRef.current.add(id)
+      } else {
+        next.add(id)
+        manuallyDisabledRef.current.delete(id)
+      }
+      saveDisabled(manuallyDisabledRef.current)
       return next
     })
   }
