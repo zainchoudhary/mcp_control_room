@@ -208,6 +208,14 @@ async def api_delete_mcp(
     mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
+
+    base = _mcp_base_url(mcp["url"])
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post(f"{base}/auth/revoke", params={"user_id": user["id"]})
+    except Exception:
+        logger.debug("Auth revoke skipped for %s (server unreachable)", mcp.get("name", mcp_id))
+
     await delete_mcp(db, mcp_id, user["id"])
 
 
@@ -263,7 +271,7 @@ async def api_disconnect_mcp(
         async with httpx.AsyncClient(timeout=8) as client:
             await client.post(f"{base}/auth/revoke", params={"user_id": user["id"]})
     except Exception:
-        pass
+        logger.debug("Auth revoke skipped for %s (server unreachable)", mcp.get("name", mcp_id))
 
     await set_mcp_connection(db, mcp_id, user["id"], False)
     return {"id": mcp_id, "connected": False}
