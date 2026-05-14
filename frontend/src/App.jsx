@@ -88,6 +88,7 @@ export default function App() {
   const { toasts, toast, dismiss } = useToast()
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
+  const pendingPromptRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -242,6 +243,11 @@ export default function App() {
     refreshMCPs()
   }, [user, activePage])
 
+  useEffect(() => {
+    if (!user || activePage !== 'tool-execution') return
+    refreshMCPs()
+  }, [user, activePage])
+
 
   const ensureSession = async () => {
     if (sessionId) return sessionId
@@ -251,8 +257,8 @@ export default function App() {
     return data.id
   }
 
-  const send = async () => {
-    const text = input.trim()
+  const send = async (overrideText) => {
+    const text = (overrideText || input).trim()
     if (!text || sending) return
 
     setInput('')
@@ -324,6 +330,16 @@ export default function App() {
     setActivePage('chat')
     window.history.pushState(null, '', '/chat')
   }
+
+  useEffect(() => {
+    if (activePage === 'chat' && pendingPromptRef.current && !sending) {
+      const prompt = pendingPromptRef.current
+      pendingPromptRef.current = null
+      setInput(prompt)
+      const timer = setTimeout(() => send(prompt), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [activePage, messages])
 
   const handleSelectSession = async (id) => {
     if (id === sessionId && activePage === 'chat') return
@@ -678,8 +694,9 @@ export default function App() {
             connectedMcps={connectedMcps}
             onNavigate={handleNavigate}
             onRunViaAgent={(prompt) => {
+              pendingPromptRef.current = prompt
               handleNavigate('chat')
-              handleNewChat().then(() => setInput(prompt))
+              handleNewChat()
             }}
             t={t}
             persistedState={toolExecState}

@@ -2,17 +2,52 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Wrench, ChevronDown, Loader2, Bot, Copy, Check,
   Clock, Server, RotateCcw, Terminal, Zap, AlertCircle, X,
+  Code2, FormInput,
 } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import oneLightTheme from 'react-syntax-highlighter/dist/esm/styles/prism/one-light'
 import { executeTool, probeMCP } from '../api.js'
 import styles from './ToolExecutionPage.module.css'
 
+function useCurrentTheme() {
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.getAttribute('data-theme') !== 'light'
+  )
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light')
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
+  return isDark
+}
+
 function prettify(raw) {
-  if (typeof raw === 'string') {
-    try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+  if (raw == null) return { text: '', isJson: false }
+
+  let data = raw
+
+  if (Array.isArray(data)) {
+    const blocks = data.filter(b => b && typeof b === 'object' && b.type === 'text' && typeof b.text === 'string')
+    if (blocks.length) data = blocks.map(b => b.text).join('\n')
   }
-  try { return JSON.stringify(raw, null, 2) } catch { return String(raw) }
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data)
+      return { text: JSON.stringify(parsed, null, 2), isJson: true }
+    } catch {
+      return { text: data, isJson: false }
+    }
+  }
+
+  if (typeof data === 'object') {
+    return { text: JSON.stringify(data, null, 2), isJson: true }
+  }
+
+  return { text: String(data), isJson: false }
 }
 
 function buildDefaultValue(schema) {
@@ -123,8 +158,85 @@ function ParamInput({ name, schema, value, onChange }) {
   return <input className={styles.formInput} type="text" value={value} onChange={(e) => onChange(name, e.target.value)} placeholder={schema?.description || `Enter ${name}`} />
 }
 
+/* ── Always-visible Output Panel ── */
+function OutputPanel({ result, toolName, executing }) {
+  const [copied, setCopied] = useState(false)
+  const isDark = useCurrentTheme()
+  const highlightStyle = isDark ? vscDarkPlus : oneLightTheme
+
+  const formatted = result ? prettify(result.data) : null
+
+  const handleCopy = () => {
+    if (!formatted) return
+    navigator.clipboard.writeText(formatted.text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className={styles.outputPanel}>
+      <div className={styles.panelHeader}>
+        <div className={styles.panelTitleRow}>
+          <Terminal size={14} />
+          <span className={styles.panelTitle}>Output</span>
+          {result && (
+            <span className={`${styles.panelBadge} ${result.ok ? styles.badgeOk : styles.badgeFail}`}>
+              {result.ok ? 'Success' : 'Error'}
+            </span>
+          )}
+        </div>
+        {result && (
+          <div className={styles.panelActions}>
+            <span className={styles.panelTime}><Clock size={11} /> {result.elapsed}ms</span>
+            <button className={styles.panelCopy} onClick={handleCopy}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.panelBody}>
+        {executing ? (
+          <div className={styles.panelPlaceholder}>
+            <Loader2 size={20} className={styles.panelSpinner} />
+            <span>Executing {toolName}...</span>
+          </div>
+        ) : result ? (
+          <>
+            {toolName && <div className={styles.panelToolName}>{toolName}</div>}
+            {formatted.isJson ? (
+              <SyntaxHighlighter
+                language="json"
+                style={highlightStyle}
+                wrapLongLines
+                customStyle={{
+                  background: 'transparent',
+                  margin: 0,
+                  padding: '14px 18px',
+                  fontSize: '12.5px',
+                  lineHeight: 1.6,
+                }}
+              >
+                {formatted.text}
+              </SyntaxHighlighter>
+            ) : (
+              <pre className={styles.panelPlainText}>{formatted.text}</pre>
+            )}
+          </>
+        ) : (
+          <div className={styles.panelPlaceholder}>
+            <Terminal size={20} />
+            <span>Execute a tool to see the response</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Tool detail card with form ── */
-function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
+function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange, onResult, executing, setExecuting }) {
   const props = tool.parameters?.properties || {}
   const required = new Set(tool.parameters?.required || [])
   const paramNames = Object.keys(props).filter((k) => k !== 'user_id')
@@ -135,20 +247,67 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
     paramNames.forEach((k) => { init[k] = buildDefaultValue(props[k]) })
     return init
   })
-  const [executing, setExecuting] = useState(false)
-  const [result, setResult] = useState(cachedForm?.result || null)
-  const [copied, setCopied] = useState(false)
+  const [inputMode, setInputMode] = useState('form')
+  const [rawJson, setRawJson] = useState('')
   const startRef = useRef(0)
 
+  const buildRawFromValues = useCallback(() => {
+    const obj = {}
+    paramNames.forEach((k) => {
+      const val = values[k]
+      const type = props[k]?.type
+      const def = props[k]?.default
+      if (val !== '' && val !== undefined && val !== null) {
+        if (type === 'boolean') obj[k] = val === true || val === 'true'
+        else if (type === 'number' || type === 'integer') { const n = Number(val); obj[k] = isNaN(n) ? val : n }
+        else if (type === 'object' || type === 'array') { try { obj[k] = JSON.parse(val) } catch { obj[k] = val } }
+        else obj[k] = val
+      } else {
+        if (def !== undefined) obj[k] = def
+        else if (type === 'integer' || type === 'number') obj[k] = 0
+        else if (type === 'boolean') obj[k] = false
+        else if (type === 'array') obj[k] = []
+        else if (type === 'object') obj[k] = {}
+        else obj[k] = 'string'
+      }
+    })
+    return JSON.stringify(obj, null, 2)
+  }, [values, paramNames, props])
+
   useEffect(() => {
-    onFormChange?.(tool.name, { values, result })
-  }, [values, result])
+    onFormChange?.(tool.name, { values })
+  }, [values])
+
+  const handleToggleMode = (mode) => {
+    if (mode === inputMode) return
+    if (mode === 'raw') {
+      setRawJson(buildRawFromValues())
+    } else {
+      try {
+        const obj = JSON.parse(rawJson)
+        const newValues = {}
+        paramNames.forEach((k) => {
+          if (k in obj) {
+            const v = obj[k]
+            newValues[k] = typeof v === 'object' ? JSON.stringify(v, null, 2) : v
+          } else {
+            newValues[k] = buildDefaultValue(props[k])
+          }
+        })
+        setValues(newValues)
+      } catch { /* invalid JSON */ }
+    }
+    setInputMode(mode)
+  }
 
   const handleChange = useCallback((name, val) => {
     setValues((prev) => ({ ...prev, [name]: val }))
   }, [])
 
   const buildArgs = () => {
+    if (inputMode === 'raw') {
+      try { return JSON.parse(rawJson) } catch { return {} }
+    }
     const args = {}
     paramNames.forEach((k) => {
       const val = values[k]
@@ -164,13 +323,12 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
 
   const handleExecute = async () => {
     setExecuting(true)
-    setResult(null)
     startRef.current = performance.now()
     try {
       const res = await executeTool(mcpId, tool.name, buildArgs())
-      setResult({ ok: true, data: res.result, elapsed: Math.round(performance.now() - startRef.current) })
+      onResult({ ok: true, data: res.result, elapsed: Math.round(performance.now() - startRef.current) })
     } catch (err) {
-      setResult({ ok: false, data: err.message, elapsed: Math.round(performance.now() - startRef.current) })
+      onResult({ ok: false, data: err.message, elapsed: Math.round(performance.now() - startRef.current) })
     } finally {
       setExecuting(false)
     }
@@ -182,18 +340,12 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
     onRunViaAgent(parts.length ? `Use the ${tool.name} tool with: ${parts.join(', ')}` : `Use the ${tool.name} tool`)
   }
 
-  const handleCopy = () => {
-    if (!result) return
-    navigator.clipboard.writeText(prettify(result.data))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   const handleClear = () => {
-    setResult(null)
+    onResult(null)
     const init = {}
     paramNames.forEach((k) => { init[k] = buildDefaultValue(props[k]) })
     setValues(init)
+    setRawJson('')
   }
 
   return (
@@ -211,21 +363,50 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
           <p className={styles.noParams}>This tool takes no parameters</p>
         ) : (
           <>
-            <div className={styles.paramHeader}>Parameters</div>
-            {paramNames.map((k) => {
-              const schema = props[k]
-              return (
-                <div key={k} className={styles.formGroup}>
-                  <label className={styles.formLabel}>
-                    {k}
-                    {required.has(k) && <span className={styles.required}>*</span>}
-                    <span className={styles.paramType}>{schema?.type || 'string'}</span>
-                  </label>
-                  {schema?.description && <p className={styles.paramDesc}>{schema.description}</p>}
-                  <ParamInput name={k} schema={schema} value={values[k]} onChange={handleChange} />
-                </div>
-              )
-            })}
+            <div className={styles.paramBar}>
+              <span className={styles.paramHeader}>Parameters</span>
+              <div className={styles.modeToggle}>
+                <button
+                  type="button"
+                  className={`${styles.modeBtn} ${inputMode === 'form' ? styles.modeBtnActive : ''}`}
+                  onClick={() => handleToggleMode('form')}
+                >
+                  <FormInput size={12} /> Form
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.modeBtn} ${inputMode === 'raw' ? styles.modeBtnActive : ''}`}
+                  onClick={() => handleToggleMode('raw')}
+                >
+                  <Code2 size={12} /> Raw
+                </button>
+              </div>
+            </div>
+
+            {inputMode === 'form' ? (
+              paramNames.map((k) => {
+                const schema = props[k]
+                return (
+                  <div key={k} className={styles.formGroup}>
+                    <label className={styles.formLabel}>
+                      {k}
+                      {required.has(k) && <span className={styles.required}>*</span>}
+                      <span className={styles.paramType}>{schema?.type || 'string'}</span>
+                    </label>
+                    {schema?.description && <p className={styles.paramDesc}>{schema.description}</p>}
+                    <ParamInput name={k} schema={schema} value={values[k]} onChange={handleChange} />
+                  </div>
+                )
+              })
+            ) : (
+              <textarea
+                className={styles.rawTextarea}
+                value={rawJson}
+                onChange={(e) => setRawJson(e.target.value)}
+                rows={Math.max(6, paramNames.length * 2 + 2)}
+                spellCheck={false}
+              />
+            )}
           </>
         )}
 
@@ -237,37 +418,10 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
           <button className={styles.agentBtn} onClick={handleAgent} disabled={executing}>
             <Bot size={14} /> Run via Agent
           </button>
-          {(result || paramNames.some((k) => values[k] !== '' && values[k] !== false)) && (
-            <button className={styles.clearBtn} onClick={handleClear} disabled={executing}>
-              <RotateCcw size={13} /> Clear
-            </button>
-          )}
+          <button className={styles.clearBtn} onClick={handleClear} disabled={executing}>
+            <RotateCcw size={13} /> Clear
+          </button>
         </div>
-
-        {result && (
-          <div className={`${styles.resultWrap} ${result.ok ? styles.resultSuccess : styles.resultError}`}>
-            <div className={styles.resultBar}>
-              <span className={styles.resultLabel}>
-                <Terminal size={13} /> Response
-                <span className={`${styles.resultStatus} ${result.ok ? styles.statusOk : styles.statusFail}`}>
-                  {result.ok ? 'Success' : 'Error'}
-                </span>
-              </span>
-              <div className={styles.resultMeta}>
-                <span className={styles.resultTime}><Clock size={11} /> {result.elapsed}ms</span>
-                <button className={styles.copyBtn} onClick={handleCopy}>
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            <div className={styles.resultCode}>
-              <SyntaxHighlighter language="json" style={vscDarkPlus} wrapLongLines>
-                {prettify(result.data)}
-              </SyntaxHighlighter>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -276,29 +430,47 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange }) {
 /* ── Main page ── */
 export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t, persistedState, onStateChange }) {
   const tr = t || ((k) => k)
+  const hasRestoredState = !!(persistedState?.mcpId && persistedState?.tools?.length)
+
   const [selectedMcpId, setSelectedMcpId] = useState(persistedState?.mcpId || null)
   const [tools, setTools] = useState(persistedState?.tools || null)
   const [probing, setProbing] = useState(false)
   const [probeError, setProbeError] = useState(null)
   const [selectedToolName, setSelectedToolName] = useState(persistedState?.toolName || null)
+  const [result, setResult] = useState(persistedState?.formCache?._result || null)
+  const [executing, setExecuting] = useState(false)
   const formCacheRef = useRef(persistedState?.formCache || {})
 
+  const syncState = useCallback((overrides = {}) => {
+    const snap = {
+      mcpId: selectedMcpId,
+      toolName: selectedToolName,
+      tools,
+      formCache: { ...formCacheRef.current, _result: result },
+      ...overrides,
+    }
+    onStateChange?.(snap)
+  }, [selectedMcpId, selectedToolName, tools, result, onStateChange])
+
+  useEffect(() => { syncState() }, [selectedMcpId, selectedToolName, tools, result])
+
   useEffect(() => {
-    onStateChange?.({ mcpId: selectedMcpId, toolName: selectedToolName, tools, formCache: formCacheRef.current })
-  }, [selectedMcpId, selectedToolName, tools])
+    if (hasRestoredState) return
+    if (selectedMcpId && !probing) {
+      probeMcpTools(selectedMcpId)
+    } else if (!selectedMcpId && connectedMcps?.length === 1) {
+      probeMcpTools(connectedMcps[0].id)
+    }
+  }, [])
 
   const handleFormChange = useCallback((toolName, data) => {
     formCacheRef.current = { ...formCacheRef.current, [toolName]: data }
-    onStateChange?.({ mcpId: selectedMcpId, toolName: selectedToolName, tools, formCache: formCacheRef.current })
-  }, [selectedMcpId, selectedToolName, tools])
+    syncState()
+  }, [syncState])
 
-  const handleSelectMcp = async (mcpId) => {
-    setSelectedMcpId(mcpId)
-    setSelectedToolName(null)
-    setTools(null)
+  const probeMcpTools = async (mcpId) => {
     setProbeError(null)
     setProbing(true)
-    formCacheRef.current = {}
     try {
       const res = await probeMCP(mcpId)
       if (res.ok) setTools(res.tools || [])
@@ -310,8 +482,18 @@ export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t,
     }
   }
 
+  const handleSelectMcp = async (mcpId) => {
+    setSelectedMcpId(mcpId)
+    setSelectedToolName(null)
+    setTools(null)
+    setResult(null)
+    formCacheRef.current = {}
+    await probeMcpTools(mcpId)
+  }
+
   const handleSelectTool = (toolName) => {
     setSelectedToolName(toolName)
+    setResult(null)
   }
 
   const selectedMcp = connectedMcps?.find((m) => m.id === selectedMcpId)
@@ -334,8 +516,8 @@ export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t,
 
   if (!connectedMcps || connectedMcps.length === 0) {
     return (
-      <div className={styles.page}>
-        <div className={styles.header}>
+      <div className={styles.pageEmpty}>
+        <div className={styles.header} style={{ padding: '32px 40px 0' }}>
           <h1 className={styles.title}>{tr('toolExecution')}</h1>
           <p className={styles.subtitle}>{tr('toolExecSubtitle')}</p>
         </div>
@@ -353,63 +535,70 @@ export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t,
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{tr('toolExecution')}</h1>
-        <p className={styles.subtitle}>{tr('toolExecSubtitle')}</p>
-      </div>
+      <div className={styles.splitLayout}>
+        <div className={styles.leftPanel}>
+          <div className={styles.header}>
+            <h1 className={styles.title}>{tr('toolExecution')}</h1>
+            <p className={styles.subtitle}>{tr('toolExecSubtitle')}</p>
+          </div>
+          <div className={styles.selectors}>
+            <DropdownSelect
+              label="Server"
+              placeholder="Select an MCP server..."
+              value={selectedMcpId}
+              displayValue={selectedMcp?.name}
+              icon={
+                selectedMcp?.icon
+                  ? <img src={selectedMcp.icon} alt="" className={styles.optIcon} onError={(e) => { e.target.style.display = 'none' }} />
+                  : <Server size={14} />
+              }
+              options={mcpOptions}
+              onSelect={handleSelectMcp}
+            />
+            {selectedMcpId && (
+              <DropdownSelect
+                label="Tool"
+                placeholder={probing ? 'Loading tools...' : probeError ? 'Error loading tools' : 'Select a tool...'}
+                value={selectedToolName}
+                displayValue={selectedToolName}
+                icon={<Wrench size={13} />}
+                options={toolOptions}
+                onSelect={handleSelectTool}
+                disabled={probing || !!probeError || !tools}
+              />
+            )}
+          </div>
 
-      <div className={styles.selectors}>
-        {/* Step 1: Select MCP */}
-        <DropdownSelect
-          label="Server"
-          placeholder="Select an MCP server..."
-          value={selectedMcpId}
-          displayValue={selectedMcp?.name}
-          icon={
-            selectedMcp?.icon
-              ? <img src={selectedMcp.icon} alt="" className={styles.optIcon} onError={(e) => { e.target.style.display = 'none' }} />
-              : <Server size={14} />
-          }
-          options={mcpOptions}
-          onSelect={handleSelectMcp}
-        />
+          {probing && (
+            <div className={styles.loadingBar}><Loader2 size={15} /> Loading tools from {selectedMcp?.name}...</div>
+          )}
+          {probeError && (
+            <div className={styles.errorBar}><AlertCircle size={14} /> {probeError}</div>
+          )}
 
-        {/* Step 2: Select Tool */}
-        {selectedMcpId && (
-          <DropdownSelect
-            label="Tool"
-            placeholder={probing ? 'Loading tools...' : probeError ? 'Error loading tools' : 'Select a tool...'}
-            value={selectedToolName}
-            displayValue={selectedToolName}
-            icon={<Wrench size={13} />}
-            options={toolOptions}
-            onSelect={handleSelectTool}
-            disabled={probing || !!probeError || !tools}
-          />
-        )}
-      </div>
-
-      {probing && (
-        <div className={styles.loadingBar}><Loader2 size={15} /> Loading tools from {selectedMcp?.name}...</div>
-      )}
-
-      {probeError && (
-        <div className={styles.errorBar}>
-          <AlertCircle size={14} /> {probeError}
+          {selectedTool && (
+            <ToolDetail
+              key={selectedTool.name}
+              tool={selectedTool}
+              mcpId={selectedMcpId}
+              onRunViaAgent={onRunViaAgent}
+              cachedForm={formCacheRef.current[selectedTool.name]}
+              onFormChange={handleFormChange}
+              onResult={setResult}
+              executing={executing}
+              setExecuting={setExecuting}
+            />
+          )}
         </div>
-      )}
 
-      {/* Step 3: Tool detail + form */}
-      {selectedTool && (
-        <ToolDetail
-          key={selectedTool.name}
-          tool={selectedTool}
-          mcpId={selectedMcpId}
-          onRunViaAgent={onRunViaAgent}
-          cachedForm={formCacheRef.current[selectedTool.name]}
-          onFormChange={handleFormChange}
-        />
-      )}
+        <div className={styles.rightPanel}>
+          <OutputPanel
+            result={result}
+            toolName={selectedToolName}
+            executing={executing}
+          />
+        </div>
+      </div>
     </div>
   )
 }

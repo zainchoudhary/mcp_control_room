@@ -199,8 +199,9 @@ async def execute_tool(
             if user_id:
                 args[USER_ID_PARAM] = user_id
 
-            result = await target.ainvoke(args)
-            return {"ok": True, "result": result, "error": None}
+            raw = await target.ainvoke(args)
+            logger.info("execute_tool raw type=%s value=%s", type(raw).__name__, repr(raw)[:500])
+            return {"ok": True, "result": raw, "error": None}
     except asyncio.TimeoutError:
         return {"ok": False, "result": None, "error": f"Tool execution timed out after {timeout}s"}
     except Exception as exc:

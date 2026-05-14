@@ -291,7 +291,8 @@ async def stream_agent_response(
                     if total_tool_calls > MAX_TOTAL_TOOL_CALLS:
                         continue
 
-                    payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": content[:2000]})
+                    flat_content = content.replace("\n", " ").replace("  ", " ").strip()
+                    payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": flat_content[:2000]})
                     yield f"data: {payload}\n\n"
 
             break
