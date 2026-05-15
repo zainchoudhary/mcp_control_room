@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Server, Search, Trash2, Loader2, ExternalLink, Wifi, WifiOff,
-  Plug, X, Clock, Globe, Layers, Wrench, Copy, Check, ChevronRight,
+  Plug, X, Clock, Globe, Layers, Wrench, Copy, Check, ChevronRight, ChevronDown,
   MoreVertical, Power, PowerOff,
 } from 'lucide-react'
 import styles from './MCPServersPage.module.css'
@@ -21,6 +21,7 @@ export function MCPServersPage({
   onClearInitialMcp,
 }) {
   const [selectedMcp, setSelectedMcp] = useState(null)
+  const [toolsMcp, setToolsMcp] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -128,6 +129,7 @@ export function MCPServersPage({
               isToggling={togglingMcp === mcp.id}
               busy={busy}
               onOpen={() => setSelectedMcp(mcp)}
+              onOpenTools={() => setToolsMcp(mcp)}
             />
           ))}
         </div>
@@ -139,17 +141,24 @@ export function MCPServersPage({
           onClose={() => setSelectedMcp(null)}
           onConnect={onConnect}
           onDisconnect={onDisconnect}
-          onProbe={onProbe}
           onDelete={(id, name) => { onDelete(id, name) }}
           isToggling={togglingMcp === selectedMcp.id}
           busy={busy}
+        />
+      )}
+
+      {toolsMcp && (
+        <ToolsModal
+          mcp={mcps.find((m) => m.id === toolsMcp.id) || toolsMcp}
+          onClose={() => setToolsMcp(null)}
+          onProbe={onProbe}
         />
       )}
     </div>
   )
 }
 
-function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, onOpen }) {
+function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, onOpen, onOpenTools }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const disabled = busy || isToggling
@@ -243,6 +252,13 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
       </div>
 
       <div className={styles.cardFooter}>
+        <button
+          className={styles.toolsLink}
+          onClick={(e) => { e.stopPropagation(); onOpenTools() }}
+          disabled={disabled}
+        >
+          <Wrench size={12} /> Available Tools
+        </button>
         <span className={styles.viewDetail}>
           View Details <ChevronRight size={14} />
         </span>
@@ -252,30 +268,10 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
 }
 
 
-function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onDelete, isToggling, busy }) {
-  const [probing, setProbing] = useState(false)
-  const [tools, setTools] = useState(null)
-  const [probeError, setProbeError] = useState(null)
+function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, isToggling, busy }) {
   const [copiedField, setCopiedField] = useState(null)
   const overlayRef = useRef(null)
   const disabled = busy || isToggling
-
-  useEffect(() => {
-    let active = true
-    setProbing(true)
-    setProbeError(null)
-    onProbe(mcp.id)
-      .then((res) => {
-        if (!active) return
-        if (res.ok) setTools(res.tools || [])
-        else setProbeError(res.error || 'Probe failed')
-      })
-      .catch((err) => {
-        if (active) setProbeError(err.message)
-      })
-      .finally(() => { if (active) setProbing(false) })
-    return () => { active = false }
-  }, [mcp.id])
 
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === 'Escape' && !disabled) onClose() }
@@ -366,61 +362,6 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
               copied={copiedField === 'id'}
             />
           </div>
-
-          <div className={styles.toolsSection}>
-            <div className={styles.toolsHeader}>
-              <Wrench size={16} />
-              <span className={styles.toolsTitle}>Available Tools</span>
-              {probing && <Loader2 size={14} className={styles.toolsLoader} />}
-              {!probing && tools && (
-                <span className={styles.toolsCount}>{tools.length}</span>
-              )}
-            </div>
-
-            <div className={styles.toolsBody}>
-              {probing ? (
-                <div className={styles.toolsProbing}>
-                  <Loader2 size={20} className={styles.toolsLoader} />
-                  <span>Loading tools...</span>
-                </div>
-              ) : probeError ? (
-                <div className={styles.toolsError}>
-                  <span>{probeError}</span>
-                  <button
-                    className={styles.retryBtn}
-                    disabled={disabled}
-                    onClick={() => {
-                      setProbing(true)
-                      setProbeError(null)
-                      onProbe(mcp.id)
-                        .then((res) => {
-                          if (res.ok) setTools(res.tools || [])
-                          else setProbeError(res.error || 'Probe failed')
-                        })
-                        .catch((err) => setProbeError(err.message))
-                        .finally(() => setProbing(false))
-                    }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : tools && tools.length === 0 ? (
-                <div className={styles.toolsEmpty}>No tools found on this server.</div>
-              ) : tools ? (
-                <div className={styles.toolsGrid}>
-                  {tools.map((t) => {
-                    const name = typeof t === 'string' ? t : t.name
-                    return (
-                      <div key={name} className={styles.toolItem}>
-                        <Wrench size={12} className={styles.toolItemIcon} />
-                        <span>{name}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </div>
-          </div>
         </div>
 
         <div className={styles.modalFooter}>
@@ -470,6 +411,187 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onProbe, onD
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ToolsModal({ mcp, onClose, onProbe }) {
+  const [probing, setProbing] = useState(true)
+  const [tools, setTools] = useState(null)
+  const [probeError, setProbeError] = useState(null)
+  const overlayRef = useRef(null)
+
+  useEffect(() => {
+    let active = true
+    setProbing(true)
+    setProbeError(null)
+    onProbe(mcp.id)
+      .then((res) => {
+        if (!active) return
+        if (res.ok) setTools(res.tools || [])
+        else setProbeError(res.error || 'Probe failed')
+      })
+      .catch((err) => { if (active) setProbeError(err.message) })
+      .finally(() => { if (active) setProbing(false) })
+    return () => { active = false }
+  }, [mcp.id])
+
+  useEffect(() => {
+    const handleEsc = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  return (
+    <div className={styles.overlay} ref={overlayRef} onClick={(e) => { if (e.target === overlayRef.current) onClose() }}>
+      <div className={styles.modal}>
+        <div className={styles.modalHeader}>
+          <div className={styles.modalHeaderLeft}>
+            <div className={`${styles.modalIcon} ${mcp.connected ? styles.modalIconOn : ''}`}>
+              <Wrench size={20} />
+            </div>
+            <div>
+              <h2 className={styles.modalTitle}>Available Tools</h2>
+              <span className={styles.modalStatus}>
+                {mcp.name}
+                {!probing && tools && <> · {tools.length} tool{tools.length !== 1 ? 's' : ''}</>}
+              </span>
+            </div>
+          </div>
+          <button className={styles.closeBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className={styles.modalBody}>
+          {probing ? (
+            <div className={styles.toolsProbing}>
+              <Loader2 size={20} className={styles.toolsLoader} />
+              <span>Loading tools...</span>
+            </div>
+          ) : probeError ? (
+            <div className={styles.toolsError}>
+              <span>{probeError}</span>
+              <button
+                className={styles.retryBtn}
+                onClick={() => {
+                  setProbing(true)
+                  setProbeError(null)
+                  onProbe(mcp.id)
+                    .then((res) => {
+                      if (res.ok) setTools(res.tools || [])
+                      else setProbeError(res.error || 'Probe failed')
+                    })
+                    .catch((err) => setProbeError(err.message))
+                    .finally(() => setProbing(false))
+                }}
+              >Retry</button>
+            </div>
+          ) : tools && tools.length === 0 ? (
+            <div className={styles.toolsEmpty}>No tools found on this server.</div>
+          ) : tools ? (
+            <div className={styles.toolsBody}>
+              <ToolsList tools={tools} />
+            </div>
+          ) : null}
+        </div>
+
+        <div className={styles.modalFooter} style={{ justifyContent: 'flex-end' }}>
+          <button className={styles.footerBtn} onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ToolsList({ tools }) {
+  const [openName, setOpenName] = useState(null)
+
+  return (
+    <div className={styles.toolsList}>
+      {tools.map((t) => {
+        const name = typeof t === 'string' ? t : t.name
+        const desc = typeof t === 'object' ? t.description : null
+        const params = typeof t === 'object' ? t.parameters : null
+        const isOpen = openName === name
+        return (
+          <ToolItem
+            key={name}
+            name={name}
+            description={desc}
+            parameters={params}
+            isOpen={isOpen}
+            onToggle={() => setOpenName(isOpen ? null : name)}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function ToolItem({ name, description, parameters, isOpen, onToggle }) {
+  const props = parameters?.properties || {}
+  const required = new Set(parameters?.required || [])
+  const entries = Object.entries(props)
+
+  const typeColor = (t) => {
+    if (!t) return ''
+    if (t === 'string') return styles.tString
+    if (t === 'number' || t === 'integer') return styles.tNumber
+    if (t === 'boolean') return styles.tBool
+    if (t === 'array') return styles.tArray
+    if (t === 'object') return styles.tObject
+    return ''
+  }
+
+  return (
+    <div className={`${styles.toolCard} ${isOpen ? styles.toolCardOpen : ''}`}>
+      <button className={styles.toolCardHeader} onClick={onToggle} type="button">
+        <span className={styles.toolCardName}>{name}</span>
+        <span className={styles.toolCardMeta}>
+          {entries.length > 0 && <span className={styles.toolCardBadge}>{entries.length} params</span>}
+          <ChevronDown size={14} className={`${styles.toolCardChev} ${isOpen ? styles.toolCardChevOpen : ''}`} />
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className={styles.toolCardBody}>
+          {description && <p className={styles.toolCardDesc}>{description}</p>}
+
+          {entries.length > 0 ? (
+            <table className={styles.paramTable}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map(([key, val]) => (
+                  <tr key={key} className={required.has(key) ? styles.paramRowReq : ''}>
+                    <td><code className={styles.paramName}>{key}</code></td>
+                    <td><span className={`${styles.paramType} ${typeColor(val.type)}`}>{val.type || '—'}</span></td>
+                    <td>
+                      {required.has(key)
+                        ? <span className={styles.paramYes}>Yes</span>
+                        : <span className={styles.paramNo}>No</span>
+                      }
+                    </td>
+                    <td className={styles.paramDescCol}>
+                      {val.description || <span className={styles.paramEmpty}>—</span>}
+                      {val.default !== undefined && (
+                        <span className={styles.paramDefault}>Default: <code>{JSON.stringify(val.default)}</code></span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : !description ? (
+            <p className={styles.toolNoInfo}>No parameters or description available.</p>
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }

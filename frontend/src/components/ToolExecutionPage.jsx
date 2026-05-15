@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Wrench, ChevronDown, ChevronRight, Loader2, Bot, Copy, Check,
   Clock, Server, RotateCcw, Terminal, Zap, AlertCircle,
-  Code2, FormInput, Search,
+  Code2, FormInput, Search, Trash2, PanelRightClose, PanelRight,
 } from 'lucide-react'
 import { executeTool, probeMCP } from '../api.js'
 import styles from './ToolExecutionPage.module.css'
@@ -301,7 +301,7 @@ function ParamInput({ name, schema, value, onChange }) {
 }
 
 /* ── Always-visible Output Panel ── */
-function OutputPanel({ result, toolName, executing }) {
+function OutputPanel({ result, toolName, executing, onClear, onCollapse }) {
   const [copied, setCopied] = useState(false)
 
   const formatted = result ? prettify(result.data) : null
@@ -317,6 +317,9 @@ function OutputPanel({ result, toolName, executing }) {
     <div className={styles.outputPanel}>
       <div className={styles.panelHeader}>
         <div className={styles.panelTitleRow}>
+          <button className={styles.panelCollapseBtn} onClick={onCollapse} title="Close panel">
+            <PanelRightClose size={15} />
+          </button>
           <Terminal size={14} />
           <span className={styles.panelTitle}>Output</span>
           {result && (
@@ -331,6 +334,9 @@ function OutputPanel({ result, toolName, executing }) {
             <button className={styles.panelCopy} onClick={handleCopy}>
               {copied ? <Check size={12} /> : <Copy size={12} />}
               {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button className={styles.panelClear} onClick={onClear} title="Clear output">
+              <Trash2 size={12} />
             </button>
           </div>
         )}
@@ -468,7 +474,6 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange, onRe
   }
 
   const handleClear = () => {
-    onResult(null)
     const init = {}
     paramNames.forEach((k) => { init[k] = buildDefaultValue(props[k]) })
     setValues(init)
@@ -566,6 +571,7 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
   const [selectedToolName, setSelectedToolName] = useState(persistedState?.toolName || null)
   const [result, setResult] = useState(persistedState?.formCache?._result || null)
   const [executing, setExecuting] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
   const formCacheRef = useRef(persistedState?.formCache || {})
 
   const syncState = useCallback((overrides = {}) => {
@@ -702,7 +708,7 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
   return (
     <div className={styles.page}>
       <div className={styles.splitLayout}>
-        <div className={styles.leftPanel}>
+        <div className={`${styles.leftPanel} ${!panelOpen ? styles.leftPanelFull : ''}`}>
           <div className={styles.header}>
             <h1 className={styles.title}>{tr('toolExecution')}</h1>
             <p className={styles.subtitle}>{tr('toolExecSubtitle')}</p>
@@ -757,13 +763,23 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
           )}
         </div>
 
-        <div className={styles.rightPanel}>
-          <OutputPanel
-            result={result}
-            toolName={selectedToolName}
-            executing={executing}
-          />
-        </div>
+        {panelOpen ? (
+          <div className={styles.rightPanel}>
+            <OutputPanel
+              result={result}
+              toolName={selectedToolName}
+              executing={executing}
+              onClear={() => setResult(null)}
+              onCollapse={() => setPanelOpen(false)}
+            />
+          </div>
+        ) : (
+          <div className={styles.panelReopenBar}>
+            <button className={styles.panelReopenBtn} onClick={() => setPanelOpen(true)} title="Show output panel">
+              <PanelRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

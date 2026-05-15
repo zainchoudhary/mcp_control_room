@@ -272,7 +272,7 @@ export default function App() {
   }
 
   const send = async (overrideText) => {
-    const text = (overrideText || input).trim()
+    const text = (typeof overrideText === 'string' ? overrideText : input).trim()
     if (!text || sending) return
 
     setInput('')

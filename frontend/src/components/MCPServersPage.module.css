@@ -78,7 +78,7 @@
   border-radius: 10px;
   background: var(--bg-secondary);
   transition: border-color 0.2s, box-shadow 0.2s;
-  max-width: 283px;
+  max-width: 230px;
   margin-bottom: 16px;
 }
 
@@ -386,6 +386,33 @@
 .cardFooter {
   padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolsLink {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  transition: gap 0.15s;
+}
+
+.card:hover .toolsLink {
+  gap: 8px;
+}
+
+.toolsLink:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .viewDetail {
@@ -841,38 +868,215 @@
   padding: 12px 0;
 }
 
-.toolsGrid {
+.toolsList {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 0;
 }
 
-.toolItem {
+.toolCard {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.toolCard:last-child {
+  border-bottom: none;
+}
+
+.toolCardOpen {
+  background: rgba(var(--accent-rgb), 0.02);
+}
+
+.toolCardHeader {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  transition: var(--transition-fast);
+  width: 100%;
+  padding: 12px 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  gap: 8px;
+  transition: background 0.15s;
 }
 
-.toolItem:hover {
-  border-color: rgba(var(--accent-rgb), 0.15);
+.toolCardHeader:hover {
+  background: rgba(var(--accent-rgb), 0.04);
+}
+
+.toolCardName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolCardOpen .toolCardName {
   color: var(--accent);
 }
 
-.toolItemIcon {
-  color: var(--text-tertiary);
+.toolCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-.toolItem:hover .toolItemIcon {
+.toolCardBadge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.toolCardChev {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.toolCardChevOpen {
+  transform: rotate(180deg);
+}
+
+.toolCardBody {
+  padding: 0 4px 16px;
+  animation: toolSlideIn 0.2s ease;
+}
+
+@keyframes toolSlideIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.toolCardDesc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.toolNoInfo {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  opacity: 0.6;
+  margin: 0;
+}
+
+/* ── Parameters Table ── */
+
+.paramTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.paramTable thead tr {
+  background: var(--bg-tertiary);
+}
+
+.paramTable th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.paramTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: top;
+  line-height: 1.4;
+}
+
+.paramTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.paramTable tbody tr:hover {
+  background: rgba(var(--accent-rgb), 0.03);
+}
+
+.paramRowReq {
+  background: rgba(var(--accent-rgb), 0.02);
+}
+
+.paramName {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: none;
+  padding: 0;
+}
+
+.paramType {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tString { color: #2ea043; background: rgba(46,160,67,0.1); }
+.tNumber { color: #d29922; background: rgba(210,153,34,0.1); }
+.tBool   { color: #bf63d9; background: rgba(191,99,217,0.1); }
+.tArray  { color: #58a6ff; background: rgba(88,166,255,0.1); }
+.tObject { color: #f78166; background: rgba(247,129,102,0.1); }
+
+.paramYes {
+  font-size: 10px;
+  font-weight: 700;
   color: var(--accent);
+}
+
+.paramNo {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  opacity: 0.6;
+}
+
+.paramDescCol {
+  max-width: 220px;
+}
+
+.paramEmpty {
+  color: var(--text-tertiary);
+  opacity: 0.4;
+}
+
+.paramDefault {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.paramDefault code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: rgba(var(--accent-rgb), 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 /* ── Modal Footer ── */
@@ -1023,7 +1227,7 @@
     justify-content: flex-start;
   }
 
-  .toolsGrid {
+  .toolsList {
     gap: 4px;
   }
 }
