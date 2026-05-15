@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Wrench, ChevronDown, ChevronRight, Loader2, Bot, Copy, Check,
   Clock, Server, RotateCcw, Terminal, Zap, AlertCircle,
-  Code2, FormInput, Search, Trash2, PanelRightClose, PanelRight,
+  Code2, FormInput, Search, Trash2, Eraser, PanelRightClose, PanelRight,
 } from 'lucide-react'
 import { executeTool, probeMCP } from '../api.js'
 import styles from './ToolExecutionPage.module.css'
@@ -18,6 +18,7 @@ function prettify(raw) {
   }
 
   if (typeof data === 'string') {
+    data = data.replace(/^>-\s*/gm, '').trim()
     try {
       const parsed = JSON.parse(data)
       return { text: JSON.stringify(parsed, null, 2), isJson: true, parsed }
@@ -46,7 +47,7 @@ function prim(val) {
 function pad(d) { return '\u00A0\u00A0'.repeat(d) }
 
 function Fold({ label, preview, count, depth, trail, children }) {
-  const [open, setOpen] = useState(() => depth < 2)
+  const [open, setOpen] = useState(true)
 
   return open ? (
     <div className={styles.jBlock}>
@@ -336,7 +337,8 @@ function OutputPanel({ result, toolName, executing, onClear, onCollapse }) {
               {copied ? 'Copied' : 'Copy'}
             </button>
             <button className={styles.panelClear} onClick={onClear} title="Clear output">
-              <Trash2 size={12} />
+              <Eraser size={13} />
+              <span>Clear</span>
             </button>
           </div>
         )}
@@ -363,6 +365,23 @@ function OutputPanel({ result, toolName, executing, onClear, onCollapse }) {
             <span>Execute a tool to see the response</span>
           </div>
         )}
+      </div>
+
+      <div className={styles.panelFooter}>
+        <div className={styles.footerLeft}>
+          <span className={styles.footerDot} />
+          <span className={styles.footerLabel}>ToolChain-AI Terminal</span>
+        </div>
+        <div className={styles.footerRight}>
+          {result && (
+            <span className={styles.footerStat}>
+              {formatted?.text?.length ?? 0} chars
+            </span>
+          )}
+          <span className={styles.footerStat}>
+            {result?.ok ? 'EXIT 0' : result ? 'EXIT 1' : 'IDLE'}
+          </span>
+        </div>
       </div>
     </div>
   )

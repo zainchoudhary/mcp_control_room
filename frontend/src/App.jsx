@@ -310,7 +310,13 @@ export default function App() {
           )
         }
         if (event.type === 'tool_result') {
-          const line = `Result: ${event.tool} -> ${event.content || ''}\n`
+          let displayContent = event.content || ''
+          try {
+            const parsed = JSON.parse(displayContent)
+            displayContent = JSON.stringify(parsed, null, 2)
+          } catch {}
+          const encoded = btoa(unescape(encodeURIComponent(displayContent)))
+          const line = `Result: ${event.tool} -> @@JSON@@${encoded}@@END@@\n`
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId ? { ...m, content: m.content + line } : m

@@ -840,8 +840,8 @@ export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdat
           <div className={styles.sidebar}>
             {TABS.map((tab) => {
               const Icon = tab.icon
-              return (
-                <button
+                return (
+                  <button
                   key={tab.id}
                   className={`${styles.sidebarItem} ${activeTab === tab.id ? styles.sidebarItemActive : ''}`}
                   onClick={() => setActiveTab(tab.id)}
@@ -849,10 +849,10 @@ export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdat
                 >
                   <Icon size={15} />
                   {tab.label}
-                </button>
-              )
-            })}
-          </div>
+                  </button>
+                )
+              })}
+            </div>
 
           <div className={styles.content}>
             {activeTab === 'general' && (

@@ -3,6 +3,7 @@ agent.py - LangGraph ReAct agent factory with streaming and MCP tool injection.
 """
 import os
 import json
+import asyncio
 import logging
 from typing import AsyncIterator, List
 
@@ -291,7 +292,14 @@ async def stream_agent_response(
                     if total_tool_calls > MAX_TOTAL_TOOL_CALLS:
                         continue
 
-                    payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": content[:4000]})
+                    try:
+                        parsed = json.loads(content)
+                        pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
+                    except (json.JSONDecodeError, TypeError):
+                        pretty = content
+                    if len(pretty) > 6000:
+                        pretty = pretty[:6000] + "\n... (truncated)"
+                    payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": pretty})
                     yield f"data: {payload}\n\n"
 
             break
@@ -312,44 +320,66 @@ async def stream_agent_response(
                 yield f"data: {payload}\n\n"
                 break
 
-            retryable = (
+            retryable_tool = (
                 "tool call validation failed" in error_str
                 or "failed_generation" in error_str
                 or "failed to call a function" in error_str
             )
-            if retryable and retries < max_retries:
-                retries += 1
-                logger.warning("Groq tool call error (attempt %d/%d): %s — retrying...",
-                               retries, max_retries, str(exc)[:100])
-                full_response = ""
-                tool_call_tracker = {}
-                seen_calls = set()
-                total_tool_calls = 0
+            retryable_transient = (
+                "rate limit" in error_str
+                or "rate_limit" in error_str
+                or "429" in error_str
+                or "503" in error_str
+                or "502" in error_str
+                or "timeout" in error_str
+                or "timed out" in error_str
+                or "connection" in error_str
+                or "econnrefused" in error_str
+                or "service unavailable" in error_str
+                or "internal server error" in error_str
+                or "bad gateway" in error_str
+                or "overloaded" in error_str
+                or "too many requests" in error_str
+            )
 
-                if retries >= 2 and use_tools:
-                    use_tools = False
-                    messages = [SystemMessage(content=get_system_prompt([]))] + [
-                        m for m in messages
-                        if not isinstance(m, SystemMessage)
-                        and not (isinstance(m, HumanMessage) and "[SYSTEM:" in m.content)
-                    ]
-                    logger.info("Retry %d: dropping tools, responding as plain chat", retries)
-                else:
-                    sequential_hint = HumanMessage(content=(
-                        "[SYSTEM: The previous attempt failed because you tried to call "
-                        "multiple tools at once. You MUST call only ONE tool at a time. "
-                        "Complete the first action fully, then move to the next one.]"
-                    ))
-                    if not any(
-                        isinstance(m, HumanMessage) and "[SYSTEM: The previous attempt" in m.content
-                        for m in messages
-                    ):
-                        messages.append(sequential_hint)
+            if (retryable_tool or retryable_transient) and retries < max_retries:
+                retries += 1
+                logger.warning("Agent error (attempt %d/%d): %s — retrying...",
+                               retries, max_retries, str(exc)[:150])
+
+                if retryable_transient:
+                    await asyncio.sleep(min(2 ** retries, 8))
+
+                if retryable_tool:
+                    full_response = ""
+                    tool_call_tracker = {}
+                    seen_calls = set()
+                    total_tool_calls = 0
+
+                    if retries >= 2 and use_tools:
+                        use_tools = False
+                        messages = [SystemMessage(content=get_system_prompt([]))] + [
+                            m for m in messages
+                            if not isinstance(m, SystemMessage)
+                            and not (isinstance(m, HumanMessage) and "[SYSTEM:" in m.content)
+                        ]
+                        logger.info("Retry %d: dropping tools, responding as plain chat", retries)
+                    else:
+                        sequential_hint = HumanMessage(content=(
+                            "[SYSTEM: The previous attempt failed because you tried to call "
+                            "multiple tools at once. You MUST call only ONE tool at a time. "
+                            "Complete the first action fully, then move to the next one.]"
+                        ))
+                        if not any(
+                            isinstance(m, HumanMessage) and "[SYSTEM: The previous attempt" in m.content
+                            for m in messages
+                        ):
+                            messages.append(sequential_hint)
 
                 continue
             else:
                 logger.error("Agent stream error: %s", exc, exc_info=True)
-                user_msg = "Something went wrong. Please try rephrasing your message."
+                user_msg = "Something went wrong. Please try again in a moment."
                 payload = json.dumps({"type": "error", "content": user_msg})
                 yield f"data: {payload}\n\n"
                 break

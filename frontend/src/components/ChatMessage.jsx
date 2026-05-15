@@ -47,7 +47,17 @@ function CodeBlock({ language, children }) {
 function prettify(raw) {
   if (typeof raw === 'object') return JSON.stringify(raw, null, 2)
   if (typeof raw !== 'string') return String(raw)
-  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+  const cleaned = raw.replace(/^>-\s*/gm, '').trim()
+  try { return JSON.stringify(JSON.parse(cleaned), null, 2) } catch {}
+  try {
+    const fixed = cleaned
+      .replace(/'/g, '"')
+      .replace(/True/g, 'true')
+      .replace(/False/g, 'false')
+      .replace(/None/g, 'null')
+    return JSON.stringify(JSON.parse(fixed), null, 2)
+  } catch {}
+  return cleaned
 }
 
 function ToolJson({ text, variant }) {
@@ -102,7 +112,7 @@ function ToolCall({ tool, input }) {
 }
 
 function ToolResult({ tool, content }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const contentStr = prettify(content)
 
   return (
@@ -115,6 +125,14 @@ function ToolResult({ tool, content }) {
       {expanded && <ToolJson text={contentStr} variant="result" />}
     </div>
   )
+}
+
+function decodeResult(raw) {
+  const b64Match = raw.match(/^@@JSON@@(.+?)@@END@@$/)
+  if (b64Match) {
+    try { return decodeURIComponent(escape(atob(b64Match[1]))) } catch {}
+  }
+  return raw
 }
 
 function parseContent(content) {
@@ -139,7 +157,8 @@ function parseContent(content) {
         parts.push({ type: 'markdown', content: markdownBuffer.join('\n') })
         markdownBuffer = []
       }
-      parts.push({ type: 'tool_result', tool: toolResultMatch[1], content: toolResultMatch[2] })
+      const resultContent = decodeResult(toolResultMatch[2])
+      parts.push({ type: 'tool_result', tool: toolResultMatch[1], content: resultContent })
     } else {
       markdownBuffer.push(line)
     }

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Server, Search, Trash2, Loader2, ExternalLink, Wifi, WifiOff,
   Plug, X, Clock, Globe, Layers, Wrench, Copy, Check, ChevronRight, ChevronDown,
-  MoreVertical, Power, PowerOff,
+  MoreVertical, Power, PowerOff, FileText,
 } from 'lucide-react'
 import styles from './MCPServersPage.module.css'
 
@@ -330,7 +330,11 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, is
         <div className={styles.modalBody}>
           {mcp.description && (
             <div className={styles.descSection}>
-              <p className={styles.descText}>{mcp.description}</p>
+              <div className={styles.descLabel}>
+                <FileText size={14} />
+                <span>Description</span>
+              </div>
+              <div className={styles.descValue}>{mcp.description}</div>
             </div>
           )}
 

@@ -100,13 +100,15 @@ def _inject_user_id(tools: list, user_id: str) -> list:
 
 
 @asynccontextmanager
-async def get_mcp_tools(mcps: list, user_id: str = ""):
+async def get_mcp_tools(mcps: list, user_id: str = "", max_retries: int = 3):
     """
     Async context manager that yields a list of LangChain-compatible tools
     loaded from the given MCP servers.
 
     If user_id is provided, it is injected transparently into all tool calls
     that accept a user_id parameter (hidden from the LLM schema).
+
+    Retries on transient connection failures so MCP switching works reliably.
 
     Usage:
         async with get_mcp_tools(connected_mcps, user_id="abc") as tools:
@@ -120,17 +122,23 @@ async def get_mcp_tools(mcps: list, user_id: str = ""):
     logger.info("Connecting to MCP servers: %s (user_id=%s)", list(server_config.keys()), user_id[:8] if user_id else "EMPTY")
 
     tools = []
-    try:
-        client = MultiServerMCPClient(server_config)
-        tools = await client.get_tools()
-        tools = _sanitize_tools(tools)
-        tools = _inject_user_id(tools, user_id)
-        logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
-        for t in tools:
-            logger.info("  Tool: %s", t.name)
+    for attempt in range(1, max_retries + 1):
+        try:
+            client = MultiServerMCPClient(server_config)
+            tools = await client.get_tools()
+            tools = _sanitize_tools(tools)
+            tools = _inject_user_id(tools, user_id)
+            logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
+            for t in tools:
+                logger.info("  Tool: %s", t.name)
+            break
+        except Exception as exc:
+            logger.warning("MCP tool load attempt %d/%d failed: %s", attempt, max_retries, exc)
+            if attempt < max_retries:
+                await asyncio.sleep(min(1.5 * attempt, 4))
+            else:
+                logger.error("Failed to load MCP tools after %d attempts: %s", max_retries, exc)
 
-    except Exception as exc:
-        logger.error("Failed to load MCP tools: %s", exc)
     yield tools
 
 

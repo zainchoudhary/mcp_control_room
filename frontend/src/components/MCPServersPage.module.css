@@ -681,17 +681,34 @@
 }
 
 .descSection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   background: var(--bg-primary);
   border-radius: var(--radius);
   border: 1px solid var(--border-subtle);
 }
 
-.descText {
+.descLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.descValue {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   line-height: 1.6;
+  text-align: right;
+  word-break: break-word;
 }
 
 /* ── Detail Rows ── */

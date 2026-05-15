@@ -194,15 +194,15 @@
 .panelClear {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
+  gap: 5px;
   height: 26px;
   background: none;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
   border-radius: 5px;
-  padding: 0;
+  padding: 0 8px;
+  font-size: 12px;
   transition: color 0.15s, background 0.15s;
 }
 
@@ -316,6 +316,59 @@
 .panelSpinner {
   animation: spin 1s linear infinite;
   color: var(--accent);
+}
+
+/* ── Terminal Footer ── */
+
+.panelFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(var(--accent-rgb), 0.03);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.footerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.5);
+  animation: footerPulse 2s ease-in-out infinite;
+}
+
+@keyframes footerPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.5); }
+  50% { opacity: 0.5; box-shadow: 0 0 2px rgba(var(--accent-rgb), 0.2); }
+}
+
+.footerLabel {
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+  font-size: 10px;
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.footerStat {
+  letter-spacing: 0.3px;
+  opacity: 0.7;
 }
 
 /* ── Selectors row ── */
