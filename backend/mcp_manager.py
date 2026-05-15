@@ -176,33 +176,53 @@ async def probe_mcp(url: str, transport: str = "sse", timeout: float = 8.0) -> d
 
 async def execute_tool(
     mcp: dict, tool_name: str, args: dict, user_id: str = "", timeout: float = 30.0,
+    max_retries: int = 2,
 ) -> dict:
     """
     Directly invoke a single tool on an MCP server and return the result.
     Bypasses the LLM agent entirely — useful for testing tools.
+    Automatically retries on transient connection errors (SSL abort, connection reset, etc.).
     """
     server_config = build_server_config([mcp])
-    try:
-        async with asyncio.timeout(timeout):
-            client = MultiServerMCPClient(server_config)
-            tools = await client.get_tools()
-            tools = _sanitize_tools(tools)
+    last_err = None
 
-            target = None
-            for t in tools:
-                if t.name == tool_name:
-                    target = t
-                    break
-            if not target:
-                return {"ok": False, "result": None, "error": f"Tool '{tool_name}' not found"}
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with asyncio.timeout(timeout):
+                client = MultiServerMCPClient(server_config)
+                tools = await client.get_tools()
+                tools = _sanitize_tools(tools)
 
-            if user_id:
-                args[USER_ID_PARAM] = user_id
+                target = None
+                for t in tools:
+                    if t.name == tool_name:
+                        target = t
+                        break
+                if not target:
+                    return {"ok": False, "result": None, "error": f"Tool '{tool_name}' not found"}
 
-            raw = await target.ainvoke(args)
-            logger.info("execute_tool raw type=%s value=%s", type(raw).__name__, repr(raw)[:500])
-            return {"ok": True, "result": raw, "error": None}
-    except asyncio.TimeoutError:
-        return {"ok": False, "result": None, "error": f"Tool execution timed out after {timeout}s"}
-    except Exception as exc:
-        return {"ok": False, "result": None, "error": str(exc)}
+                call_args = {**args}
+                if user_id:
+                    call_args[USER_ID_PARAM] = user_id
+
+                raw = await target.ainvoke(call_args)
+                logger.info("execute_tool raw type=%s value=%s", type(raw).__name__, repr(raw)[:500])
+                return {"ok": True, "result": raw, "error": None}
+        except asyncio.TimeoutError:
+            return {"ok": False, "result": None, "error": f"Tool execution timed out after {timeout}s"}
+        except (ConnectionError, OSError) as exc:
+            last_err = exc
+            logger.warning("execute_tool attempt %d/%d failed (transient): %s", attempt, max_retries, exc)
+            if attempt < max_retries:
+                await asyncio.sleep(0.5)
+        except Exception as exc:
+            last_err = exc
+            err_msg = str(exc).lower()
+            is_transient = any(k in err_msg for k in ("connection abort", "connection reset", "ssl", "broken pipe", "eof"))
+            if is_transient and attempt < max_retries:
+                logger.warning("execute_tool attempt %d/%d failed (transient): %s", attempt, max_retries, exc)
+                await asyncio.sleep(0.5)
+            else:
+                return {"ok": False, "result": None, "error": str(exc)}
+
+    return {"ok": False, "result": None, "error": f"Failed after {max_retries} attempts: {last_err}"}

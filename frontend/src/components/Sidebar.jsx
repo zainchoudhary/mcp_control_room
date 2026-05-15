@@ -10,6 +10,7 @@ export function Sidebar({
   activePage,
   onNavigate,
   sessions,
+  sessionsLoading,
   currentSessionId,
   onNewChat,
   onSelectSession,
@@ -154,7 +155,18 @@ export function Sidebar({
                         <span>{tr('newChat')}</span>
                       </button>
                       <div className={styles.sessions}>
-                        {sessions.length === 0 ? (
+                        {sessionsLoading ? (
+                          <div className={styles.sessionsSkeleton}>
+                            <div className={styles.skelGroup} />
+                            {[1, 2, 3, 4].map(i => (
+                              <div key={i} className={styles.skelItem} style={{ animationDelay: `${i * 0.1}s` }} />
+                            ))}
+                            <div className={styles.skelGroup} style={{ width: '50%', marginTop: 12 }} />
+                            {[5, 6].map(i => (
+                              <div key={i} className={styles.skelItem} style={{ animationDelay: `${i * 0.1}s` }} />
+                            ))}
+                          </div>
+                        ) : sessions.length === 0 ? (
                           <div className={styles.empty}>{tr('noConversations')}</div>
                         ) : (
                           (() => {

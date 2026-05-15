@@ -111,6 +111,17 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
             detail="Invalid or expired reset link. Please request a new one.",
         )
 
+    user = await get_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    full_user = await get_user_by_email(db, user["email"])
+    if full_user and verify_password(body.password, full_user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be the same as your current password.",
+        )
+
     hashed = hash_password(body.password)
     await update_user_password(db, user_id, hashed)
 

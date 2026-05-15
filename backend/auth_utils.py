@@ -122,7 +122,7 @@ def send_reset_email(to_email: str, username: str, reset_token: str, frontend_ur
         logger.error("SMTP credentials not configured")
         raise RuntimeError("Email service not configured.")
 
-    reset_link = f"{frontend_url}?reset_token={reset_token}"
+    reset_link = f"{frontend_url}/reset-password?reset_token={reset_token}"
 
     html = f"""\
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px;">

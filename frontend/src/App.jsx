@@ -38,8 +38,13 @@ const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
   const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+  if (new URLSearchParams(window.location.search).has('reset_token')) {
+    window.history.replaceState(null, '', `/reset-password${window.location.search}`)
+    return 'reset-password'
+  }
   if (path === '' || path === '/') return 'landing'
   if (APP_PAGES.includes(path)) return path
+  if (AUTH_PAGES.includes(path)) return path
   return 'dashboard'
 }
 
@@ -60,7 +65,9 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(!!savedUser)
   const [activePage, setActivePage] = useState(getPageFromUrl)
   const [mcps, setMcps] = useState([])
+  const [mcpsLoading, setMcpsLoading] = useState(true)
   const [sessions, setSessions] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(true)
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -111,8 +118,9 @@ export default function App() {
   useEffect(() => {
     if (!authChecked) return
     const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
+    const hasResetToken = new URLSearchParams(window.location.search).has('reset_token')
     if (user) {
-      if (AUTH_PAGES.includes(path)) {
+      if (AUTH_PAGES.includes(path) && !hasResetToken) {
         setActivePage('dashboard')
         window.history.replaceState(null, '', '/dashboard')
       } else if (path === '' || path === '/') {
@@ -160,7 +168,9 @@ export default function App() {
           logout()
           setUser(null)
           setMcps([])
+          setMcpsLoading(true)
           setSessions([])
+          setSessionsLoading(true)
           setSessionId(null)
           setMessages([])
           setActivePage('login')
@@ -200,6 +210,8 @@ export default function App() {
       })
     } catch (err) {
       toast(err.message, 'error')
+    } finally {
+      setMcpsLoading(false)
     }
   }, [])
 
@@ -209,6 +221,8 @@ export default function App() {
       setSessions(data)
     } catch (err) {
       toast(err.message, 'error')
+    } finally {
+      setSessionsLoading(false)
     }
   }, [])
 
@@ -609,6 +623,15 @@ export default function App() {
     )
   }
 
+  if (activePage === 'reset-password' && new URLSearchParams(window.location.search).has('reset_token')) {
+    return (
+      <>
+        <AuthPage onAuth={handleAuth} initialMode="reset" />
+        <ToastContainer toasts={toasts} dismiss={dismiss} />
+      </>
+    )
+  }
+
   if (activePage === 'landing') {
     return (
       <LandingPage
@@ -631,6 +654,7 @@ export default function App() {
         activePage={activePage}
         onNavigate={handleNavigate}
         sessions={sessions}
+        sessionsLoading={sessionsLoading}
         currentSessionId={sessionId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
@@ -676,6 +700,7 @@ export default function App() {
         {activePage === 'mcp-servers' && (
           <MCPServersPage
             mcps={mcps}
+            mcpsLoading={mcpsLoading}
             onConnect={onConnect}
             onDisconnect={onDisconnect}
             onProbe={onProbe}
@@ -692,6 +717,7 @@ export default function App() {
         {activePage === 'tool-execution' && (
           <ToolExecutionPage
             connectedMcps={connectedMcps}
+            mcpsLoading={mcpsLoading}
             onNavigate={handleNavigate}
             onRunViaAgent={(prompt) => {
               pendingPromptRef.current = prompt

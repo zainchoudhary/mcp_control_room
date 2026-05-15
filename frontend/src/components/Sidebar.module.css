@@ -521,6 +521,37 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Session skeleton loader ── */
+
+.sessionsSkeleton {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skelGroup {
+  height: 8px;
+  width: 40%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: sidebarShimmer 1.4s ease-in-out infinite;
+  margin-bottom: 4px;
+}
+
+.skelItem {
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  animation: sidebarShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes sidebarShimmer {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+
 /* ── Mobile ── */
 
 .mobileOverlay {

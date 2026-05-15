@@ -1,31 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import {
-  Wrench, ChevronDown, Loader2, Bot, Copy, Check,
-  Clock, Server, RotateCcw, Terminal, Zap, AlertCircle, X,
-  Code2, FormInput,
+  Wrench, ChevronDown, ChevronRight, Loader2, Bot, Copy, Check,
+  Clock, Server, RotateCcw, Terminal, Zap, AlertCircle,
+  Code2, FormInput, Search,
 } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import oneLightTheme from 'react-syntax-highlighter/dist/esm/styles/prism/one-light'
 import { executeTool, probeMCP } from '../api.js'
 import styles from './ToolExecutionPage.module.css'
 
-function useCurrentTheme() {
-  const [isDark, setIsDark] = useState(
-    () => document.documentElement.getAttribute('data-theme') !== 'light'
-  )
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') !== 'light')
-    })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    return () => observer.disconnect()
-  }, [])
-  return isDark
-}
-
 function prettify(raw) {
-  if (raw == null) return { text: '', isJson: false }
+  if (raw == null) return { text: '', isJson: false, parsed: null }
 
   let data = raw
 
@@ -37,17 +20,152 @@ function prettify(raw) {
   if (typeof data === 'string') {
     try {
       const parsed = JSON.parse(data)
-      return { text: JSON.stringify(parsed, null, 2), isJson: true }
+      return { text: JSON.stringify(parsed, null, 2), isJson: true, parsed }
     } catch {
-      return { text: data, isJson: false }
+      return { text: data, isJson: false, parsed: null }
     }
   }
 
   if (typeof data === 'object') {
-    return { text: JSON.stringify(data, null, 2), isJson: true }
+    return { text: JSON.stringify(data, null, 2), isJson: true, parsed: data }
   }
 
-  return { text: String(data), isJson: false }
+  return { text: String(data), isJson: false, parsed: null }
+}
+
+/* ── Collapsible JSON Tree Viewer ── */
+
+function prim(val) {
+  if (val === null) return <span className={styles.jNull}>null</span>
+  if (typeof val === 'boolean') return <span className={styles.jBool}>{String(val)}</span>
+  if (typeof val === 'number') return <span className={styles.jNum}>{val}</span>
+  if (typeof val === 'string') return <span className={styles.jStr}>&quot;{val}&quot;</span>
+  return <span>{String(val)}</span>
+}
+
+function pad(d) { return '\u00A0\u00A0'.repeat(d) }
+
+function Fold({ label, preview, count, depth, trail, children }) {
+  const [open, setOpen] = useState(() => depth < 2)
+
+  return open ? (
+    <div className={styles.jBlock}>
+      <div className={styles.jRow}>
+        {label}
+        <span className={styles.jTog} onClick={() => setOpen(false)}><ChevronDown size={12} /></span>
+        <span className={styles.jBrace}>{preview.open}</span>
+      </div>
+      <div className={styles.jChildren}>{children}</div>
+      <div className={styles.jRow}>
+        <span className={styles.jPad}>{pad(depth)}</span>
+        <span className={styles.jBrace}>{preview.close}</span>
+        {trail}
+      </div>
+    </div>
+  ) : (
+    <div className={styles.jRow}>
+      {label}
+      <span className={styles.jTog} onClick={() => setOpen(true)}><ChevronRight size={12} /></span>
+      <span className={styles.jBrace}>{preview.open}</span>
+      <span className={styles.jPrev} onClick={() => setOpen(true)}>
+        {preview.text}<span className={styles.jCnt}>{count}</span>
+      </span>
+      <span className={styles.jBrace}>{preview.close}</span>
+      {trail}
+    </div>
+  )
+}
+
+function JNode({ data, depth, trail, label }) {
+  if (data === null || typeof data !== 'object') {
+    return (
+      <div className={styles.jRow}>
+        {label}
+        {prim(data)}
+        {trail}
+      </div>
+    )
+  }
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return <div className={styles.jRow}>{label}<span className={styles.jBrace}>[]</span>{trail}</div>
+    }
+    const allSimple = data.every(v => v === null || typeof v !== 'object')
+    if (allSimple && data.length <= 5) {
+      return (
+        <div className={styles.jRow}>
+          {label}
+          <span className={styles.jBrace}>[</span>
+          {data.map((v, i) => <span key={i}>{prim(v)}{i < data.length - 1 && <span className={styles.jCom}>, </span>}</span>)}
+          <span className={styles.jBrace}>]</span>
+          {trail}
+        </div>
+      )
+    }
+    return (
+      <Fold
+        label={label}
+        preview={{ open: '[', close: ']', text: 'Array' }}
+        count={data.length}
+        depth={depth}
+        trail={trail}
+      >
+        {data.map((item, i) => (
+          <JNode
+            key={i}
+            data={item}
+            depth={depth + 1}
+            trail={i < data.length - 1 ? <span className={styles.jCom}>,</span> : null}
+            label={<span className={styles.jPad}>{pad(depth + 1)}</span>}
+          />
+        ))}
+      </Fold>
+    )
+  }
+
+  const entries = Object.entries(data)
+  if (entries.length === 0) {
+    return <div className={styles.jRow}>{label}<span className={styles.jBrace}>{'{}'}</span>{trail}</div>
+  }
+  const prevText = entries.length <= 3
+    ? entries.map(([k]) => k).join(', ')
+    : entries.slice(0, 3).map(([k]) => k).join(', ') + ', …'
+
+  return (
+    <Fold
+      label={label}
+      preview={{ open: '{', close: '}', text: prevText }}
+      count={entries.length}
+      depth={depth}
+      trail={trail}
+    >
+      {entries.map(([key, val], i) => (
+        <JNode
+          key={key}
+          data={val}
+          depth={depth + 1}
+          trail={i < entries.length - 1 ? <span className={styles.jCom}>,</span> : null}
+          label={
+            <>
+              <span className={styles.jPad}>{pad(depth + 1)}</span>
+              <span className={styles.jKey}>&quot;{key}&quot;</span>
+              <span className={styles.jCol}>: </span>
+            </>
+          }
+        />
+      ))}
+    </Fold>
+  )
+}
+
+function JsonTree({ data }) {
+  if (data == null || typeof data !== 'object') return <pre className={styles.panelPlainText}>{String(data)}</pre>
+  return (
+    <div className={styles.jViewer}>
+      <JNode data={data} depth={0} trail={null} label={null} />
+    </div>
+  )
 }
 
 function buildDefaultValue(schema) {
@@ -63,7 +181,9 @@ function buildDefaultValue(schema) {
 /* ── Reusable dropdown selector ── */
 function DropdownSelect({ label, placeholder, value, displayValue, icon, options, onSelect, disabled }) {
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const ref = useRef(null)
+  const searchRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -71,6 +191,16 @@ function DropdownSelect({ label, placeholder, value, displayValue, icon, options
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [open])
+
+  useEffect(() => {
+    if (open && searchRef.current) searchRef.current.focus()
+    if (!open) setSearch('')
+  }, [open])
+
+  const q = search.toLowerCase()
+  const filtered = q
+    ? options.filter(o => o.name.toLowerCase().includes(q) || (o.desc && o.desc.toLowerCase().includes(q)))
+    : options
 
   return (
     <div className={styles.fieldGroup}>
@@ -94,10 +224,22 @@ function DropdownSelect({ label, placeholder, value, displayValue, icon, options
         </button>
         {open && (
           <div className={styles.dropdownMenu}>
-            {options.length === 0 ? (
-              <div className={styles.dropdownEmpty}>No options available</div>
+            <div className={styles.dropdownSearch}>
+              <Search size={14} className={styles.dropdownSearchIcon} />
+              <input
+                ref={searchRef}
+                className={styles.dropdownSearchInput}
+                type="text"
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            {filtered.length === 0 ? (
+              <div className={styles.dropdownEmpty}>{options.length === 0 ? 'No options available' : 'No results found'}</div>
             ) : (
-              options.map((opt) => (
+              filtered.map((opt) => (
                 <button
                   key={opt.id}
                   className={`${styles.dropdownItem} ${opt.id === value ? styles.dropdownItemActive : ''}`}
@@ -161,8 +303,6 @@ function ParamInput({ name, schema, value, onChange }) {
 /* ── Always-visible Output Panel ── */
 function OutputPanel({ result, toolName, executing }) {
   const [copied, setCopied] = useState(false)
-  const isDark = useCurrentTheme()
-  const highlightStyle = isDark ? vscDarkPlus : oneLightTheme
 
   const formatted = result ? prettify(result.data) : null
 
@@ -205,21 +345,8 @@ function OutputPanel({ result, toolName, executing }) {
         ) : result ? (
           <>
             {toolName && <div className={styles.panelToolName}>{toolName}</div>}
-            {formatted.isJson ? (
-              <SyntaxHighlighter
-                language="json"
-                style={highlightStyle}
-                wrapLongLines
-                customStyle={{
-                  background: 'transparent',
-                  margin: 0,
-                  padding: '14px 18px',
-                  fontSize: '12.5px',
-                  lineHeight: 1.6,
-                }}
-              >
-                {formatted.text}
-              </SyntaxHighlighter>
+            {formatted.isJson && formatted.parsed != null ? (
+              <JsonTree data={formatted.parsed} />
             ) : (
               <pre className={styles.panelPlainText}>{formatted.text}</pre>
             )}
@@ -428,7 +555,7 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange, onRe
 }
 
 /* ── Main page ── */
-export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t, persistedState, onStateChange }) {
+export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRunViaAgent, t, persistedState, onStateChange }) {
   const tr = t || ((k) => k)
   const hasRestoredState = !!(persistedState?.mcpId && persistedState?.tools?.length)
 
@@ -513,6 +640,45 @@ export function ToolExecutionPage({ connectedMcps, onNavigate, onRunViaAgent, t,
     desc: t.description ? (t.description.length > 60 ? t.description.slice(0, 60) + '...' : t.description) : '',
     icon: <Wrench size={13} />,
   }))
+
+  if (mcpsLoading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.splitLayout}>
+          <div className={styles.leftPanel}>
+            <div className={styles.header}>
+              <h1 className={styles.title}>{tr('toolExecution')}</h1>
+              <p className={styles.subtitle}>{tr('toolExecSubtitle')}</p>
+            </div>
+            <div className={styles.selectors}>
+              <div className={styles.fieldGroup}>
+                <div className={styles.skelLabel} />
+                <div className={styles.skelDropdown} />
+              </div>
+            </div>
+            <div className={styles.skelCard}>
+              <div className={styles.skelCardRow}>
+                <div className={styles.skelCircle} />
+                <div className={styles.skelLines}>
+                  <div className={styles.skelLine} style={{ width: '50%' }} />
+                  <div className={styles.skelLine} style={{ width: '80%', height: 8 }} />
+                </div>
+              </div>
+              <div className={styles.skelLines} style={{ gap: 12, paddingTop: 12 }}>
+                <div className={styles.skelLine} style={{ width: '30%', height: 8 }} />
+                <div className={styles.skelDropdown} style={{ height: 36 }} />
+                <div className={styles.skelLine} style={{ width: '25%', height: 8 }} />
+                <div className={styles.skelDropdown} style={{ height: 36 }} />
+              </div>
+            </div>
+          </div>
+          <div className={styles.rightPanel}>
+            <OutputPanel result={null} toolName={null} executing={false} />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!connectedMcps || connectedMcps.length === 0) {
     return (

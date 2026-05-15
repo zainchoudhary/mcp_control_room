@@ -8,6 +8,7 @@ import styles from './MCPServersPage.module.css'
 
 export function MCPServersPage({
   mcps,
+  mcpsLoading,
   onConnect,
   onDisconnect,
   onProbe,
@@ -20,6 +21,7 @@ export function MCPServersPage({
   onClearInitialMcp,
 }) {
   const [selectedMcp, setSelectedMcp] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     if (initialSelectedMcp) {
@@ -34,6 +36,11 @@ export function MCPServersPage({
       setSelectedMcp(null)
     }
   }, [mcps, selectedMcp])
+
+  const q = searchQuery.toLowerCase()
+  const filteredMcps = q
+    ? mcps.filter(m => m.name?.toLowerCase().includes(q) || m.url?.toLowerCase().includes(q))
+    : mcps
 
   return (
     <div className={styles.page}>
@@ -51,7 +58,46 @@ export function MCPServersPage({
         </button>
       </div>
 
-      {mcps.length === 0 ? (
+      {!mcpsLoading && mcps.length > 0 && (
+        <div className={styles.searchBar}>
+          <Search size={15} className={styles.searchIcon} />
+          <input
+            className={styles.searchInput}
+            type="text"
+            placeholder="Search MCP Servers"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className={styles.searchClear} onClick={() => setSearchQuery('')} type="button">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {mcpsLoading ? (
+        <div className={styles.grid}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className={styles.skelCard} style={{ animationDelay: `${i * 0.12}s` }}>
+              <div className={styles.skelCardHeader}>
+                <div className={styles.skelCardIcon} />
+                <div className={styles.skelCardLines}>
+                  <div className={styles.skelLine} style={{ width: '60%' }} />
+                  <div className={styles.skelLine} style={{ width: '40%', height: 8 }} />
+                </div>
+              </div>
+              <div className={styles.skelCardBody}>
+                <div className={styles.skelLine} style={{ width: '80%' }} />
+                <div className={styles.skelLine} style={{ width: '50%' }} />
+              </div>
+              <div className={styles.skelCardFooter}>
+                <div className={styles.skelLine} style={{ width: '30%', height: 28, borderRadius: 8 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : mcps.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>
             <Server size={40} />
@@ -65,9 +111,14 @@ export function MCPServersPage({
             <span>Register Server</span>
           </button>
         </div>
+      ) : filteredMcps.length === 0 ? (
+        <div className={styles.noResults}>
+          <Search size={20} />
+          <span>No servers matching "{searchQuery}"</span>
+        </div>
       ) : (
         <div className={styles.grid}>
-          {mcps.map((mcp) => (
+          {filteredMcps.map((mcp) => (
             <ServerCard
               key={mcp.id}
               mcp={mcp}
