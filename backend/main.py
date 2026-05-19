@@ -1,5 +1,5 @@
 """
-main.py - FastAPI application for the ToolChain AI Dashboard.
+main.py - FastAPI application for the ToolChain AI Dashboard (v2 - Stripe billing).
 
 Routes:
   GET  /                       → serve dashboard HTML
@@ -43,7 +43,18 @@ from database import (
 from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
 from auth_routes import router as auth_router
+from stripe_routes import router as stripe_router, get_user_limits
 from auth_utils import get_current_user, send_contact_email
+from plan_guard import (
+    require_active_subscription,
+    check_daily_message_limit,
+    check_session_limit,
+    check_mcp_register_limit,
+    check_mcp_connect_limit,
+    check_tool_execution_access,
+    get_usage_stats,
+    get_limits,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,9 +64,28 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     await init_db()
     logger.info("PostgreSQL database initialized via SQLAlchemy.")
+
+    async def _expiry_loop():
+        """Background task that checks for expired subscriptions every 6 hours."""
+        from plan_guard import check_and_downgrade_expired_users
+        while True:
+            try:
+                await asyncio.sleep(6 * 3600)
+                async with AsyncSessionLocal() as db:
+                    count = await check_and_downgrade_expired_users(db)
+                    if count:
+                        logger.info("Expiry check: downgraded %d user(s)", count)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("Expiry check failed")
+
+    task = asyncio.create_task(_expiry_loop())
     yield
+    task.cancel()
     logger.info("Shutting down.")
 
 
@@ -76,6 +106,7 @@ app.add_middleware(
 
 app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="assets")
 app.include_router(auth_router)
+app.include_router(stripe_router)
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
@@ -135,6 +166,7 @@ async def api_contact(body: ContactRequest):
 @app.get("/mcp-servers", include_in_schema=False)
 @app.get("/tool-execution", include_in_schema=False)
 @app.get("/chat", include_in_schema=False)
+@app.get("/pricing", include_in_schema=False)
 @app.get("/login", include_in_schema=False)
 @app.get("/signup", include_in_schema=False)
 @app.get("/forgot-password", include_in_schema=False)
@@ -166,12 +198,13 @@ async def api_list_mcps(
 @app.post("/api/mcps", status_code=201)
 async def api_register_mcp(
     body: MCPCreate,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(check_mcp_register_limit),
     db: AsyncSession = Depends(get_db),
 ):
     existing = await list_mcps(db, user["id"])
     if any(m["name"] == body.name for m in existing):
         raise HTTPException(status_code=409, detail=f"MCP with name '{body.name}' already exists.")
+
     url = body.url.rstrip("/")
     if body.transport == "sse" and not url.endswith("/sse"):
         url += "/sse"
@@ -223,7 +256,7 @@ async def api_delete_mcp(
 async def api_connect_mcp(
     mcp_id: str,
     skip_auth: bool = False,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(check_mcp_connect_limit),
     db: AsyncSession = Depends(get_db),
 ):
     mcp = await get_mcp(db, mcp_id, user["id"])
@@ -312,10 +345,10 @@ async def api_execute_tool(
     mcp_id: str,
     tool_name: str,
     body: ToolExecuteRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(check_tool_execution_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Directly invoke a single tool on the MCP server (bypasses the agent)."""
+    """Directly invoke a single tool on the MCP server (bypasses the agent). Pro+ only."""
     mcp = await get_mcp(db, mcp_id, user["id"])
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
@@ -479,7 +512,7 @@ async def api_list_sessions(
 
 @app.post("/api/sessions", status_code=201)
 async def api_create_session(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(check_session_limit),
     db: AsyncSession = Depends(get_db),
 ):
     session = await create_session(db, user["id"])
@@ -613,12 +646,12 @@ async def api_get_messages(
 @app.post("/api/chat/stream")
 async def api_chat_stream(
     body: ChatRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(check_daily_message_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """
     SSE endpoint. Opens MCP connections, runs the LangGraph agent,
-    and streams tokens back to the client.
+    and streams tokens back to the client. Enforces daily message limit.
     """
     history = await get_session_messages(db, body.session_id)
     await save_message(db, body.session_id, "user", body.message)

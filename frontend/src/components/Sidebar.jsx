@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings, Wrench,
+  Settings, Wrench, Crown, Zap, Sparkles,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -50,6 +50,7 @@ export function Sidebar({
     { id: 'dashboard', label: tr('dashboard'), icon: LayoutDashboard },
     { id: 'mcp-servers', label: tr('mcpServers'), icon: Server, badge: mcpCount || null },
     { id: 'tool-execution', label: tr('toolExecution'), icon: Wrench },
+    { id: 'pricing', label: tr('pricing') || 'Pricing', icon: Crown, special: true },
     { id: 'chat', label: tr('chat'), icon: MessageSquare },
   ]
 
@@ -129,7 +130,7 @@ export function Sidebar({
               return (
                 <div key={item.id}>
                   <button
-                    className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
+                    className={`${styles.navItem} ${isActive ? styles.navItemActive : ''} ${item.special ? styles.navItemSpecial : ''}`}
                     onClick={() => {
                       onNavigate(item.id)
                       if (isChat) setChatExpanded(true)
@@ -137,6 +138,14 @@ export function Sidebar({
                   >
                     <Icon size={17} />
                     <span className={styles.navLabel}>{item.label}</span>
+                    {item.special && user?.plan && user.plan !== 'free' && (
+                      <span className={`${styles.navPlanTag} ${styles[`navPlanTag_${user.plan}`]}`}>
+                        {user.plan === 'enterprise' ? 'Enterprise' : 'Pro'}
+                      </span>
+                    )}
+                    {item.special && (!user?.plan || user.plan === 'free') && (
+                      <span className={styles.navProTag}>Pro</span>
+                    )}
                     {item.badge != null && <span className={styles.navBadge}>{item.badge}</span>}
                     {isChat && (
                       <button
@@ -227,6 +236,19 @@ export function Sidebar({
           </nav>
 
           <div className={styles.bottom}>
+            {user && user.plan && user.plan !== 'free' && (
+              <div className={`${styles.planBadge} ${styles[`planBadge_${user.plan}`]}`}>
+                <Crown size={12} />
+                <span>{user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}</span>
+              </div>
+            )}
+            {user && (!user.plan || user.plan === 'free') && (
+              <button className={styles.upgradeBanner} onClick={() => onNavigate('pricing')}>
+                <Zap size={13} />
+                <span>Upgrade Plan</span>
+              </button>
+            )}
+
             <button className={styles.settingsBtn} onClick={onOpenSettings}>
               <Settings size={15} />
               <span>{tr('settings')}</span>

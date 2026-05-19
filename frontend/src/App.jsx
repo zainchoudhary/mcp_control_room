@@ -23,6 +23,7 @@ import { ChatInput } from './components/ChatInput.jsx'
 import { RegisterModal } from './components/RegisterModal.jsx'
 import { AuthPage } from './components/AuthPage.jsx'
 import { LandingPage } from './components/LandingPage.jsx'
+import { PricingPage } from './components/PricingPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { SettingsModal } from './components/SettingsModal.jsx'
@@ -33,7 +34,7 @@ import { useAccentColor } from './hooks/useAccentColor.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
-const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat']
+const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'pricing']
 const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
@@ -119,15 +120,23 @@ export default function App() {
     if (!authChecked) return
     const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
     const hasResetToken = new URLSearchParams(window.location.search).has('reset_token')
+    const params = new URLSearchParams(window.location.search)
     if (user) {
-      if (AUTH_PAGES.includes(path) && !hasResetToken) {
+      if (params.get('checkout') === 'success') {
+        toast('Subscription activated! Welcome to your new plan.', 'success')
+        window.history.replaceState(null, '', '/dashboard')
+        setActivePage('dashboard')
+        fetchMe().then(u => { if (u) { setUser(u); localStorage.setItem('toolchain_user', JSON.stringify(u)) } })
+      } else if (AUTH_PAGES.includes(path) && !hasResetToken) {
         setActivePage('dashboard')
         window.history.replaceState(null, '', '/dashboard')
       } else if (path === '' || path === '/') {
         setActivePage('landing')
       }
     } else {
-      if (!AUTH_PAGES.includes(path) && path !== '') {
+      if (path === 'pricing') {
+        setActivePage('pricing')
+      } else if (!AUTH_PAGES.includes(path) && path !== '') {
         window.history.replaceState(null, '', '/')
       }
     }
@@ -605,6 +614,27 @@ export default function App() {
     const currentPath = window.location.pathname.replace(/^\/+/, '').toLowerCase()
     const showAuth = AUTH_PAGES.includes(currentPath) || AUTH_PAGES.includes(activePage)
 
+    if (activePage === 'pricing' || currentPath === 'pricing') {
+      return (
+        <>
+          <PricingPage
+            user={null}
+            t={t}
+            onNavigate={(page) => {
+              window.history.pushState(null, '', '/login')
+              setActivePage('login')
+            }}
+            addToast={toast}
+            onBack={() => {
+              window.history.pushState(null, '', '/')
+              setActivePage('landing')
+            }}
+          />
+          <ToastContainer toasts={toasts} dismiss={dismiss} />
+        </>
+      )
+    }
+
     if (!showAuth) {
       return (
         <LandingPage
@@ -616,6 +646,10 @@ export default function App() {
           onSignIn={() => {
             window.history.pushState(null, '', '/login')
             setActivePage('login')
+          }}
+          onPricing={() => {
+            window.history.pushState(null, '', '/pricing')
+            setActivePage('pricing')
           }}
         />
       )
@@ -649,6 +683,10 @@ export default function App() {
         onSignIn={() => {
           setActivePage('dashboard')
           window.history.pushState(null, '', '/dashboard')
+        }}
+        onPricing={() => {
+          setActivePage('pricing')
+          window.history.pushState(null, '', '/pricing')
         }}
       />
     )
@@ -733,6 +771,16 @@ export default function App() {
             t={t}
             persistedState={toolExecState}
             onStateChange={setToolExecState}
+            user={user}
+          />
+        )}
+
+        {activePage === 'pricing' && (
+          <PricingPage
+            user={user}
+            t={t}
+            onNavigate={handleNavigate}
+            addToast={toast}
           />
         )}
 
@@ -831,6 +879,7 @@ export default function App() {
           onLanguageChange={setLanguage}
           accentId={accentId}
           onAccentChange={setAccentColor}
+          onNavigate={handleNavigate}
         />
       )}
 

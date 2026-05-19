@@ -97,7 +97,10 @@ export async function* streamChat(sessionId, message, mcpIds = []) {
     body: JSON.stringify({ session_id: sessionId, message, mcp_ids: mcpIds }),
   })
 
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || `HTTP ${res.status}`)
+  }
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -121,6 +124,13 @@ export async function* streamChat(sessionId, message, mcpIds = []) {
     }
   }
 }
+
+// Billing / Subscription
+export const getPlans = () => request('/billing/plans')
+export const getSubscription = () => request('/billing/subscription')
+export const getUsage = () => request('/billing/usage')
+export const createCheckout = (plan) => request('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) })
+export const createPortalSession = () => request('/billing/portal', { method: 'POST' })
 
 // Contact form (public, no auth)
 export const submitContact = (data) =>

@@ -12,6 +12,394 @@
   overflow: hidden;
 }
 
+/* ── Pro Upgrade Gate ── */
+
+.gateWrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* ── Stage 0: Full-screen lock intro ── */
+
+.gateIntro {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gateIntroShrink {
+  opacity: 0;
+  transform: scale(0.3);
+  pointer-events: none;
+}
+
+.gateIntroLock {
+  width: 100px;
+  height: 100px;
+  border-radius: 28px;
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 2px solid rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: introLockIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+  z-index: 2;
+}
+@keyframes introLockIn {
+  0%   { opacity: 0; transform: scale(0.3); }
+  50%  { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.gateIntroRipple,
+.gateIntroRipple2 {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 28px;
+  border: 2px solid rgba(var(--accent-rgb), 0.15);
+  animation: introRipple 1.8s ease-out infinite;
+}
+.gateIntroRipple2 {
+  animation-delay: 0.4s;
+}
+@keyframes introRipple {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.8); opacity: 0; border-radius: 50%; }
+}
+
+.gateIntroText {
+  margin-top: 24px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: introTextIn 0.5s 0.3s ease backwards;
+}
+.gateIntroText span {
+  color: var(--accent);
+  font-weight: 850;
+}
+@keyframes introTextIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Stage 1: Mock bg fades in ── */
+
+/* Blurred mock preview background */
+.gateMockBg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  filter: blur(5px);
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.gateMockBgShow {
+  opacity: 0.35;
+}
+.gateMockSidebar {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px solid var(--border-subtle);
+}
+.gateMockSbBlock {
+  height: 28px;
+  border-radius: 8px;
+  background: var(--border-subtle);
+  margin-bottom: 8px;
+}
+.gateMockSbLine {
+  height: 14px;
+  border-radius: 6px;
+  background: var(--border-subtle);
+}
+.gateMockMain {
+  flex: 1;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.gateMockHeader {
+  height: 36px;
+  width: 50%;
+  border-radius: 8px;
+  background: var(--border-subtle);
+}
+.gateMockForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gateMockInput {
+  height: 38px;
+  border-radius: 8px;
+  background: var(--border-subtle);
+}
+.gateMockOutput {
+  flex: 1;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gateMockLine {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--border-subtle);
+}
+
+/* Glass card overlay */
+.gateCard {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 420px;
+  padding: 40px 36px 36px;
+  border-radius: 24px;
+  background: rgba(var(--bg-primary-rgb, var(--bg-secondary-rgb)), 0.82);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.05),
+    0 8px 40px rgba(0, 0, 0, 0.12),
+    0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.88) translateY(24px);
+  pointer-events: none;
+  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gateCardShow {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.gateGlow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(var(--accent-rgb), 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1; transform: translateX(-50%) scale(1.15); }
+}
+
+.gateLockRing {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(var(--accent-rgb), 0.18) 0%,
+    rgba(var(--accent-rgb), 0.04) 35%,
+    rgba(var(--accent-rgb), 0.18) 65%,
+    rgba(var(--accent-rgb), 0.04) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  animation: ringRotate 8s linear infinite;
+  position: relative;
+}
+@keyframes ringRotate {
+  from { background: conic-gradient(from 0deg, rgba(var(--accent-rgb), 0.2) 0%, rgba(var(--accent-rgb), 0.03) 35%, rgba(var(--accent-rgb), 0.2) 65%, rgba(var(--accent-rgb), 0.03) 100%); }
+  to   { background: conic-gradient(from 360deg, rgba(var(--accent-rgb), 0.2) 0%, rgba(var(--accent-rgb), 0.03) 35%, rgba(var(--accent-rgb), 0.2) 65%, rgba(var(--accent-rgb), 0.03) 100%); }
+}
+
+.gateLockInner {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.gateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.12) 0%, rgba(var(--accent-rgb), 0.04) 100%);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.gateTitle {
+  font-size: 1.55rem;
+  font-weight: 850;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.gateDesc {
+  font-size: 0.84rem;
+  color: var(--text-tertiary);
+  line-height: 1.65;
+  margin: 0 0 24px;
+  max-width: 340px;
+}
+
+.gateFeats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.gateFeat {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(var(--accent-rgb), 0.03);
+  border: 1px solid rgba(var(--accent-rgb), 0.06);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: left;
+  animation: featIn 0.35s ease backwards;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gateFeat:hover {
+  border-color: rgba(var(--accent-rgb), 0.15);
+  background: rgba(var(--accent-rgb), 0.06);
+}
+@keyframes featIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.gateFeatIcon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gateActions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.gateUpgradeBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 20px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #000;
+  font-size: 0.88rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.gateUpgradeBtn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -110%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+  animation: gateBtnShimmer 3s ease-in-out infinite;
+}
+@keyframes gateBtnShimmer {
+  0%, 100% { left: -110%; }
+  50%      { left: 110%; }
+}
+.gateUpgradeBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(var(--accent-rgb), 0.4);
+}
+
+.gateSecondaryBtn {
+  padding: 13px 20px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.gateSecondaryBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.04);
+}
+
+@media (max-width: 480px) {
+  .gateCard { padding: 28px 20px 24px; }
+  .gateFeats { grid-template-columns: 1fr; }
+  .gateActions { flex-direction: column; }
+}
+
 .header {
   padding: 32px 0 0;
   margin-bottom: 20px;

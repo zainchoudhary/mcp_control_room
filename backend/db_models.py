@@ -25,12 +25,21 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    subscription_status: Mapped[str] = mapped_column(String(30), nullable=False, default="inactive")
+    plan: Mapped[str] = mapped_column(String(30), nullable=False, default="free")
+    subscription_end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     def to_dict(self, include_password: bool = False) -> dict:
         d = {
             "id": self.id,
             "username": self.username,
             "email": self.email,
             "full_name": self.full_name,
+            "plan": self.plan or "free",
+            "subscription_status": self.subscription_status or "inactive",
+            "subscription_end_date": self.subscription_end_date.isoformat() if self.subscription_end_date else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

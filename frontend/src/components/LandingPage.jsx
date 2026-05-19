@@ -48,7 +48,7 @@ function Counter({ end, suffix = '', prefix = '' }) {
   return <span ref={ref}>{prefix}{count}{suffix}</span>
 }
 
-export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
+export function LandingPage({ onGetStarted, onSignIn, onPricing, isLoggedIn }) {
   const [trustedRef, trustedVis] = useReveal()
   const [showcaseRef, showcaseVis] = useReveal()
   const [flowRef, flowVis] = useReveal()
@@ -69,6 +69,7 @@ export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
           <span className={styles.logoText}>ToolChain<span>AI</span></span>
         </div>
         <div className={styles.navRight}>
+          <button className={styles.navLink} onClick={onPricing}>Pricing</button>
           {isLoggedIn ? (
             <button className={styles.navCta} onClick={onGetStarted}>Go to Dashboard</button>
           ) : (
@@ -395,6 +396,7 @@ export function LandingPage({ onGetStarted, onSignIn, isLoggedIn }) {
           <div className={styles.footerLinks}>
             <span onClick={() => showcaseRef.current?.scrollIntoView({ behavior: 'smooth' })}>Features</span>
             <span onClick={() => howRef.current?.scrollIntoView({ behavior: 'smooth' })}>How it Works</span>
+            <span onClick={onPricing}>Pricing</span>
             <span onClick={() => contactRef.current?.scrollIntoView({ behavior: 'smooth' })}>Contact</span>
           </div>
           <span className={styles.footerCopy}>© 2026 ToolChain AI. All rights reserved.</span>

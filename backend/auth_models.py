@@ -213,4 +213,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     full_name: str | None
+    plan: str = "free"
+    subscription_status: str = "inactive"
+    subscription_end_date: str | None = None
     created_at: str

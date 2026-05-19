@@ -3,6 +3,7 @@ import {
   Wrench, ChevronDown, ChevronRight, Loader2, Bot, Copy, Check,
   Clock, Server, RotateCcw, Terminal, Zap, AlertCircle,
   Code2, FormInput, Search, Trash2, Eraser, PanelRightClose, PanelRight,
+  Lock, Crown, Rocket,
 } from 'lucide-react'
 import { executeTool, probeMCP } from '../api.js'
 import styles from './ToolExecutionPage.module.css'
@@ -579,10 +580,13 @@ function ToolDetail({ tool, mcpId, onRunViaAgent, cachedForm, onFormChange, onRe
 }
 
 /* ── Main page ── */
-export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRunViaAgent, t, persistedState, onStateChange }) {
+export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRunViaAgent, t, persistedState, onStateChange, user }) {
   const tr = t || ((k) => k)
+  const userPlan = user?.plan || 'free'
+  const isFreeUser = userPlan === 'free'
   const hasRestoredState = !!(persistedState?.mcpId && persistedState?.tools?.length)
 
+  const [gateStage, setGateStage] = useState(0)
   const [selectedMcpId, setSelectedMcpId] = useState(persistedState?.mcpId || null)
   const [tools, setTools] = useState(persistedState?.tools || null)
   const [probing, setProbing] = useState(false)
@@ -605,6 +609,14 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
   }, [selectedMcpId, selectedToolName, tools, result, onStateChange])
 
   useEffect(() => { syncState() }, [selectedMcpId, selectedToolName, tools, result])
+
+  useEffect(() => {
+    if (!isFreeUser) return
+    setGateStage(0)
+    const t1 = setTimeout(() => setGateStage(1), 1200)
+    const t2 = setTimeout(() => setGateStage(2), 1900)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [isFreeUser])
 
   useEffect(() => {
     if (hasRestoredState) return
@@ -665,6 +677,99 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
     desc: t.description ? (t.description.length > 60 ? t.description.slice(0, 60) + '...' : t.description) : '',
     icon: <Wrench size={13} />,
   }))
+
+  if (isFreeUser) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.gateWrap}>
+          {/* Stage 0: Full-screen lock intro */}
+          {gateStage < 2 && (
+            <div className={`${styles.gateIntro} ${gateStage >= 1 ? styles.gateIntroShrink : ''}`}>
+              <div className={styles.gateIntroRipple} />
+              <div className={styles.gateIntroRipple2} />
+              <div className={styles.gateIntroLock}>
+                <Lock size={48} strokeWidth={1.5} />
+              </div>
+              <div className={styles.gateIntroText}>
+                <span>Pro</span> Feature
+              </div>
+            </div>
+          )}
+
+          {/* Stage 1+: Blurred mock preview behind */}
+          <div className={`${styles.gateMockBg} ${gateStage >= 1 ? styles.gateMockBgShow : ''}`}>
+            <div className={styles.gateMockSidebar}>
+              <div className={styles.gateMockSbBlock} />
+              <div className={styles.gateMockSbLine} style={{ width: '80%' }} />
+              <div className={styles.gateMockSbLine} style={{ width: '60%' }} />
+              <div className={styles.gateMockSbLine} style={{ width: '90%' }} />
+              <div className={styles.gateMockSbLine} style={{ width: '45%' }} />
+              <div className={styles.gateMockSbLine} style={{ width: '70%' }} />
+            </div>
+            <div className={styles.gateMockMain}>
+              <div className={styles.gateMockHeader} />
+              <div className={styles.gateMockForm}>
+                <div className={styles.gateMockInput} />
+                <div className={styles.gateMockInput} />
+                <div className={styles.gateMockInput} style={{ width: '60%' }} />
+              </div>
+              <div className={styles.gateMockOutput}>
+                <div className={styles.gateMockLine} style={{ width: '90%' }} />
+                <div className={styles.gateMockLine} style={{ width: '75%' }} />
+                <div className={styles.gateMockLine} style={{ width: '60%' }} />
+                <div className={styles.gateMockLine} style={{ width: '85%' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stage 2: Glass card */}
+          <div className={`${styles.gateCard} ${gateStage >= 2 ? styles.gateCardShow : ''}`}>
+            <div className={styles.gateGlow} />
+
+            <div className={styles.gateLockRing}>
+              <div className={styles.gateLockInner}>
+                <Lock size={24} />
+              </div>
+            </div>
+
+            <div className={styles.gateBadge}>
+              <Crown size={11} />
+              <span>Pro Feature</span>
+            </div>
+
+            <h2 className={styles.gateTitle}>Tool Execution</h2>
+            <p className={styles.gateDesc}>
+              Run MCP tools directly, inspect arguments with smart forms, and explore rich JSON output — all in one powerful interface.
+            </p>
+
+            <div className={styles.gateFeats}>
+              {[
+                { icon: Zap, text: 'Execute any tool instantly' },
+                { icon: Code2, text: 'Form & raw JSON modes' },
+                { icon: Terminal, text: 'Rich output with tree viewer' },
+                { icon: Server, text: 'Works with all connected MCPs' },
+              ].map(({ icon: FIcon, text }, i) => (
+                <div key={i} className={styles.gateFeat} style={{ animationDelay: `${2.0 + i * 0.1}s` }}>
+                  <div className={styles.gateFeatIcon}><FIcon size={13} /></div>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.gateActions}>
+              <button className={styles.gateUpgradeBtn} onClick={() => onNavigate('pricing')}>
+                <Rocket size={15} />
+                Upgrade to Pro
+              </button>
+              <button className={styles.gateSecondaryBtn} onClick={() => onNavigate('pricing')}>
+                View Plans
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (mcpsLoading) {
     return (

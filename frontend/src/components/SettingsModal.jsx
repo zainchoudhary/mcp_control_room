@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { X as XIcon, Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets } from 'lucide-react'
-import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount } from '../api.js'
+import { X as XIcon, Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers } from 'lucide-react'
+import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage } from '../api.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
 import { ACCENT_COLORS } from '../hooks/useAccentColor.js'
 import styles from './SettingsModal.module.css'
@@ -793,7 +793,162 @@ function ChatSessionsTab({ onSessionsDeleted, busy, onBusyChange }) {
   )
 }
 
-export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdated, onSessionsDeleted, onLogout, language, onLanguageChange, accentId, onAccentChange }) {
+const PLAN_ICONS = { free: Zap, pro: Crown, enterprise: Building2 }
+const PLAN_COLORS = { free: '#6366f1', pro: 'var(--accent, #00c896)', enterprise: '#f59e0b' }
+
+function UsageBar({ used, limit, color }) {
+  if (limit === -1) return <span className={styles.billingUsageUnlimited}>Unlimited</span>
+  const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
+  const isHigh = pct >= 80
+  return (
+    <div className={styles.billingUsageBar}>
+      <div className={styles.billingUsageTrack}>
+        <div
+          className={styles.billingUsageFill}
+          style={{ width: `${pct}%`, background: isHigh ? '#ef4444' : (color || 'var(--accent)') }}
+        />
+      </div>
+      <span className={`${styles.billingUsageText} ${isHigh ? styles.billingUsageHigh : ''}`}>
+        {used} / {limit}
+      </span>
+    </div>
+  )
+}
+
+function BillingTab({ user, onNavigate, busy }) {
+  const [sub, setSub] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  useEffect(() => {
+    getSubscription().then(setSub).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const handleManage = useCallback(async () => {
+    setPortalLoading(true)
+    try {
+      const { url } = await createPortalSession()
+      if (url) window.location.href = url
+    } catch {
+      /* ignore */
+    } finally {
+      setPortalLoading(false)
+    }
+  }, [])
+
+  const plan = sub?.plan || user?.plan || 'free'
+  const PlanIcon = PLAN_ICONS[plan] || Zap
+  const planColor = PLAN_COLORS[plan] || PLAN_COLORS.free
+  const limits = sub?.limits || {}
+  const usage = sub?.usage || {}
+  const isActive = sub?.status === 'active' || sub?.status === 'trialing'
+  const isPastDue = sub?.status === 'past_due'
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Billing</span>
+        <span className={styles.sectionHint}>Manage your subscription and plan</span>
+      </div>
+
+      {loading ? (
+        <div className={styles.billingLoading}>
+          <Loader2 size={20} className={styles.spinner} />
+          <span>Loading billing info...</span>
+        </div>
+      ) : (
+        <>
+          {/* Past due warning */}
+          {isPastDue && (
+            <div className={styles.billingWarning}>
+              <AlertTriangle size={14} />
+              <span>Your payment is overdue. Please update your payment method to avoid losing access.</span>
+            </div>
+          )}
+
+          {/* Plan Card */}
+          <div className={styles.billingPlanCard} style={{ '--plan-clr': planColor }}>
+            <div className={styles.billingCardGlow} />
+            <div className={styles.billingPlanTop}>
+              <div className={styles.billingPlanIcon} style={{ background: planColor }}>
+                <PlanIcon size={20} />
+              </div>
+              <div className={styles.billingPlanInfo}>
+                <div className={styles.billingPlanName}>{planLabel} Plan</div>
+                <div className={styles.billingPlanStatus}>
+                  <span
+                    className={styles.billingStatusDot}
+                    style={{ background: isActive ? '#10b981' : isPastDue ? '#f59e0b' : plan === 'free' ? '#6366f1' : '#ef4444' }}
+                  />
+                  {plan === 'free' ? 'Free Tier' : isActive ? 'Active' : isPastDue ? 'Past Due' : sub?.status || 'Inactive'}
+                </div>
+              </div>
+              {plan !== 'free' && (
+                <div className={styles.billingPlanBadge} style={{ background: planColor }}>
+                  {planLabel}
+                </div>
+              )}
+            </div>
+            {plan !== 'free' && sub?.end_date && (
+              <div className={styles.billingRenew}>
+                <Calendar size={12} />
+                Renews {new Date(sub.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            )}
+          </div>
+
+          {/* Usage section */}
+          <div className={styles.billingLimitsHeader}>
+            <Shield size={13} />
+            <span>Usage &amp; Limits</span>
+          </div>
+          <div className={styles.billingLimits}>
+            {[
+              { icon: MessageSquare, label: 'Messages Today', used: usage.messages?.used ?? 0, limit: limits.messages_per_day, reset: 'Resets daily' },
+              { icon: Layers, label: 'Sessions This Month', used: usage.sessions?.used ?? 0, limit: limits.sessions_per_month, reset: usage.sessions?.days_until_reset ? `Resets in ${usage.sessions.days_until_reset}d` : 'Resets monthly' },
+              { icon: Server, label: 'MCP Servers', used: usage.mcps?.used ?? 0, limit: limits.mcps, reset: null },
+            ].map(({ icon: LIcon, label, used, limit, reset }, i) => (
+              <div key={i} className={styles.billingLimitItem}>
+                <div className={styles.billingLimitIcon}><LIcon size={14} /></div>
+                <div className={styles.billingLimitText}>
+                  <div className={styles.billingLimitLabelRow}>
+                    <span className={styles.billingLimitLabel}>{label}</span>
+                    {reset && <span className={styles.billingLimitReset}>{reset}</span>}
+                  </div>
+                  <UsageBar used={used} limit={limit} color={planColor} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className={styles.billingActions}>
+            {plan !== 'free' && (
+              <button
+                className={styles.billingManageBtn}
+                onClick={handleManage}
+                disabled={portalLoading || busy}
+              >
+                {portalLoading ? <Loader2 size={14} className={styles.spinner} /> : <ExternalLink size={14} />}
+                Manage Subscription
+              </button>
+            )}
+            <button
+              className={styles.billingUpgradeBtn}
+              onClick={() => onNavigate?.('pricing')}
+            >
+              <Rocket size={14} />
+              {plan === 'free' ? 'Upgrade Plan' : 'View Plans'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdated, onSessionsDeleted, onLogout, language, onLanguageChange, accentId, onAccentChange, onNavigate }) {
   const overlayRef = useRef(null)
   const [activeTab, setActiveTab] = useState('general')
   const [busy, setBusy] = useState(false)
@@ -804,6 +959,7 @@ export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdat
     { id: 'account', label: t('account'), icon: User },
     { id: 'security', label: t('security'), icon: Shield },
     { id: 'sessions', label: t('chatSessions'), icon: MessageSquare },
+    { id: 'billing', label: 'Billing', icon: CreditCard },
   ], [t])
 
   const handleBusyChange = useCallback((isBusy) => setBusy(isBusy), [])
@@ -871,6 +1027,9 @@ export function SettingsModal({ theme, onToggleTheme, onClose, user, onUserUpdat
             )}
             {activeTab === 'sessions' && (
               <ChatSessionsTab onSessionsDeleted={onSessionsDeleted} busy={busy} onBusyChange={handleBusyChange} />
+            )}
+            {activeTab === 'billing' && (
+              <BillingTab user={user} onNavigate={(page) => { onClose(); onNavigate?.(page) }} busy={busy} />
             )}
           </div>
         </div>

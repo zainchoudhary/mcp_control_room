@@ -592,3 +592,123 @@
     display: none;
   }
 }
+
+/* ── Special Pricing Nav Item ─────────── */
+
+.navItemSpecial {
+  position: relative;
+  background: rgba(var(--accent-rgb), 0.03);
+  border: 1px solid rgba(var(--accent-rgb), 0.08);
+  border-radius: 9px !important;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+.navItemSpecial svg:first-child {
+  color: var(--accent);
+  opacity: 0.8;
+}
+.navItemSpecial .navLabel {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.navItemSpecial:hover {
+  background: rgba(var(--accent-rgb), 0.06);
+  border-color: rgba(var(--accent-rgb), 0.14);
+}
+.navItemSpecial::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(var(--accent-rgb), 0.06) 50%, transparent 100%);
+  animation: shimmerNav 3s ease-in-out infinite;
+  border-radius: 9px;
+  pointer-events: none;
+}
+@keyframes shimmerNav {
+  0% { left: -60%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+.navProTag {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-left: auto;
+  line-height: 1.5;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+.navPlanTag {
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-left: auto;
+  line-height: 1.5;
+}
+.navPlanTag_pro {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+}
+.navPlanTag_enterprise {
+  background: rgba(245, 158, 11, 0.10);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+/* ── Plan Badge & Upgrade Banner ─────── */
+
+.planBadge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.planBadge_pro {
+  background: rgba(0, 200, 150, 0.08);
+  color: var(--accent, #00c896);
+  border: 1px solid rgba(0, 200, 150, 0.18);
+}
+
+.planBadge_enterprise {
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.upgradeBanner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent, #00c896);
+  background: rgba(0, 200, 150, 0.06);
+  border: 1px dashed rgba(0, 200, 150, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 6px;
+}
+
+.upgradeBanner:hover {
+  background: rgba(0, 200, 150, 0.1);
+  border-color: rgba(0, 200, 150, 0.35);
+}
