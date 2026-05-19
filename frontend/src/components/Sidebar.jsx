@@ -148,12 +148,15 @@ export function Sidebar({
                     )}
                     {item.badge != null && <span className={styles.navBadge}>{item.badge}</span>}
                     {isChat && (
-                      <button
+                      <span
+                        role="button"
+                        tabIndex={0}
                         className={styles.expandBtn}
                         onClick={(e) => { e.stopPropagation(); setChatExpanded((v) => !v) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setChatExpanded((v) => !v) } }}
                       >
                         {chatExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </button>
+                      </span>
                     )}
                   </button>
 
@@ -206,13 +209,16 @@ export function Sidebar({
                                   >
                                     <span className={styles.sessionTitle}>{s.title || tr('newConversation')}</span>
                                     {hoveredSession === s.id && (
-                                      <button
+                                      <span
+                                        role="button"
+                                        tabIndex={0}
                                         className={styles.deleteSessionBtn}
                                         onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id) }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDeleteSession(s.id) } }}
                                         title="Delete"
                                       >
                                         <Trash2 size={12} />
-                                      </button>
+                                      </span>
                                     )}
                                   </button>
                                 ))}
@@ -236,12 +242,6 @@ export function Sidebar({
           </nav>
 
           <div className={styles.bottom}>
-            {user && user.plan && user.plan !== 'free' && (
-              <div className={`${styles.planBadge} ${styles[`planBadge_${user.plan}`]}`}>
-                <Crown size={12} />
-                <span>{user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}</span>
-              </div>
-            )}
             {user && (!user.plan || user.plan === 'free') && (
               <button className={styles.upgradeBanner} onClick={() => onNavigate('pricing')}>
                 <Zap size={13} />

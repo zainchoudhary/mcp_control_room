@@ -1,72 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { getPlans, getSubscription, createCheckout } from '../api.js'
+import { getSubscription, createCheckout } from '../api.js'
 import {
   Crown, Zap, Building2, Check, X as XMark,
-  Sparkles, Shield, Rocket, Star, Loader2,
+  Shield, Rocket, Loader2, ArrowLeft, Bot, Star,
   Server, MessageSquare, Layers, Headphones,
-  Code, KeyRound, ArrowRight, ArrowLeft, Bot, Users, TrendingUp,
+  Code, KeyRound, TrendingUp, Users,
 } from 'lucide-react'
 import styles from './PricingPage.module.css'
-
-const PLANS = [
-  {
-    id: 'free', name: 'Free', tag: 'For getting started',
-    monthly: 0, yearly: 0, popular: false,
-    icon: Zap, color: '#6366f1',
-    highlight: [
-      '2 MCP servers',
-      '25 messages / day',
-      '5 sessions / month',
-      'Basic AI agent',
-      'Community support',
-    ],
-    cta: 'Current Plan',
-  },
-  {
-    id: 'pro', name: 'Pro', tag: 'For power users',
-    monthly: 10, yearly: 96, popular: true,
-    icon: Crown, color: 'var(--accent, #00c896)',
-    prevPlan: 'Free',
-    highlight: [
-      '10 MCP servers',
-      '500 messages / day',
-      '50 sessions / month',
-      'Advanced AI agent',
-      'Priority support',
-      'Execution history',
-    ],
-    cta: 'Upgrade to Pro',
-  },
-  {
-    id: 'enterprise', name: 'Enterprise', tag: 'For teams & orgs',
-    monthly: 30, yearly: 288, popular: false,
-    icon: Building2, color: '#f59e0b',
-    prevPlan: 'Pro',
-    highlight: [
-      'Unlimited MCP servers',
-      'Unlimited messages',
-      'Unlimited sessions / month',
-      'Premium AI agent',
-      'Dedicated support',
-      'Custom integrations',
-      'Full API access',
-    ],
-    cta: 'Upgrade to Enterprise',
-  },
-]
-
-const COMPARISON_FEATURES = [
-  { label: 'MCP Servers', free: '2', pro: '10', enterprise: 'Unlimited', icon: Server },
-  { label: 'Messages / Day', free: '25', pro: '500', enterprise: 'Unlimited', icon: MessageSquare },
-  { label: 'Sessions / Month', free: '5', pro: '50', enterprise: 'Unlimited', icon: Layers },
-  { label: 'AI Agent', free: 'Basic', pro: 'Advanced', enterprise: 'Premium', icon: Bot },
-  { label: 'Tool Execution', free: false, pro: true, enterprise: true, icon: Code },
-  { label: 'Execution History', free: false, pro: true, enterprise: true, icon: TrendingUp },
-  { label: 'Priority Support', free: false, pro: true, enterprise: true, icon: Headphones },
-  { label: 'Custom Integrations', free: false, pro: false, enterprise: true, icon: KeyRound },
-  { label: 'API Access', free: false, pro: false, enterprise: true, icon: Shield },
-  { label: 'Dedicated Support', free: false, pro: false, enterprise: true, icon: Users },
-]
 
 const PLAN_COLORS = {
   free: '#6366f1',
@@ -74,19 +14,91 @@ const PLAN_COLORS = {
   enterprise: '#f59e0b',
 }
 
-export function PricingPage({ user, addToast, onNavigate, onBack }) {
+export function PricingPage({ user, addToast, onNavigate, onBack, t: tProp }) {
+  const t = tProp || ((k) => k)
+
+  const PLANS = useMemo(() => [
+    {
+      id: 'free',
+      name: t('planFree'),
+      subtitle: t('freeSubtitle'),
+      monthly: 0,
+      yearly: 0,
+      popular: false,
+      color: '#6366f1',
+      features: [
+        t('feat2Mcp'),
+        t('feat25Msg'),
+        t('feat5Sessions'),
+        t('featBasicAgent'),
+        t('featCommSupport'),
+      ],
+      cta: t('currentPlan'),
+    },
+    {
+      id: 'pro',
+      name: t('planPro'),
+      subtitle: t('proSubtitle'),
+      monthly: 10,
+      yearly: 96,
+      popular: true,
+      color: 'var(--accent, #00c896)',
+      prevPlan: t('planFree'),
+      features: [
+        t('feat10Mcp'),
+        t('feat500Msg'),
+        t('feat50Sessions'),
+        t('featAdvAgent'),
+        t('featPrioSupport'),
+        t('featExecHistory'),
+      ],
+      cta: t('upgradeToPro'),
+    },
+    {
+      id: 'enterprise',
+      name: t('planEnterprise'),
+      subtitle: t('enterpriseSubtitle'),
+      monthly: 30,
+      yearly: 288,
+      popular: false,
+      color: '#f59e0b',
+      prevPlan: t('planPro'),
+      features: [
+        t('featUnlimitedMcp'),
+        t('featUnlimitedMsg'),
+        t('featUnlimitedSessions'),
+        t('featPremAgent'),
+        t('featDedSupport'),
+        t('featApiAccess'),
+        t('featTeamMgmt'),
+      ],
+      cta: t('upgradeToEnterprise'),
+    },
+  ], [t])
+
+  const COMPARE = useMemo(() => [
+    { label: t('cmpMcpServers'), icon: Server, free: '2', pro: '10', ent: t('cmpUnlimited') },
+    { label: t('cmpMsgDay'), icon: MessageSquare, free: '25', pro: '500', ent: t('cmpUnlimited') },
+    { label: t('cmpSessionMonth'), icon: Layers, free: '5', pro: '50', ent: t('cmpUnlimited') },
+    { label: t('cmpAiAgent'), icon: Bot, free: t('cmpBasic'), pro: t('cmpAdvanced'), ent: t('cmpPremium') },
+    { label: t('cmpToolExec'), icon: Code, free: false, pro: true, ent: true },
+    { label: t('cmpExecHistory'), icon: TrendingUp, free: false, pro: true, ent: true },
+    { label: t('cmpPrioSupport'), icon: Headphones, free: false, pro: true, ent: true },
+    { label: t('cmpCustomInt'), icon: KeyRound, free: false, pro: false, ent: true },
+    { label: t('cmpApiAccess'), icon: Shield, free: false, pro: false, ent: true },
+    { label: t('cmpDedSupport'), icon: Users, free: false, pro: false, ent: true },
+  ], [t])
   const isGuest = !user
   const [subscription, setSubscription] = useState(null)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
   const [billing, setBilling] = useState('monthly')
-  const [hoveredRow, setHoveredRow] = useState(null)
 
   useEffect(() => {
     if (!isGuest) getSubscription().then(setSubscription).catch(() => {})
   }, [isGuest])
 
   const handleSubscribe = useCallback(async (planId) => {
-    if (planId === 'free') return
+    if (planId === 'free' && !isGuest) return
     if (isGuest) {
       onNavigate?.('login')
       return
@@ -105,212 +117,158 @@ export function PricingPage({ user, addToast, onNavigate, onBack }) {
   const currentPlan = subscription?.plan || user?.plan || 'free'
   const planRank = { free: 0, pro: 1, enterprise: 2 }
 
-  const getCtaLabel = (plan) => {
-    if (isGuest) return plan.id === 'free' ? 'Get Started Free' : `Get Started with ${plan.name}`
-    return plan.cta
-  }
-
   return (
     <div className={styles.page}>
 
-      {/* ── Guest Nav Bar ── */}
-      {isGuest && (
-        <nav className={styles.guestNav}>
-          <button className={styles.guestNavBack} onClick={onBack}>
-            <ArrowLeft size={16} />
-            <span>Back</span>
-          </button>
-          <div className={styles.guestNavBrand}>
-            <Bot size={16} />
-            <span>ToolChain<strong>AI</strong></span>
+      {/* ── Top Nav ── */}
+      <nav className={styles.topNav}>
+        <div className={styles.brand}>
+          <div className={styles.brandIcon}><Bot size={16} /></div>
+          <span className={styles.brandName}>ToolChain AI</span>
+        </div>
+        {isGuest && (
+          <div className={styles.navActions}>
+            <button className={styles.navLink} onClick={() => onNavigate?.('login')}>{t('logIn')}</button>
+            <button className={styles.navCta} onClick={() => onNavigate?.('login')}>{t('signUp')}</button>
           </div>
-          <div className={styles.guestNavActions}>
-            <button className={styles.guestNavLogin} onClick={() => onNavigate?.('login')}>Log in</button>
-            <button className={styles.guestNavSignup} onClick={() => onNavigate?.('login')}>Sign up</button>
-          </div>
-        </nav>
-      )}
+        )}
+      </nav>
+      <button className={styles.backBtn} onClick={onBack}>
+        <ArrowLeft size={15} />
+      </button>
 
-      {/* ── Hero ─────────────────────────── */}
+      {/* ── Hero ── */}
       <section className={styles.hero}>
         <div className={styles.heroGlow} />
-        <h1 className={styles.heroH1}>
-          Plans that grow <span className={styles.accent}>with you</span>
+        <h1 className={styles.h1}>
+          {t('pricingHeroTitle1')} <span className={styles.accent}>{t('pricingHeroTitle2')}</span>
         </h1>
-        <p className={styles.heroP}>
-          Get started for free. Upgrade when you need more power.<br />
+        <p className={styles.subtitle}>
+          {t('pricingHeroSub')}
         </p>
 
-        {/* Billing Toggle */}
         <div className={styles.toggle}>
           <button
-            className={`${styles.toggleBtn} ${billing === 'monthly' ? styles.toggleActive : ''}`}
+            className={`${styles.toggleBtn} ${billing === 'monthly' ? styles.toggleOn : ''}`}
             onClick={() => setBilling('monthly')}
-          >Monthly</button>
+          >{t('monthly')}</button>
           <button
-            className={`${styles.toggleBtn} ${billing === 'yearly' ? styles.toggleActive : ''}`}
+            className={`${styles.toggleBtn} ${billing === 'yearly' ? styles.toggleOn : ''}`}
             onClick={() => setBilling('yearly')}
           >
-            Yearly
-            <span className={styles.saveBadge}>Save 20%</span>
+            {t('annual')}
+            <span className={styles.badge}>-20%</span>
           </button>
         </div>
       </section>
 
-      {/* ── Plan Cards ───────────────────── */}
+      {/* ── Cards ── */}
       <section className={styles.cards}>
-        {PLANS.map((plan, i) => {
-          const Icon = plan.icon
-          const isCurrent = currentPlan === plan.id
-          const isUpgrade = (planRank[plan.id] ?? 0) > (planRank[currentPlan] ?? 0)
+        {PLANS.map((plan) => {
+          const isCurrent = !isGuest && currentPlan === plan.id
+          const isUpgrade = isGuest || (planRank[plan.id] ?? 0) > (planRank[currentPlan] ?? 0)
+          const isDowngrade = !isGuest && !isCurrent && !isUpgrade
           const price = billing === 'yearly' ? plan.yearly : plan.monthly
           const perMonth = billing === 'yearly' && plan.yearly > 0
-            ? (plan.yearly / 12).toFixed(0)
+            ? Math.round(plan.yearly / 12)
             : null
+
+          let btnLabel = plan.cta
+          if (isGuest) btnLabel = plan.id === 'free' ? t('getStarted') : t('getPlan').replace('${name}', plan.name)
+          if (isCurrent) btnLabel = t('currentPlan')
+          if (isDowngrade) btnLabel = t('downgrade')
 
           return (
             <div
               key={plan.id}
-              className={`${styles.card} ${plan.popular ? styles.cardPop : ''} ${isCurrent ? styles.cardCurrent : ''}`}
-              style={{ '--i': i, '--plan-color': plan.color }}
+              className={`${styles.card} ${plan.popular ? styles.pop : ''} ${isCurrent ? styles.current : ''}`}
+              style={{ '--pcolor': plan.color }}
             >
-              {plan.popular && (
-                <div className={styles.popRibbon}>
-                  <Star size={10} /> Most Popular
-                </div>
-              )}
+              {plan.popular && <div className={styles.ribbon}><Star size={9} /> {t('mostPopular')}</div>}
 
-              <div className={styles.cardTop}>
-                <div className={styles.cardIcon}>
-                  <Icon size={18} />
-                </div>
-                <div>
-                  <h3 className={styles.cardName}>{plan.name}</h3>
-                  <p className={styles.cardTag}>{plan.tag}</p>
-                </div>
+              <h3 className={styles.planName}>{plan.name}</h3>
+              <p className={styles.planSub}>{plan.subtitle}</p>
+
+              <div className={styles.priceRow}>
+                <span className={styles.priceCurrency}>$</span>
+                <span className={styles.priceMain}>{perMonth || price}</span>
+                <span className={styles.pricePer}>{t('perMonth')}</span>
               </div>
+              {perMonth && <p className={styles.billedNote}>{t('billedAnnually').replace('${price}', price)}</p>}
+              {price === 0 && <p className={styles.billedNote}>{t('noCreditCard')}</p>}
 
-              <div className={styles.cardPrice}>
-                {price === 0 ? (
-                  <span className={styles.bigPrice}>Free</span>
-                ) : (
-                  <>
-                    <span className={styles.dollar}>$</span>
-                    <span className={styles.bigPrice}>{perMonth || price}</span>
-                    <span className={styles.period}>/ mo</span>
-                  </>
-                )}
-              </div>
-              {perMonth && (
-                <p className={styles.billedNote}>
-                  Billed ${price} annually
-                </p>
-              )}
-              {price === 0 && <p className={styles.billedNote}>No credit card needed</p>}
+              <button
+                className={`${styles.cta} ${plan.popular && isUpgrade ? styles.ctaPrimary : ''} ${isCurrent ? styles.ctaCurrent : ''} ${isDowngrade ? styles.ctaDown : ''}`}
+                onClick={() => handleSubscribe(plan.id)}
+                disabled={isCurrent || isDowngrade || !!checkoutLoading}
+              >
+                {checkoutLoading === plan.id
+                  ? <Loader2 size={14} className={styles.spin} />
+                  : isCurrent
+                    ? <Shield size={14} />
+                    : isUpgrade
+                      ? <Rocket size={14} />
+                      : null
+                }
+                {btnLabel}
+              </button>
 
-              <div className={styles.sep} />
+              <div className={styles.divider} />
 
               {plan.prevPlan && (
-                <p className={styles.includes}>Everything in {plan.prevPlan}, plus:</p>
+                <p className={styles.inherits}>{t('everythingInPlan').replace('${plan}', plan.prevPlan)}</p>
               )}
 
-              <ul className={styles.feats}>
-                {plan.highlight.map((h, j) => (
+              <ul className={styles.featureList}>
+                {plan.features.map((f, j) => (
                   <li key={j}>
-                    <Check size={14} className={styles.checkIcon} />
-                    {h}
+                    <Check size={14} className={styles.fCheck} />
+                    <span>{f}</span>
                   </li>
                 ))}
               </ul>
-
-              <div className={styles.cardCta}>
-                {isGuest ? (
-                  <button
-                    className={`${styles.btn} ${plan.popular ? styles.btnPrimary : styles.btnSecondary}`}
-                    onClick={() => handleSubscribe(plan.id)}
-                  >
-                    <Rocket size={14} />
-                    {getCtaLabel(plan)}
-                  </button>
-                ) : isCurrent ? (
-                  <button className={`${styles.btn} ${styles.btnOutline}`} disabled>
-                    <Shield size={14} /> Current Plan
-                  </button>
-                ) : isUpgrade ? (
-                  <button
-                    className={`${styles.btn} ${plan.popular ? styles.btnPrimary : styles.btnSecondary}`}
-                    onClick={() => handleSubscribe(plan.id)}
-                    disabled={!!checkoutLoading}
-                  >
-                    {checkoutLoading === plan.id
-                      ? <Loader2 size={14} className={styles.spin} />
-                      : <Rocket size={14} />
-                    }
-                    {plan.cta}
-                  </button>
-                ) : (
-                  <button className={`${styles.btn} ${styles.btnSecondary}`} disabled>
-                    <ArrowRight size={14} /> Downgrade
-                  </button>
-                )}
-              </div>
             </div>
           )
         })}
       </section>
 
-      {/* ── Feature Comparison ────────────── */}
-      <section className={styles.compSection}>
-        <div className={styles.compHeader}>
-          <Layers size={18} className={styles.compHIcon} />
-          <h2 className={styles.compTitle}>Compare plans</h2>
-          <p className={styles.compSub}>See exactly what you get with each plan</p>
+      {/* ── Comparison ── */}
+      <section className={styles.compare}>
+        <div className={styles.compareHeader}>
+          <Layers size={18} className={styles.compareIcon} />
+          <h2 className={styles.compareH2}>{t('comparePlans')}</h2>
+          <p className={styles.compareSub}>{t('compareSubtitle')}</p>
         </div>
-
-        <div className={styles.compTable}>
-          {/* Column headers */}
-          <div className={`${styles.compRow} ${styles.compHead}`}>
-            <div className={styles.compLabel}>Features</div>
-            {['free', 'pro', 'enterprise'].map((planId) => {
-              const PIcon = planId === 'free' ? Zap : planId === 'pro' ? Crown : Building2
+        <div className={styles.table}>
+          <div className={`${styles.row} ${styles.rowHead}`}>
+            <div className={styles.cellLabel}>{t('features')}</div>
+            {['free', 'pro', 'enterprise'].map((pid) => {
+              const PIcon = pid === 'free' ? Zap : pid === 'pro' ? Crown : Building2
               return (
-                <div key={planId} className={`${styles.compColHead} ${planId === 'pro' ? styles.compColPop : ''}`}>
-                  <div className={styles.compColIcon} style={{ '--col-color': PLAN_COLORS[planId] }}>
-                    <PIcon size={13} />
+                <div key={pid} className={`${styles.cellH} ${pid === 'pro' ? styles.cellHPop : ''}`}>
+                  <div className={styles.colIcon} style={{ '--col-c': PLAN_COLORS[pid] }}>
+                    <PIcon size={12} />
                   </div>
-                  <span>{planId.charAt(0).toUpperCase() + planId.slice(1)}</span>
+                  <span>{pid === 'free' ? t('planFree') : pid === 'pro' ? t('planPro') : t('planEnterprise')}</span>
                 </div>
               )
             })}
           </div>
-
-          {/* Feature rows */}
-          {COMPARISON_FEATURES.map((feat, i) => {
-            const FeIcon = feat.icon
+          {COMPARE.map((feat, i) => {
+            const FIcon = feat.icon
             return (
-              <div
-                key={i}
-                className={`${styles.compRow} ${hoveredRow === i ? styles.compRowHover : ''}`}
-                style={{ '--row-i': i }}
-                onMouseEnter={() => setHoveredRow(i)}
-                onMouseLeave={() => setHoveredRow(null)}
-              >
-                <div className={styles.compLabel}>
-                  <div className={styles.compFeatIconWrap}>
-                    <FeIcon size={13} />
-                  </div>
+              <div key={i} className={styles.row}>
+                <div className={styles.cellLabel}>
+                  <div className={styles.featIcon}><FIcon size={13} /></div>
                   {feat.label}
                 </div>
-                {['free', 'pro', 'enterprise'].map((planId) => {
-                  const val = feat[planId]
+                {['free', 'pro', 'ent'].map((col) => {
+                  const v = feat[col]
                   return (
-                    <div key={planId} className={`${styles.compCell} ${planId === 'pro' ? styles.compCellPop : ''}`}>
-                      {val === true
-                        ? <div className={styles.compCheckWrap}><Check size={14} /></div>
-                        : val === false
-                          ? <div className={styles.compXWrap}><XMark size={14} /></div>
-                          : <span className={styles.compVal}>{val}</span>
-                      }
+                    <div key={col} className={`${styles.cell} ${col === 'pro' ? styles.cellPop : ''}`}>
+                      {v === true ? <div className={styles.checkWrap}><Check size={14} /></div>
+                        : v === false ? <div className={styles.xWrap}><XMark size={14} /></div>
+                        : <span className={styles.cVal}>{v}</span>}
                     </div>
                   )
                 })}
@@ -320,24 +278,14 @@ export function PricingPage({ user, addToast, onNavigate, onBack }) {
         </div>
       </section>
 
-      {/* ── Trust Strip ───────────────────── */}
+      {/* ── Trust ── */}
       <section className={styles.trust}>
-        <div className={styles.trustItem}>
-          <Shield size={18} />
-          <span>Bank-level encryption</span>
-        </div>
-        <div className={styles.trustDot} />
-        <div className={styles.trustItem}>
-          <Zap size={18} />
-          <span>Instant plan switching</span>
-        </div>
-        <div className={styles.trustDot} />
-        <div className={styles.trustItem}>
-          <Headphones size={18} />
-          <span>Cancel anytime</span>
-        </div>
+        <div className={styles.trustItem}><Shield size={16} /> {t('trustEncryption')}</div>
+        <span className={styles.trustDot} />
+        <div className={styles.trustItem}><Zap size={16} /> {t('trustSwitching')}</div>
+        <span className={styles.trustDot} />
+        <div className={styles.trustItem}><Crown size={16} /> {t('trustCancel')}</div>
       </section>
-
     </div>
   )
 }

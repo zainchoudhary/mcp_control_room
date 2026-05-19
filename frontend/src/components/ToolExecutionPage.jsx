@@ -696,32 +696,6 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
             </div>
           )}
 
-          {/* Stage 1+: Blurred mock preview behind */}
-          <div className={`${styles.gateMockBg} ${gateStage >= 1 ? styles.gateMockBgShow : ''}`}>
-            <div className={styles.gateMockSidebar}>
-              <div className={styles.gateMockSbBlock} />
-              <div className={styles.gateMockSbLine} style={{ width: '80%' }} />
-              <div className={styles.gateMockSbLine} style={{ width: '60%' }} />
-              <div className={styles.gateMockSbLine} style={{ width: '90%' }} />
-              <div className={styles.gateMockSbLine} style={{ width: '45%' }} />
-              <div className={styles.gateMockSbLine} style={{ width: '70%' }} />
-            </div>
-            <div className={styles.gateMockMain}>
-              <div className={styles.gateMockHeader} />
-              <div className={styles.gateMockForm}>
-                <div className={styles.gateMockInput} />
-                <div className={styles.gateMockInput} />
-                <div className={styles.gateMockInput} style={{ width: '60%' }} />
-              </div>
-              <div className={styles.gateMockOutput}>
-                <div className={styles.gateMockLine} style={{ width: '90%' }} />
-                <div className={styles.gateMockLine} style={{ width: '75%' }} />
-                <div className={styles.gateMockLine} style={{ width: '60%' }} />
-                <div className={styles.gateMockLine} style={{ width: '85%' }} />
-              </div>
-            </div>
-          </div>
-
           {/* Stage 2: Glass card */}
           <div className={`${styles.gateCard} ${gateStage >= 2 ? styles.gateCardShow : ''}`}>
             <div className={styles.gateGlow} />

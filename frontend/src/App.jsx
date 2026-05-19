@@ -692,6 +692,39 @@ export default function App() {
     )
   }
 
+  if (activePage === 'pricing') {
+    return (
+      <>
+        <PricingPage
+          user={user}
+          t={t}
+          onNavigate={handleNavigate}
+          addToast={toast}
+          onBack={() => {
+            setActivePage('dashboard')
+            window.history.pushState(null, '', '/dashboard')
+          }}
+        />
+        <ToastContainer toasts={toasts} dismiss={dismiss} />
+        {showSettings && (
+          <SettingsModal
+            onClose={() => setShowSettings(false)}
+            user={user}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            language={language}
+            setLanguage={setLanguage}
+            accentId={accentId}
+            setAccentColor={setAccentColor}
+            onNavigate={handleNavigate}
+            addToast={toast}
+            t={t}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <div className={styles.app}>
       <Sidebar
@@ -772,15 +805,6 @@ export default function App() {
             persistedState={toolExecState}
             onStateChange={setToolExecState}
             user={user}
-          />
-        )}
-
-        {activePage === 'pricing' && (
-          <PricingPage
-            user={user}
-            t={t}
-            onNavigate={handleNavigate}
-            addToast={toast}
           />
         )}
 

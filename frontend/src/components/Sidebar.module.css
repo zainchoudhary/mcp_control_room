@@ -385,7 +385,6 @@
 .bottom {
   flex-shrink: 0;
   padding: 8px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 /* ── Settings Button ── */
@@ -597,33 +596,11 @@
 
 .navItemSpecial {
   position: relative;
-  background: rgba(var(--accent-rgb), 0.03);
-  border: 1px solid rgba(var(--accent-rgb), 0.08);
-  border-radius: 9px !important;
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-.navItemSpecial svg:first-child {
-  color: var(--accent);
-  opacity: 0.8;
-}
-.navItemSpecial .navLabel {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-.navItemSpecial:hover {
-  background: rgba(var(--accent-rgb), 0.06);
-  border-color: rgba(var(--accent-rgb), 0.14);
+  background: transparent;
+  border: none;
 }
 .navItemSpecial::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 60%; height: 100%;
-  background: linear-gradient(90deg, transparent 0%, rgba(var(--accent-rgb), 0.06) 50%, transparent 100%);
-  animation: shimmerNav 3s ease-in-out infinite;
-  border-radius: 9px;
-  pointer-events: none;
+  display: none;
 }
 @keyframes shimmerNav {
   0% { left: -60%; }
@@ -701,14 +678,13 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--accent, #00c896);
-  background: rgba(0, 200, 150, 0.06);
-  border: 1px dashed rgba(0, 200, 150, 0.2);
+  background: transparent;
+  border: none;
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: 6px;
 }
 
 .upgradeBanner:hover {
-  background: rgba(0, 200, 150, 0.1);
-  border-color: rgba(0, 200, 150, 0.35);
+  background: rgba(0, 200, 150, 0.06);
 }
