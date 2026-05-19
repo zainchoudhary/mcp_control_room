@@ -654,7 +654,10 @@ async def api_chat_stream(
                             line = f'Tool: {data["tool"]}({json.dumps(data.get("input", {}))})\n'
                             full_response_parts.append(line)
                         elif evt_type == "tool_result":
-                            line = f'Result: {data["tool"]} -> {data.get("content", "")}\n'
+                            import base64
+                            raw_content = data.get("content", "")
+                            encoded = base64.b64encode(raw_content.encode("utf-8")).decode("ascii")
+                            line = f'Result: {data["tool"]} -> @@JSON@@{encoded}@@END@@\n'
                             full_response_parts.append(line)
                     except Exception:
                         pass
