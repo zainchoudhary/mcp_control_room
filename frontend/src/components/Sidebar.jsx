@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings, Wrench, Crown, Zap, Sparkles,
+  Settings, Wrench, Crown, Zap, Sparkles, Search, X,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -28,8 +28,16 @@ export function Sidebar({
   const [hoveredSession, setHoveredSession] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(true)
+  const [sessionSearch, setSessionSearch] = useState('')
   const menuRef = useRef(null)
   const collapsedMenuRef = useRef(null)
+  const searchInputRef = useRef(null)
+
+  const filteredSessions = useMemo(() => {
+    if (!sessionSearch.trim()) return sessions
+    const q = sessionSearch.toLowerCase()
+    return sessions.filter(s => (s.title || '').toLowerCase().includes(q))
+  }, [sessions, sessionSearch])
 
   useEffect(() => {
     if (!userMenuOpen) return
@@ -155,13 +163,10 @@ export function Sidebar({
                   >
                     <Icon size={17} />
                     <span className={styles.navLabel}>{item.label}</span>
-                    {item.special && user?.plan && user.plan !== 'free' && (
-                      <span className={`${styles.navPlanTag} ${styles[`navPlanTag_${user.plan}`]}`}>
-                        {user.plan === 'enterprise' ? 'Enterprise' : 'Pro'}
+                    {item.special && user && (
+                      <span className={`${styles.navPlanTag} ${styles[`navPlanTag_${user.plan || 'free'}`]}`}>
+                        {user.plan === 'enterprise' ? 'Enterprise' : user.plan === 'pro' ? 'Pro' : 'Free'}
                       </span>
-                    )}
-                    {item.special && (!user?.plan || user.plan === 'free') && (
-                      <span className={styles.navProTag}>Pro</span>
                     )}
                     {item.badge != null && <span className={styles.navBadge}>{item.badge}</span>}
                   </button>
@@ -173,6 +178,26 @@ export function Sidebar({
                         <Plus size={14} />
                         <span>{tr('newChat')}</span>
                       </button>
+
+                      {sessions.length > 3 && (
+                        <div className={styles.searchWrap}>
+                          <Search size={13} className={styles.searchIcon} />
+                          <input
+                            ref={searchInputRef}
+                            className={styles.searchInput}
+                            type="text"
+                            placeholder={tr('Search Chats') || 'Search chats...'}
+                            value={sessionSearch}
+                            onChange={(e) => setSessionSearch(e.target.value)}
+                          />
+                          {sessionSearch && (
+                            <button className={styles.searchClear} onClick={() => setSessionSearch('')}>
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <div className={styles.sessions}>
                         {sessionsLoading ? (
                           <div className={styles.sessionsSkeleton}>
@@ -185,8 +210,8 @@ export function Sidebar({
                               <div key={i} className={styles.skelItem} style={{ animationDelay: `${i * 0.1}s` }} />
                             ))}
                           </div>
-                        ) : sessions.length === 0 ? (
-                          <div className={styles.empty}>{tr('noConversations')}</div>
+                        ) : filteredSessions.length === 0 ? (
+                          <div className={styles.empty}>{sessionSearch ? (tr('noResults') || 'No results') : tr('noConversations')}</div>
                         ) : (
                           (() => {
                             const now = new Date()
@@ -195,7 +220,7 @@ export function Sidebar({
                             const weekAgo = new Date(today - 604800000)
 
                             const groups = { today: [], yesterday: [], week: [], older: [] }
-                            sessions.forEach(s => {
+                            filteredSessions.forEach(s => {
                               const d = new Date(s.created_at)
                               if (d >= today) groups.today.push(s)
                               else if (d >= yesterday) groups.yesterday.push(s)
@@ -231,7 +256,6 @@ export function Sidebar({
                                 ))}
                               </div>
                             )
-
                             return <>
                               {renderGroup(tr('today'), groups.today)}
                               {renderGroup(tr('yesterday'), groups.yesterday)}

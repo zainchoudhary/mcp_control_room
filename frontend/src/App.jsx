@@ -351,6 +351,60 @@ export default function App() {
     }
   }
 
+  const handleEditMessage = async (messageId, newText) => {
+    if (sending) return
+    const idx = messages.findIndex((m) => m.id === messageId)
+    if (idx === -1) return
+
+    const kept = messages.slice(0, idx)
+    const editedMsg = { ...messages[idx], content: newText }
+    const assistantId = crypto.randomUUID()
+
+    setMessages([...kept, editedMsg, { id: assistantId, role: 'assistant', content: '' }])
+    setStreamingId(assistantId)
+    setSending(true)
+    setInput('')
+
+    try {
+      const sid = await ensureSession()
+      for await (const event of streamChat(sid, newText, [...enabledMcpIds])) {
+        if (event.type === 'token') {
+          setMessages((prev) =>
+            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + (event.content || '') } : m)
+          )
+        }
+        if (event.type === 'tool_use') {
+          const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
+          setMessages((prev) =>
+            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + line } : m)
+          )
+        }
+        if (event.type === 'tool_result') {
+          let displayContent = event.content || ''
+          try { displayContent = JSON.stringify(JSON.parse(displayContent), null, 2) } catch {}
+          const encoded = btoa(unescape(encodeURIComponent(displayContent)))
+          const line = `Result: ${event.tool} -> @@JSON@@${encoded}@@END@@\n`
+          setMessages((prev) =>
+            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + line } : m)
+          )
+        }
+        if (event.type === 'error') {
+          const msg = event.content || 'Stream error'
+          const isRetryable = msg.includes('failed_generation') || msg.includes('tool call validation') || msg.includes('failed to call a function')
+          if (!isRetryable) toast(msg, 'error')
+        }
+      }
+    } catch (err) {
+      toast(err.message, 'error')
+      setMessages((prev) =>
+        prev.map((m) => m.id === assistantId ? { ...m, content: 'Failed to get response. Please try again.' } : m)
+      )
+    } finally {
+      setSending(false)
+      setStreamingId(null)
+    }
+  }
+
   const handleNewChat = () => {
     setSessionId(null)
     setMessages([])
@@ -862,6 +916,7 @@ export default function App() {
                       key={m.id}
                       message={m}
                       isStreaming={m.id === streamingId}
+                      onEdit={m.role === 'user' && !sending ? handleEditMessage : undefined}
                     />
                   ))}
                   <div ref={messagesEndRef} />

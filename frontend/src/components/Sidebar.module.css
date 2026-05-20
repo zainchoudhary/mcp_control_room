@@ -290,9 +290,67 @@
   background: rgba(var(--accent-rgb), 0.08);
 }
 
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 0 6px;
+  width: calc(100% - 8px);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 7px 30px 7px 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.searchInput:focus {
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+.searchClear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.searchClear:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .sessions {
   flex: 1;
-  max-height: calc(100vh - 380px);
+  max-height: calc(100vh - 420px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -632,6 +690,11 @@
   text-transform: uppercase;
   margin-left: auto;
   line-height: 1.5;
+}
+.navPlanTag_free {
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-subtle);
 }
 .navPlanTag_pro {
   background: rgba(var(--accent-rgb), 0.12);

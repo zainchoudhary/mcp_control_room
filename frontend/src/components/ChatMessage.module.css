@@ -310,6 +310,82 @@
   border-color: var(--border-default);
 }
 
+/* ── Edit Mode ── */
+
+.editWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeIn 0.15s ease;
+}
+
+.editTextarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.editTextarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.15);
+}
+
+.editActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.editCancelBtn,
+.editSubmitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editCancelBtn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.editCancelBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.editSubmitBtn {
+  background: var(--accent);
+  color: white;
+}
+
+.editSubmitBtn:hover {
+  opacity: 0.9;
+}
+
+.editSubmitBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }

@@ -130,6 +130,124 @@
   cursor: pointer;
 }
 
+/* ── Custom Transport Dropdown ── */
+
+.customSelect {
+  position: relative;
+}
+
+.selectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.selectTrigger:hover {
+  border-color: var(--border-strong);
+}
+
+.selectTriggerOpen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.selectChevron {
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.selectChevronOpen {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.selectDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+  padding: 3px;
+  animation: dropIn 0.15s ease;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.selectOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.selectOption:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.selectOptionActive {
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent);
+}
+
+.selectOptionActive:hover {
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.selectOptionText {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.selectOptionLabel {
+  font-weight: 500;
+}
+
+.selectOptionDesc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.selectOptionActive .selectOptionDesc {
+  color: rgba(var(--accent-rgb), 0.6);
+  opacity: 1;
+}
+
+.selectCheck {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .iconInputWrap {
   display: flex;
   align-items: center;

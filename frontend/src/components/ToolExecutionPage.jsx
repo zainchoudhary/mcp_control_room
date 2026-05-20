@@ -622,8 +622,6 @@ export function ToolExecutionPage({ connectedMcps, mcpsLoading, onNavigate, onRu
     if (hasRestoredState) return
     if (selectedMcpId && !probing) {
       probeMcpTools(selectedMcpId)
-    } else if (!selectedMcpId && connectedMcps?.length === 1) {
-      probeMcpTools(connectedMcps[0].id)
     }
   }, [])
 

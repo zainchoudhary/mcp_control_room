@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Copy, Check, User, Bot, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, Check, User, Bot, Wrench, ChevronDown, ChevronUp, Pencil, X, Send } from 'lucide-react'
 import styles from './ChatMessage.module.css'
 
 function CodeBlock({ language, children }) {
@@ -216,15 +216,55 @@ const markdownComponents = {
   hr() { return <hr className={styles.hr} /> },
 }
 
-export function ChatMessage({ message, isStreaming }) {
+export function ChatMessage({ message, isStreaming, onEdit }) {
   const isUser = message.role === 'user'
   const parts = useMemo(() => isUser ? null : parseContent(message.content), [message.content, isUser])
   const [contentCopied, setContentCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const editRef = useRef(null)
+
+  useEffect(() => {
+    if (editing && editRef.current) {
+      editRef.current.focus()
+      editRef.current.style.height = 'auto'
+      editRef.current.style.height = editRef.current.scrollHeight + 'px'
+    }
+  }, [editing])
 
   const handleCopyAll = async () => {
     await navigator.clipboard.writeText(message.content)
     setContentCopied(true)
     setTimeout(() => setContentCopied(false), 2000)
+  }
+
+  const startEdit = () => {
+    setEditText(message.content)
+    setEditing(true)
+  }
+
+  const cancelEdit = () => {
+    setEditing(false)
+    setEditText('')
+  }
+
+  const submitEdit = () => {
+    const trimmed = editText.trim()
+    if (!trimmed || trimmed === message.content) {
+      cancelEdit()
+      return
+    }
+    setEditing(false)
+    setEditText('')
+    onEdit?.(message.id, trimmed)
+  }
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      submitEdit()
+    }
+    if (e.key === 'Escape') cancelEdit()
   }
 
   return (
@@ -241,7 +281,34 @@ export function ChatMessage({ message, isStreaming }) {
 
           <div className={styles.messageContent}>
             {isUser ? (
-              <p className={styles.paragraph}>{message.content}</p>
+              editing ? (
+                <div className={styles.editWrap}>
+                  <textarea
+                    ref={editRef}
+                    className={styles.editTextarea}
+                    value={editText}
+                    onChange={(e) => {
+                      setEditText(e.target.value)
+                      e.target.style.height = 'auto'
+                      e.target.style.height = e.target.scrollHeight + 'px'
+                    }}
+                    onKeyDown={handleEditKeyDown}
+                    rows={1}
+                  />
+                  <div className={styles.editActions}>
+                    <button className={styles.editCancelBtn} onClick={cancelEdit}>
+                      <X size={14} />
+                      <span>Cancel</span>
+                    </button>
+                    <button className={styles.editSubmitBtn} onClick={submitEdit} disabled={!editText.trim()}>
+                      <Send size={14} />
+                      <span>Send</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.paragraph}>{message.content}</p>
+              )
             ) : (
               <>
                 {parts?.map((part, i) => {
@@ -261,6 +328,19 @@ export function ChatMessage({ message, isStreaming }) {
               </>
             )}
           </div>
+
+          {isUser && !editing && !isStreaming && (
+            <div className={styles.actions}>
+              <button className={styles.actionBtn} onClick={handleCopyAll} title="Copy message">
+                {contentCopied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+              {onEdit && (
+                <button className={styles.actionBtn} onClick={startEdit} title="Edit message">
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
+          )}
 
           {!isUser && !isStreaming && message.content.trim() && (
             <div className={styles.actions}>

@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { X, ChevronDown, Check } from 'lucide-react'
 import styles from './RegisterModal.module.css'
+
+const TRANSPORT_OPTIONS = [
+  { value: 'sse', label: 'SSE', desc: 'Server-Sent Events' },
+  { value: 'streamable_http', label: 'Streamable HTTP', desc: 'HTTP streaming' },
+]
 
 const DOMAIN_MAP = {
   gmail:'gmail.com',mail:'gmail.com',email:'gmail.com',inbox:'gmail.com',
@@ -68,16 +73,27 @@ export function RegisterModal({ onClose, onRegister }) {
   const [form, setForm] = useState({ name: '', url: '', transport: 'sse', description: '', icon: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [transportOpen, setTransportOpen] = useState(false)
   const nameRef = useRef(null)
+  const transportRef = useRef(null)
 
   useEffect(() => {
     nameRef.current?.focus()
     const handleKey = (e) => {
-      if (e.key === 'Escape' && !loading) onClose()
+      if (e.key === 'Escape' && !loading) { setTransportOpen(false); onClose() }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [onClose, loading])
+
+  useEffect(() => {
+    if (!transportOpen) return
+    const handleClick = (e) => {
+      if (transportRef.current && !transportRef.current.contains(e.target)) setTransportOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [transportOpen])
 
   const update = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
 
@@ -134,10 +150,34 @@ export function RegisterModal({ onClose, onRegister }) {
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Transport</label>
-              <select className={styles.select} value={form.transport} onChange={(e) => update('transport', e.target.value)}>
-                <option value="sse">SSE</option>
-                <option value="streamable_http">Streamable HTTP</option>
-              </select>
+              <div className={styles.customSelect} ref={transportRef}>
+                <button
+                  type="button"
+                  className={`${styles.selectTrigger} ${transportOpen ? styles.selectTriggerOpen : ''}`}
+                  onClick={() => setTransportOpen((v) => !v)}
+                >
+                  <span>{TRANSPORT_OPTIONS.find((o) => o.value === form.transport)?.label}</span>
+                  <ChevronDown size={14} className={`${styles.selectChevron} ${transportOpen ? styles.selectChevronOpen : ''}`} />
+                </button>
+                {transportOpen && (
+                  <div className={styles.selectDropdown}>
+                    {TRANSPORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`${styles.selectOption} ${form.transport === opt.value ? styles.selectOptionActive : ''}`}
+                        onClick={() => { update('transport', opt.value); setTransportOpen(false) }}
+                      >
+                        <div className={styles.selectOptionText}>
+                          <span className={styles.selectOptionLabel}>{opt.label}</span>
+                          <span className={styles.selectOptionDesc}>{opt.desc}</span>
+                        </div>
+                        {form.transport === opt.value && <Check size={14} className={styles.selectCheck} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
