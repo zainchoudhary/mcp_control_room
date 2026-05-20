@@ -240,23 +240,25 @@
   justify-content: center;
 }
 
-.expandBtn {
+.navItemCollapsible {
+  cursor: pointer;
+}
+
+.collapseArrow {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-tertiary);
-  transition: var(--transition-fast);
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease, color 0.15s ease;
+  margin-left: auto;
 }
 
-.expandBtn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+.collapseArrowOpen {
+  transform: rotate(90deg);
+  color: var(--accent);
 }
 
 /* ── Chat Sub-section ── */

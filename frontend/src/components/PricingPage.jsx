@@ -14,7 +14,7 @@ const PLAN_COLORS = {
   enterprise: '#f59e0b',
 }
 
-export function PricingPage({ user, addToast, onNavigate, onBack, t: tProp }) {
+export function PricingPage({ user, addToast, onNavigate, onBack, onBrandClick, t: tProp }) {
   const t = tProp || ((k) => k)
 
   const PLANS = useMemo(() => [
@@ -122,7 +122,7 @@ export function PricingPage({ user, addToast, onNavigate, onBack, t: tProp }) {
 
       {/* ── Top Nav ── */}
       <nav className={styles.topNav}>
-        <div className={styles.brand}>
+        <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
           <div className={styles.brandIcon}><Bot size={16} /></div>
           <span className={styles.brandName}>ToolChain AI</span>
         </div>

@@ -20,6 +20,7 @@ export function Sidebar({
   onOpenSettings,
   user,
   onLogout,
+  onBrandClick,
   mcpCount,
   connectedCount,
   t,
@@ -63,7 +64,7 @@ export function Sidebar({
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
         </button>
         {!collapsed && (
-          <div className={styles.brand}>
+          <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
             <div className={styles.brandIcon}><Bot size={16} /></div>
             <span className={styles.brandName}>ToolChain AI</span>
           </div>
@@ -129,12 +130,28 @@ export function Sidebar({
 
               return (
                 <div key={item.id}>
+                  {isChat ? (
+                    <button
+                      className={`${styles.navItem} ${styles.navItemCollapsible} ${isActive ? styles.navItemActive : ''}`}
+                      onClick={() => {
+                        if (activePage !== 'chat') {
+                          onNavigate('chat')
+                          setChatExpanded(true)
+                        } else {
+                          setChatExpanded((v) => !v)
+                        }
+                      }}
+                    >
+                      <Icon size={17} />
+                      <span className={styles.navLabel}>{item.label}</span>
+                      <span className={`${styles.collapseArrow} ${chatExpanded && isActive ? styles.collapseArrowOpen : ''}`}>
+                        <ChevronRight size={14} />
+                      </span>
+                    </button>
+                  ) : (
                   <button
                     className={`${styles.navItem} ${isActive ? styles.navItemActive : ''} ${item.special ? styles.navItemSpecial : ''}`}
-                    onClick={() => {
-                      onNavigate(item.id)
-                      if (isChat) setChatExpanded(true)
-                    }}
+                    onClick={() => onNavigate(item.id)}
                   >
                     <Icon size={17} />
                     <span className={styles.navLabel}>{item.label}</span>
@@ -147,18 +164,8 @@ export function Sidebar({
                       <span className={styles.navProTag}>Pro</span>
                     )}
                     {item.badge != null && <span className={styles.navBadge}>{item.badge}</span>}
-                    {isChat && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        className={styles.expandBtn}
-                        onClick={(e) => { e.stopPropagation(); setChatExpanded((v) => !v) }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setChatExpanded((v) => !v) } }}
-                      >
-                        {chatExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </span>
-                    )}
                   </button>
+                  )}
 
                   {isChat && isActive && chatExpanded && (
                     <div className={styles.chatSub}>

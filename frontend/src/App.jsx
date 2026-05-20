@@ -629,6 +629,10 @@ export default function App() {
               window.history.pushState(null, '', '/')
               setActivePage('landing')
             }}
+            onBrandClick={() => {
+              window.history.pushState(null, '', '/')
+              setActivePage('landing')
+            }}
           />
           <ToastContainer toasts={toasts} dismiss={dismiss} />
         </>
@@ -704,6 +708,7 @@ export default function App() {
             setActivePage('dashboard')
             window.history.pushState(null, '', '/dashboard')
           }}
+          onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
         />
         <ToastContainer toasts={toasts} dismiss={dismiss} />
         {showSettings && (
@@ -741,6 +746,7 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
         user={user}
         onLogout={requestLogout}
+        onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
         mcpCount={mcps.length}
         connectedCount={connectedCount}
         t={t}
@@ -750,7 +756,7 @@ export default function App() {
         <button className={styles.mobileMenuBtn} onClick={() => setSidebarCollapsed(false)}>
           <Menu size={20} />
         </button>
-        <div className={styles.mobileHeaderBrand}>
+        <div className={styles.mobileHeaderBrand} onClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }} style={{ cursor: 'pointer' }}>
           <div className={styles.mobileHeaderIcon}><Bot size={14} /></div>
           <span>ToolChain AI</span>
         </div>
