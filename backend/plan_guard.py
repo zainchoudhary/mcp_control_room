@@ -142,9 +142,9 @@ async def check_daily_message_limit(
 
 
 def _current_month_start() -> datetime:
-    """Return the first moment of the current month (UTC)."""
-    now = datetime.now(timezone.utc)
-    return datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    """Return the first moment of the current month (naive UTC)."""
+    now = datetime.utcnow()
+    return datetime(now.year, now.month, 1)
 
 
 async def check_session_limit(

@@ -60,6 +60,24 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+:global([data-theme="dark"]) .welcome {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(255, 255, 255, 0.02) 50%, var(--bg-secondary) 100%);
+  border-color: var(--border-subtle);
+}
+
+:global([data-theme="dark"]) .welcome::before {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.025) 0%, transparent 65%);
+}
+
+:global([data-theme="dark"]) .welcome::after {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.015) 0%, transparent 70%);
+}
+
+:global([data-theme="dark"]) .welcomeDate {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-subtle);
+}
+
 .welcomeLeft {
   display: flex;
   flex-direction: column;
