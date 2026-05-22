@@ -2,10 +2,12 @@
 auth_database.py - User authentication persistence layer (SQLAlchemy + MySQL).
 """
 from typing import Optional
-from sqlalchemy import select, delete
+from datetime import datetime
+
+from sqlalchemy import select, delete, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db_models import User, MCP, ChatSession, Message
+from db_models import User, UserDevice, MCP, ChatSession, Message
 
 
 async def create_user(
@@ -90,6 +92,73 @@ async def delete_user_account(db: AsyncSession, user_id: str):
 
     await db.execute(delete(ChatSession).where(ChatSession.user_id == user_id))
     await db.execute(delete(MCP).where(MCP.user_id == user_id))
+    await db.execute(delete(UserDevice).where(UserDevice.user_id == user_id))
 
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
+
+
+async def list_user_devices(db: AsyncSession, user_id: str) -> list[dict]:
+    result = await db.execute(
+        select(UserDevice)
+        .where(UserDevice.user_id == user_id)
+        .order_by(desc(UserDevice.last_seen_at))
+    )
+    return [d.to_dict() for d in result.scalars().all()]
+
+
+async def register_user_device(
+    db: AsyncSession,
+    user_id: str,
+    client_device_id: str,
+    label: str,
+    user_agent: Optional[str] = None,
+) -> dict:
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.user_id == user_id,
+            UserDevice.client_device_id == client_device_id,
+        )
+    )
+    device = result.scalar_one_or_none()
+    now = datetime.utcnow()
+    if device:
+        device.label = label
+        device.user_agent = user_agent
+        device.last_seen_at = now
+    else:
+        device = UserDevice(
+            user_id=user_id,
+            client_device_id=client_device_id,
+            label=label,
+            user_agent=user_agent,
+            last_seen_at=now,
+        )
+        db.add(device)
+    await db.commit()
+    await db.refresh(device)
+    return device.to_dict()
+
+
+async def user_device_is_registered(
+    db: AsyncSession, user_id: str, client_device_id: str
+) -> bool:
+    result = await db.execute(
+        select(UserDevice.id).where(
+            UserDevice.user_id == user_id,
+            UserDevice.client_device_id == client_device_id,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def delete_user_device(db: AsyncSession, user_id: str, device_id: str) -> bool:
+    result = await db.execute(
+        select(UserDevice).where(UserDevice.id == device_id, UserDevice.user_id == user_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        return False
+    await db.delete(device)
+    await db.commit()
+    return True

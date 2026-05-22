@@ -31,6 +31,8 @@ class User(Base):
     plan: Mapped[str] = mapped_column(String(30), nullable=False, default="free")
     subscription_end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    devices: Mapped[list["UserDevice"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
     def to_dict(self, include_password: bool = False) -> dict:
         d = {
             "id": self.id,
@@ -46,6 +48,30 @@ class User(Base):
         if include_password:
             d["password"] = self.password
         return d
+
+
+class UserDevice(Base):
+    __tablename__ = "user_devices"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    client_device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="devices")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "client_device_id": self.client_device_id,
+            "label": self.label,
+            "user_agent": self.user_agent,
+            "last_seen_at": self.last_seen_at.isoformat() if self.last_seen_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class MCP(Base):

@@ -33,6 +33,7 @@ import { useLanguage } from './hooks/useLanguage.js'
 import { useAccentColor } from './hooks/useAccentColor.js'
 import { usePreferences, getStartupPage } from './hooks/usePreferences.js'
 import { applyCustomBg } from './utils/customBackground.js'
+import { registerCurrentDevice } from './utils/registerDevice.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
@@ -109,6 +110,7 @@ export default function App() {
         if (u) {
           setUser(u)
           setDataLoading(false)
+          await registerCurrentDevice(u.id)
         } else {
           setUser(null)
           setDataLoading(false)
@@ -228,6 +230,7 @@ export default function App() {
   const handleAuth = async (userData) => {
     setUser(userData)
     setDataLoading(false)
+    await registerCurrentDevice(userData.id)
     const urlPage = getPageFromUrl()
     const onAuthRoute = AUTH_PAGES.includes(urlPage)
     const startPage = onAuthRoute ? getStartupPage(userData.id) : (

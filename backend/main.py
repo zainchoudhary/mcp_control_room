@@ -6,6 +6,9 @@ Routes:
   POST /api/auth/signup        → register new user
   POST /api/auth/login         → authenticate user
   GET  /api/auth/me            → current user profile
+  GET  /api/auth/username/check → username availability
+  GET  /api/auth/account/devices → connected devices
+  POST /api/auth/account/devices → register current device
   GET  /api/mcps               → list all registered MCPs
   POST /api/mcps               → register a new MCP
   GET  /api/mcps/{id}          → get single MCP

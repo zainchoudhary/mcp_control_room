@@ -1,4 +1,4 @@
-import { getToken } from './auth.js'
+import { getToken, logout } from './auth.js'
 
 const BASE = '/api'
 
@@ -9,6 +9,16 @@ function authHeaders() {
   return headers
 }
 
+function handleSessionRevoked(detail) {
+  const msg = typeof detail === 'string' ? detail : ''
+  if (!msg.toLowerCase().includes('device was removed')) return false
+  logout()
+  if (!window.location.pathname.includes('login')) {
+    window.location.replace('/login')
+  }
+  return true
+}
+
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { ...authHeaders(), ...options.headers },
@@ -16,7 +26,11 @@ async function request(path, options = {}) {
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || `HTTP ${res.status}`)
+    const detail = err.detail
+    if (res.status === 401 && handleSessionRevoked(detail)) {
+      throw new Error('Session ended on this device.')
+    }
+    throw new Error(typeof detail === 'string' ? detail : `HTTP ${res.status}`)
   }
   if (res.status === 204) return null
   return res.json()
@@ -66,6 +80,17 @@ export const deleteAccount = (password) =>
     method: 'DELETE',
     body: JSON.stringify({ password }),
   })
+
+export const checkUsernameAvailability = (username) =>
+  request(`/auth/username/check?username=${encodeURIComponent(username)}`)
+
+export const listAccountDevices = () => request('/auth/account/devices')
+
+export const registerAccountDevice = (body) =>
+  request('/auth/account/devices', { method: 'POST', body: JSON.stringify(body) })
+
+export const removeAccountDevice = (deviceId) =>
+  request(`/auth/account/devices/${deviceId}`, { method: 'DELETE' })
 
 // Bulk session actions
 export const deleteAllSessions = () => request('/sessions', { method: 'DELETE' })

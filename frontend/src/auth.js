@@ -11,6 +11,10 @@ function setAuth(token, user) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
+function updateToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+}
+
 function clearAuth() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
@@ -96,7 +100,16 @@ async function fetchMe() {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) {
-    clearAuth()
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    const detail = err.detail
+    if (res.status === 401 && typeof detail === 'string' && detail.toLowerCase().includes('device was removed')) {
+      logout()
+      if (!window.location.pathname.includes('login')) {
+        window.location.replace('/login')
+      }
+    } else {
+      clearAuth()
+    }
     return null
   }
   const user = await res.json()
@@ -104,4 +117,4 @@ async function fetchMe() {
   return user
 }
 
-export { getToken, getSavedUser, signup, login, logout, fetchMe, forgotPassword, resetPassword }
+export { getToken, getSavedUser, signup, login, logout, fetchMe, forgotPassword, resetPassword, updateToken }

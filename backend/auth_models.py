@@ -204,6 +204,28 @@ class ChangeUsernameRequest(BaseModel):
         return v
 
 
+class RegisterDeviceRequest(BaseModel):
+    client_device_id: str
+    label: str
+    user_agent: str | None = None
+
+    @field_validator("client_device_id")
+    @classmethod
+    def validate_client_device_id(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 8 or len(v) > 64:
+            raise ValueError("Invalid device identifier.")
+        return v
+
+    @field_validator("label")
+    @classmethod
+    def validate_label(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) > 120:
+            raise ValueError("Device label is required (max 120 characters).")
+        return v
+
+
 class DeleteAccountRequest(BaseModel):
     password: str
 

@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard } from 'lucide-react'
-import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage } from '../api.js'
+import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard, Monitor, SearchCheck, XCircle } from 'lucide-react'
+import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, checkUsernameAvailability, listAccountDevices, removeAccountDevice } from '../api.js'
+import { logout } from '../auth.js'
+import { getClientDeviceId, clearClientDeviceId } from '../utils/deviceId.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
 import { ACCENT_COLORS } from '../hooks/useAccentColor.js'
 import { STARTUP_PAGES } from '../hooks/usePreferences.js'
@@ -316,6 +318,17 @@ function GeneralTab({ theme, onToggleTheme, busy, language, onLanguageChange, ac
   )
 }
 
+function formatActivityDate(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
 function AccountTab({ user, onLogout, busy, onBusyChange }) {
   const [openPanel, setOpenPanel] = useState(null)
   const [deletePw, setDeletePw] = useState('')
@@ -324,6 +337,82 @@ function AccountTab({ user, onLogout, busy, onBusyChange }) {
   const [deleting, setDeleting] = useState(false)
   const [showDeletePw, setShowDeletePw] = useState(false)
 
+  const [devices, setDevices] = useState([])
+  const [devicesLoading, setDevicesLoading] = useState(false)
+  const [devicesError, setDevicesError] = useState(null)
+  const [removingDeviceId, setRemovingDeviceId] = useState(null)
+
+  const [checkUsername, setCheckUsername] = useState('')
+  const [checkResult, setCheckResult] = useState(null)
+  const [checkingUsername, setCheckingUsername] = useState(false)
+  const checkDebounceRef = useRef(null)
+
+  const clientDeviceId = user?.id ? getClientDeviceId(user.id) : null
+
+  const loadDevices = useCallback(async () => {
+    setDevicesLoading(true)
+    setDevicesError(null)
+    try {
+      const data = await listAccountDevices()
+      setDevices(data.devices || [])
+    } catch (err) {
+      setDevicesError(err.message || 'Failed to load devices.')
+      setDevices([])
+    } finally {
+      setDevicesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (openPanel === 'devices') loadDevices()
+  }, [openPanel, loadDevices])
+
+  useEffect(() => {
+    if (openPanel !== 'usernameCheck') return
+    const q = checkUsername.trim()
+    if (!q || q.length < 3) {
+      setCheckResult(null)
+      setCheckingUsername(false)
+      return
+    }
+    if (checkDebounceRef.current) clearTimeout(checkDebounceRef.current)
+    setCheckingUsername(true)
+    checkDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailability(q)
+        setCheckResult(res)
+      } catch (err) {
+        setCheckResult({ valid: false, available: false, message: err.message || 'Check failed.' })
+      } finally {
+        setCheckingUsername(false)
+      }
+    }, 400)
+    return () => {
+      if (checkDebounceRef.current) clearTimeout(checkDebounceRef.current)
+    }
+  }, [checkUsername, openPanel])
+
+  const handleRemoveDevice = async (device) => {
+    const isCurrent = device.client_device_id === clientDeviceId
+    setRemovingDeviceId(device.id)
+    onBusyChange?.(true)
+    try {
+      await removeAccountDevice(device.id)
+      if (isCurrent) {
+        clearClientDeviceId(user.id)
+        logout()
+        onLogout?.()
+        return
+      }
+      await loadDevices()
+    } catch (err) {
+      setDevicesError(err.message || 'Failed to remove device.')
+    } finally {
+      setRemovingDeviceId(null)
+      onBusyChange?.(false)
+    }
+  }
+
   const togglePanel = useCallback((panel) => {
     setOpenPanel((prev) => {
       if (prev === panel) {
@@ -331,6 +420,10 @@ function AccountTab({ user, onLogout, busy, onBusyChange }) {
           setDeletePw('')
           setDeleteConfirm('')
           setDeleteMsg(null)
+        }
+        if (panel === 'usernameCheck') {
+          setCheckUsername('')
+          setCheckResult(null)
         }
         return null
       }
@@ -392,6 +485,99 @@ function AccountTab({ user, onLogout, busy, onBusyChange }) {
             </span>
           </div>
         </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="devices"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={Monitor}
+        label="Connected Devices"
+        hint={devices.length ? `${devices.length} device${devices.length !== 1 ? 's' : ''}` : 'Browsers signed in'}
+        disabled={busy}
+      >
+        {devicesLoading ? (
+          <div className={styles.panelLoading}><Loader2 size={20} className={styles.spinner} /></div>
+        ) : devicesError ? (
+          <p className={styles.panelError}>{devicesError}</p>
+        ) : (
+          <>
+            <p className={styles.panelDesc}>
+              Devices that have signed in to your account. Remove any you do not recognize.
+            </p>
+            {devices.length === 0 ? (
+              <p className={styles.panelEmpty}>No devices registered yet. Sign in again from this browser to register it.</p>
+            ) : (
+              <ul className={styles.deviceList}>
+                {devices.map((d) => {
+                  const isCurrent = d.client_device_id === clientDeviceId
+                  return (
+                    <li key={d.id} className={`${styles.deviceItem} ${isCurrent ? styles.deviceItemCurrent : ''}`}>
+                      <div className={styles.deviceItemMain}>
+                        <Monitor size={16} className={styles.deviceItemIcon} />
+                        <div>
+                          <div className={styles.deviceItemLabel}>
+                            {d.label}
+                            {isCurrent && <span className={styles.deviceBadge}>This device</span>}
+                          </div>
+                          <div className={styles.deviceItemMeta}>
+                            Last seen {formatActivityDate(d.last_seen_at)}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.deviceRemoveBtn}
+                        onClick={() => handleRemoveDevice(d)}
+                        disabled={busy || removingDeviceId === d.id}
+                      >
+                        {removingDeviceId === d.id ? <Loader2 size={14} className={styles.spinner} /> : 'Remove'}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="usernameCheck"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={SearchCheck}
+        label="Username Availability Checker"
+        hint="Check before changing"
+        disabled={busy}
+      >
+        <p className={styles.panelDesc}>
+          See if a username is available before you change it in Security → Change Username.
+        </p>
+        <div className={styles.formGroup}>
+          <label className={styles.formLabel}>Username to check</label>
+          <input
+            className={styles.formInput}
+            type="text"
+            value={checkUsername}
+            onChange={(e) => setCheckUsername(e.target.value)}
+            placeholder={user?.username ? `e.g. new_${user.username}` : 'Enter a username'}
+            disabled={busy}
+            autoComplete="off"
+          />
+        </div>
+        {checkingUsername && (
+          <div className={styles.checkStatus}><Loader2 size={14} className={styles.spinner} /> Checking…</div>
+        )}
+        {!checkingUsername && checkResult && (
+          <div className={`${styles.checkResult} ${checkResult.available ? styles.checkResultOk : styles.checkResultBad}`}>
+            {checkResult.available ? <Check size={16} /> : <XCircle size={16} />}
+            <span>{checkResult.message}</span>
+          </div>
+        )}
+        {!checkingUsername && checkUsername.trim().length > 0 && checkUsername.trim().length < 3 && (
+          <p className={styles.panelHint}>Enter at least 3 characters.</p>
+        )}
       </CollapsibleSection>
 
       <CollapsibleSection

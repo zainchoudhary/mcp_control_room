@@ -2,27 +2,35 @@
 auth_routes.py - FastAPI router for user authentication (signup, login, me).
 """
 import logging
+import re
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db_config import get_db
+from db_models import UserDevice
 from auth_models import (
     SignupRequest, LoginRequest, AuthResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
     ChangePasswordRequest, ChangeUsernameRequest, DeleteAccountRequest,
+    RegisterDeviceRequest,
 )
 from auth_database import (
     create_user, get_user_by_email, get_user_by_id,
     email_exists, username_exists,
     update_user_password, update_user_username, delete_user_account,
+    list_user_devices, register_user_device,
 )
+
 from auth_utils import (
     hash_password, verify_password, create_access_token, get_current_user,
     create_reset_token, decode_reset_token, send_reset_email,
 )
 
 logger = logging.getLogger(__name__)
+
+_USERNAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*$")
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -79,6 +87,105 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Return the currently authenticated user's profile."""
     return UserResponse(**current_user)
+
+
+def _validate_username_format(username: str) -> str | None:
+    """Return error message if invalid, else None."""
+    u = username.strip()
+    if len(u) < 3:
+        return "Username must be at least 3 characters."
+    if len(u) > 30:
+        return "Username must not exceed 30 characters."
+    if not _USERNAME_RE.match(u):
+        return "Must start with a letter; use letters, numbers, dots, hyphens, or underscores."
+    return None
+
+
+@router.get("/username/check")
+async def check_username_availability(
+    username: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if a username is valid and available (for settings checker)."""
+    u = username.strip()
+    fmt_err = _validate_username_format(u)
+    if fmt_err:
+        return {
+            "username": u,
+            "valid": False,
+            "available": False,
+            "message": fmt_err,
+        }
+    if u == current_user.get("username"):
+        return {
+            "username": u,
+            "valid": True,
+            "available": True,
+            "is_current": True,
+            "message": "This is your current username.",
+        }
+    taken = await username_exists(db, u)
+    return {
+        "username": u,
+        "valid": True,
+        "available": not taken,
+        "is_current": False,
+        "message": "Username is available." if not taken else "This username is already taken.",
+    }
+
+
+@router.get("/account/devices")
+async def account_devices(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List devices that have signed in to this account."""
+    devices = await list_user_devices(db, current_user["id"])
+    return {"devices": devices}
+
+
+@router.post("/account/devices", status_code=200)
+async def register_device(
+    body: RegisterDeviceRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register or refresh the current browser/device for this account."""
+    device = await register_user_device(
+        db,
+        current_user["id"],
+        body.client_device_id,
+        body.label,
+        body.user_agent,
+    )
+    token = create_access_token(current_user["id"], body.client_device_id)
+    return {"device": device, "access_token": token, "token_type": "bearer"}
+
+
+@router.delete("/account/devices/{device_id}")
+async def remove_device(
+    device_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove a registered device; tokens bound to that device will be rejected."""
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.id == device_id,
+            UserDevice.user_id == current_user["id"],
+        )
+    )
+    device_row = result.scalar_one_or_none()
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Device not found.")
+    revoked_client_id = device_row.client_device_id
+    await db.delete(device_row)
+    await db.commit()
+    return {
+        "message": "Device removed. That device has been signed out.",
+        "revoked_client_device_id": revoked_client_id,
+    }
 
 
 @router.post("/forgot-password")
