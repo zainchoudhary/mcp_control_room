@@ -14,7 +14,7 @@ const PLAN_COLORS = {
   enterprise: '#f59e0b',
 }
 
-export function PricingPage({ user, addToast, onNavigate, onBack, onBrandClick, t: tProp }) {
+export function PricingPage({ user, addToast, onNavigate, onBack, onBrandClick, embedded, t: tProp }) {
   const t = tProp || ((k) => k)
 
   const PLANS = useMemo(() => [
@@ -118,24 +118,27 @@ export function PricingPage({ user, addToast, onNavigate, onBack, onBrandClick, 
   const planRank = { free: 0, pro: 1, enterprise: 2 }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${embedded ? styles.pageEmbedded : ''}`}>
 
-      {/* ── Top Nav ── */}
-      <nav className={styles.topNav}>
-        <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
-          <div className={styles.brandIcon}><Bot size={16} /></div>
-          <span className={styles.brandName}>ToolChain AI</span>
-        </div>
-        {isGuest && (
-          <div className={styles.navActions}>
-            <button className={styles.navLink} onClick={() => onNavigate?.('login')}>{t('logIn')}</button>
-            <button className={styles.navCta} onClick={() => onNavigate?.('login')}>{t('signUp')}</button>
+      {!embedded && (
+        <nav className={styles.topNav}>
+          <div className={styles.topNavLeft}>
+            <button type="button" className={styles.backBtn} onClick={onBack} title="Back">
+              <ArrowLeft size={18} />
+            </button>
+            <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
+              <div className={styles.brandIcon}><Bot size={16} /></div>
+              <span className={styles.brandName}>ToolChain AI</span>
+            </div>
           </div>
-        )}
-      </nav>
-      <button className={styles.backBtn} onClick={onBack}>
-        <ArrowLeft size={15} />
-      </button>
+          {isGuest && (
+            <div className={styles.navActions}>
+              <button type="button" className={styles.navLink} onClick={() => onNavigate?.('login')}>{t('logIn')}</button>
+              <button type="button" className={styles.navCta} onClick={() => onNavigate?.('login')}>{t('signUp')}</button>
+            </div>
+          )}
+        </nav>
+      )}
 
       {/* ── Hero ── */}
       <section className={styles.hero}>

@@ -167,6 +167,7 @@ async def api_contact(body: ContactRequest):
 @app.get("/tool-execution", include_in_schema=False)
 @app.get("/chat", include_in_schema=False)
 @app.get("/pricing", include_in_schema=False)
+@app.get("/settings", include_in_schema=False)
 @app.get("/login", include_in_schema=False)
 @app.get("/signup", include_in_schema=False)
 @app.get("/forgot-password", include_in_schema=False)

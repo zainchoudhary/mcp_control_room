@@ -268,23 +268,29 @@
   animation: fadeIn 0.15s ease;
 }
 
-.newChatBtn {
+.chatToolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin: 0 0 6px;
   width: calc(100% - 8px);
-  padding: 8px 12px;
-  margin-bottom: 6px;
-  border: 1px dashed rgba(var(--accent-rgb), 0.15);
+}
+
+.newChatIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
   border-radius: 8px;
-  background: rgba(var(--accent-rgb), 0.03);
-  color: var(--text-tertiary);
-  font-size: 13px;
-  font-weight: 500;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   transition: all 0.15s ease;
 }
 
-.newChatBtn:hover {
+.newChatIconBtn:hover {
   border-color: var(--accent);
   color: var(--accent);
   background: rgba(var(--accent-rgb), 0.08);
@@ -294,8 +300,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin: 0 0 6px;
-  width: calc(100% - 8px);
+  flex: 1;
+  min-width: 0;
 }
 
 .searchIcon {
@@ -308,7 +314,8 @@
 
 .searchInput {
   width: 100%;
-  padding: 7px 30px 7px 30px;
+  height: 34px;
+  padding: 0 28px 0 30px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--bg-primary);
@@ -467,6 +474,17 @@
 .settingsBtn:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.settingsBtnActive {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settingsBtnActive:hover {
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 /* ── User Row ── */

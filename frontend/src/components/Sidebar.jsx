@@ -98,7 +98,7 @@ export function Sidebar({
           <div className={styles.collapsedSpacer} />
 
           <button
-            className={styles.collapsedBtn}
+            className={`${styles.collapsedBtn} ${activePage === 'settings' ? styles.collapsedBtnActive : ''}`}
             onClick={onOpenSettings}
             title="Settings"
           >
@@ -174,29 +174,38 @@ export function Sidebar({
 
                   {isChat && isActive && chatExpanded && (
                     <div className={styles.chatSub}>
-                      <button className={styles.newChatBtn} onClick={onNewChat}>
-                        <Plus size={14} />
-                        <span>{tr('newChat')}</span>
-                      </button>
-
-                      {sessions.length > 3 && (
+                      <div className={styles.chatToolbar}>
+                        <button
+                          type="button"
+                          className={styles.newChatIconBtn}
+                          onClick={onNewChat}
+                          title={tr('newChat') || 'New chat'}
+                          aria-label={tr('newChat') || 'New chat'}
+                        >
+                          <Plus size={16} />
+                        </button>
                         <div className={styles.searchWrap}>
                           <Search size={13} className={styles.searchIcon} />
                           <input
                             ref={searchInputRef}
                             className={styles.searchInput}
                             type="text"
-                            placeholder={tr('Search Chats') || 'Search chats...'}
+                            placeholder={tr('searchChats') || 'Search chats...'}
                             value={sessionSearch}
                             onChange={(e) => setSessionSearch(e.target.value)}
                           />
                           {sessionSearch && (
-                            <button className={styles.searchClear} onClick={() => setSessionSearch('')}>
+                            <button
+                              type="button"
+                              className={styles.searchClear}
+                              onClick={() => setSessionSearch('')}
+                              aria-label="Clear search"
+                            >
                               <X size={12} />
                             </button>
                           )}
                         </div>
-                      )}
+                      </div>
 
                       <div className={styles.sessions}>
                         {sessionsLoading ? (
@@ -280,7 +289,10 @@ export function Sidebar({
               </button>
             )}
 
-            <button className={styles.settingsBtn} onClick={onOpenSettings}>
+            <button
+              className={`${styles.settingsBtn} ${activePage === 'settings' ? styles.settingsBtnActive : ''}`}
+              onClick={onOpenSettings}
+            >
               <Settings size={15} />
               <span>{tr('settings')}</span>
             </button>

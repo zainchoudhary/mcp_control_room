@@ -26,7 +26,7 @@ import { LandingPage } from './components/LandingPage.jsx'
 import { PricingPage } from './components/PricingPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
-import { SettingsModal } from './components/SettingsModal.jsx'
+import { SettingsPage } from './components/SettingsModal.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
 import { useLanguage } from './hooks/useLanguage.js'
@@ -34,7 +34,7 @@ import { useAccentColor } from './hooks/useAccentColor.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
-const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'pricing']
+const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'pricing', 'settings']
 const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
@@ -79,7 +79,6 @@ export default function App() {
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
-  const [showSettings, setShowSettings] = useState(false)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
   const [toolExecState, setToolExecState] = useState({ mcpId: null, toolName: null, tools: null, formCache: {} })
@@ -750,37 +749,47 @@ export default function App() {
     )
   }
 
-  if (activePage === 'pricing') {
+  if (activePage === 'settings') {
     return (
-      <>
-        <PricingPage
+      <div className={styles.app}>
+        <SettingsPage
+          theme={theme}
+          onToggleTheme={toggleTheme}
           user={user}
-          t={t}
-          onNavigate={handleNavigate}
-          addToast={toast}
-          onBack={() => {
-            setActivePage('dashboard')
-            window.history.pushState(null, '', '/dashboard')
+          onUserUpdated={(updatedUser) => {
+            setUser(updatedUser)
+            localStorage.setItem('toolchain_user', JSON.stringify(updatedUser))
           }}
-          onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
+          onSessionsDeleted={() => {
+            setSessions([])
+            setSessionId(null)
+            setMessages([])
+          }}
+          onLogout={() => { logout(); window.location.reload() }}
+          language={language}
+          onLanguageChange={setLanguage}
+          accentId={accentId}
+          onAccentChange={setAccentColor}
+          onNavigate={handleNavigate}
+          onBack={() => handleNavigate('dashboard')}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebarCollapse={() => setSidebarCollapsed((c) => !c)}
         />
-        <ToastContainer toasts={toasts} dismiss={dismiss} />
-        {showSettings && (
-          <SettingsModal
-            onClose={() => setShowSettings(false)}
-            user={user}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            language={language}
-            setLanguage={setLanguage}
-            accentId={accentId}
-            setAccentColor={setAccentColor}
-            onNavigate={handleNavigate}
-            addToast={toast}
-            t={t}
+        {confirmDialog && (
+          <ConfirmDialog
+            open
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            confirmLabel={confirmDialog.confirmLabel}
+            icon={confirmDialog.icon}
+            variant={confirmDialog.variant}
+            onConfirm={confirmDialog.onConfirm}
+            onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}
+            loading={logoutLoading || deleteLoading}
           />
         )}
-      </>
+        <ToastContainer toasts={toasts} dismiss={dismiss} />
+      </div>
     )
   }
 
@@ -797,7 +806,7 @@ export default function App() {
         onDeleteSession={handleDeleteSession}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={() => handleNavigate('settings')}
         user={user}
         onLogout={requestLogout}
         onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
@@ -848,6 +857,18 @@ export default function App() {
             connectedCount={connectedCount}
             initialSelectedMcp={initialSelectedMcp}
             onClearInitialMcp={() => setInitialSelectedMcp(null)}
+          />
+        )}
+
+        {activePage === 'pricing' && (
+          <PricingPage
+            user={user}
+            t={t}
+            onNavigate={handleNavigate}
+            addToast={toast}
+            onBack={() => handleNavigate('dashboard')}
+            onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
+            embedded
           />
         )}
 
@@ -942,30 +963,6 @@ export default function App() {
 
       {showRegister && (
         <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />
-      )}
-
-      {showSettings && (
-        <SettingsModal
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onClose={() => setShowSettings(false)}
-          user={user}
-          onUserUpdated={(updatedUser) => {
-            setUser(updatedUser)
-            localStorage.setItem('toolchain_user', JSON.stringify(updatedUser))
-          }}
-          onSessionsDeleted={() => {
-            setSessions([])
-            setSessionId(null)
-            setMessages([])
-          }}
-          onLogout={() => { logout(); window.location.reload() }}
-          language={language}
-          onLanguageChange={setLanguage}
-          accentId={accentId}
-          onAccentChange={setAccentColor}
-          onNavigate={handleNavigate}
-        />
       )}
 
       {confirmDialog && (

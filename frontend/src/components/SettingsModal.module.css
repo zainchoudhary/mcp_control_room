@@ -1,3 +1,368 @@
+/* ── Full-page settings (replaces app sidebar) ── */
+
+.settingsLayout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.settingsAside {
+  width: 270px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.asideCollapsed {
+  width: 52px;
+}
+
+.asideTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.asideCollapsed .asideTop {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+.asideToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.asideToggleBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.asideCollapsedBack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.asideCollapsedBack:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.asideCollapsedNav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.asideCollapsedBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.asideCollapsedBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.asideCollapsedBtnActive {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.asideCollapsedBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  margin: -4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.backBtn:hover {
+  color: var(--accent);
+  background: transparent;
+}
+
+.asideBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.asideBrandIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-light);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+}
+
+.asideBrandName {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.asideBrandSub {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.2;
+}
+
+.asideNav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.asideNav .sidebarItem {
+  padding: 10px 12px;
+  font-size: 13px;
+  gap: 12px;
+}
+
+.asideNav .sidebarItem span {
+  flex: 1;
+  text-align: left;
+}
+
+.asideHint {
+  flex-shrink: 0;
+  padding: 10px 14px 14px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settingsMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-secondary);
+}
+
+.settingsMainHeader {
+  flex-shrink: 0;
+  padding: 28px 32px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.mainTitle {
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
+  margin: 0;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mainTitle::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  border-radius: 3px;
+  background: var(--accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
+}
+
+.mainDesc {
+  margin: 6px 0 0 16px;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.settingsMain .content {
+  flex: 1;
+  padding: 24px 32px 40px;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settingsPane {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* ── Input with toggle ── */
+
+.inputWrap {
+  position: relative;
+}
+
+.inputWrap .formInput {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.inputToggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.inputToggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.inputToggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .settingsLayout {
+    flex-direction: column;
+  }
+
+  .settingsAside,
+  .asideCollapsed {
+    width: 100%;
+    height: auto;
+    max-height: 42vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .asideCollapsed .asideTop {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .asideCollapsedNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .asideNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+
+  .asideNav .sidebarItem {
+    flex: 1;
+    min-width: calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .asideHint {
+    display: none;
+  }
+
+  .settingsMainHeader {
+    padding: 20px 20px 16px;
+  }
+
+  .settingsMain .content {
+    padding: 20px 16px 32px;
+  }
+
+  .optionValue {
+    font-size: 12px;
+  }
+}
+
+/* ── Modal (legacy) ── */
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -197,7 +562,59 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  width: 100%;
+}
+
+/* ── Grouped list (ChatGPT / Claude style) ── */
+
+.settingsGroup {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-primary);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.settingsGroupDanger {
+  width: 100%;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 14px;
+  background: var(--bg-primary);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.06);
+}
+
+.settingsGroup .optionBlock,
+.settingsGroupDanger .optionBlock {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settingsGroup .optionBlock + .optionBlock,
+.settingsGroupDanger .optionBlock + .optionBlock {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settingsGroup .optionBlock:hover,
+.settingsGroupDanger .optionBlock:hover {
+  border-color: transparent;
+}
+
+.settingsGroup .optionBlock + .optionBlockDanger {
+  border-top-color: rgba(239, 68, 68, 0.2);
+}
+
+.settingsGroup .optionBlockDanger .optionRow:hover {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.settingsGroup .optionBlockDanger .optionRowActive,
+.settingsGroup .optionBlockDanger .deleteRowActive {
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .sectionHeader {
@@ -221,32 +638,32 @@
 
 .themeGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
 .themeCard {
   display: flex;
   flex-direction: column;
-  border: 2px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--bg-primary);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-secondary);
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   text-align: left;
   padding: 0;
+  width: 100%;
 }
 
 .themeCard:hover {
   border-color: var(--border-default);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 
 .themeCardActive {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-light), var(--shadow-sm);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2);
 }
 
 .themeCardActive:hover {
@@ -254,7 +671,7 @@
 }
 
 .themePreview {
-  height: 72px;
+  height: 64px;
   padding: 10px;
   display: flex;
   gap: 8px;
@@ -361,44 +778,50 @@
   margin-top: 2px;
 }
 
-/* ── Language Grid ── */
+/* ── Language list (full width) ── */
 
-.langGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 16px;
+.langList {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-secondary);
 }
 
 .langBtn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--bg-primary);
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: background 0.12s ease;
   text-align: left;
 }
 
+.langBtn:last-child {
+  border-bottom: none;
+}
+
 .langBtn:hover:not(:disabled) {
-  border-color: var(--border-default);
   background: var(--bg-tertiary);
 }
 
 .langBtnActive {
-  border-color: var(--accent);
   background: var(--accent-light);
   color: var(--accent);
   font-weight: 600;
 }
 
 .langBtnActive:hover:not(:disabled) {
-  border-color: var(--accent);
   background: var(--accent-light);
 }
 
@@ -426,8 +849,8 @@
 .accentGrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 12px;
+  width: 100%;
 }
 
 .accentBtn {
@@ -435,19 +858,19 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 10px 8px 8px;
-  border: 2px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--bg-primary);
+  padding: 10px 10px 8px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-secondary);
   cursor: pointer;
-  transition: var(--transition-fast);
-  min-width: 60px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-width: 72px;
+  flex: 1 1 0;
   position: relative;
 }
 
 .accentBtn:hover:not(:disabled) {
   border-color: var(--border-default);
-  transform: translateY(-1px);
 }
 
 .accentBtnActive {
@@ -500,26 +923,26 @@
   font-weight: 600;
 }
 
-/* ── Account Option Rows (Collapsible) ── */
+/* ── Collapsible rows ── */
 
 .optionBlock {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--bg-primary);
+  width: 100%;
   overflow: hidden;
 }
 
 .optionRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 14px 16px;
+  min-height: 52px;
+  padding: 0 18px;
   border: none;
   background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: var(--transition-fast);
+  transition: background 0.12s ease;
   color: var(--text-primary);
 }
 
@@ -531,52 +954,79 @@
   background: var(--bg-tertiary);
 }
 
+.settingsGroupDanger .optionRowActive,
+.deleteRowActive {
+  background: rgba(239, 68, 68, 0.04);
+}
+
 .optionIcon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius);
-  background: var(--accent-light);
-  color: var(--accent);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid rgba(var(--accent-rgb), 0.15);
 }
 
-.optionText {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+.optionRowActive .optionIcon {
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .optionLabel {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.optionValue {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  justify-self: end;
+}
+
+.optionValueDanger {
+  color: #ef4444;
 }
 
 .optionHint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
 .optionChevron {
   color: var(--text-tertiary);
   flex-shrink: 0;
-  transition: transform 0.2s ease;
+  opacity: 0.7;
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+
+.optionRow:hover .optionChevron {
+  opacity: 1;
 }
 
 .optionChevronOpen {
   transform: rotate(90deg);
-  color: var(--accent);
+  color: var(--text-secondary);
+  opacity: 1;
 }
 
 .optionPanel {
-  padding: 0 16px 16px;
+  padding: 16px 18px 20px;
   border-top: 1px solid var(--border-subtle);
-  animation: panelSlide 0.2s ease;
+  background: var(--bg-secondary);
+  animation: panelSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @keyframes panelSlide {
@@ -594,7 +1044,7 @@
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
-  margin: 16px 0 4px;
+  margin: 12px 0 4px;
 }
 
 .dangerNotice {
@@ -602,7 +1052,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  margin: 16px 0 4px;
+  margin: 0 0 14px;
   border-radius: var(--radius);
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.2);
@@ -632,7 +1082,11 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding-top: 4px;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-primary);
 }
 
 .profileRow {
@@ -696,12 +1150,14 @@
 }
 
 .formInput {
-  padding: 9px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius);
-  background: var(--bg-secondary);
+  border-radius: 10px;
+  background: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   outline: none;
   transition: var(--transition-fast);
@@ -1013,10 +1469,15 @@
 }
 
 .deleteCard {
-  border: 1px solid rgba(239, 68, 68, 0.18);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--bg-primary);
+}
+
+.deleteCard > .panelDesc {
+  margin: 0;
+  padding: 16px 16px 12px;
 }
 
 .deleteWarningBanner {
@@ -1050,12 +1511,7 @@
   line-height: 1.8;
 }
 .deleteList li::marker {
-  color: #ef4444;
-}
-.deleteKeyword {
-  color: #ef4444;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
 }
 
 .deleteFieldInput {
@@ -1075,8 +1531,8 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(239, 68, 68, 0.1);
-  background: rgba(239, 68, 68, 0.02);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
 }
 
 .deleteCancelBtn {
@@ -1134,9 +1590,11 @@
   overflow: hidden;
   padding: 18px 20px;
   background: var(--bg-primary);
-  border: 1px solid var(--border-default);
-  border-radius: 14px;
-  margin-bottom: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  margin-bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .billingCardGlow {
   position: absolute;
@@ -1231,8 +1689,9 @@
 .billingLimits {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 18px;
+  gap: 8px;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .billingLimitItem {
@@ -1298,7 +1757,16 @@
 
 .billingActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
+}
+
+.billingActions .billingManageBtn,
+.billingActions .billingUpgradeBtn {
+  flex: 1;
+  min-width: 140px;
+  justify-content: center;
 }
 
 .billingManageBtn,
