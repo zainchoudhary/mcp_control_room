@@ -23,6 +23,7 @@ export function Sidebar({
   onBrandClick,
   mcpCount,
   connectedCount,
+  searchFocusToken = 0,
   t,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
@@ -53,6 +54,16 @@ export function Sidebar({
   useEffect(() => {
     setUserMenuOpen(false)
   }, [collapsed])
+
+  useEffect(() => {
+    if (!searchFocusToken) return
+    setChatExpanded(true)
+    const rafId = requestAnimationFrame(() => {
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [searchFocusToken])
 
   const tr = t || ((k) => k)
   const navItems = [

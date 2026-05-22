@@ -4,6 +4,13 @@
   padding: 0;
 }
 
+.no-animations *,
+.no-animations *::before,
+.no-animations *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
 /* ── Dark Theme (default) ── */
 :root, [data-theme="dark"] {
   --bg-primary:     #212121;
@@ -128,6 +135,49 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Custom backgrounds (prefs.customBg → data-custom-bg on html) */
+html[data-custom-bg="subtle-dots"] body {
+  background-color: var(--bg-primary);
+  background-image: radial-gradient(circle, var(--border-default) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-attachment: fixed;
+}
+
+html[data-custom-bg="subtle-grid"] body {
+  background-color: var(--bg-primary);
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-attachment: fixed;
+}
+
+html[data-custom-bg="gradient-warm"] body {
+  background-color: var(--bg-primary);
+  background-image: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fbbf24 100%);
+  background-attachment: fixed;
+}
+
+html[data-custom-bg="gradient-cool"] body {
+  background-color: var(--bg-primary);
+  background-image: linear-gradient(135deg, #dbeafe 0%, #93c5fd 50%, #3b82f6 100%);
+  background-attachment: fixed;
+}
+
+html[data-custom-bg="gradient-accent"] body {
+  background-color: var(--bg-primary);
+  background-image: linear-gradient(135deg, var(--accent-light) 0%, rgba(var(--accent-rgb), 0.3) 100%);
+  background-attachment: fixed;
+}
+
+[data-theme="dark"] html[data-custom-bg="gradient-warm"] body {
+  background-image: linear-gradient(135deg, rgba(254, 243, 199, 0.15) 0%, rgba(251, 191, 36, 0.12) 50%, rgba(245, 158, 11, 0.08) 100%);
+}
+
+[data-theme="dark"] html[data-custom-bg="gradient-cool"] body {
+  background-image: linear-gradient(135deg, rgba(219, 234, 254, 0.12) 0%, rgba(59, 130, 246, 0.1) 50%, rgba(37, 99, 235, 0.08) 100%);
 }
 
 ::-webkit-scrollbar {

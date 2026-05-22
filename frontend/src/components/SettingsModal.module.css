@@ -5,7 +5,7 @@
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: var(--bg-primary);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -212,14 +212,15 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
 .settingsMainHeader {
   flex-shrink: 0;
   padding: 28px 32px 20px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .mainTitle {
@@ -1036,6 +1037,206 @@
 
 .optionPanel .formGroup:first-child {
   margin-top: 16px;
+}
+
+/* ── Toggle Switch ── */
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.toggleRowLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.toggleRowHint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.toggleSwitch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 99px;
+  background: var(--border-default);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.toggleSwitchOn {
+  background: var(--accent);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.toggleSwitchOn .toggleKnob {
+  transform: translateX(20px);
+}
+
+/* ── Startup Page Select ── */
+
+.startupList {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.startupBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  text-align: left;
+}
+
+.startupBtn:last-child {
+  border-bottom: none;
+}
+
+.startupBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.startupBtnActive {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.startupBtnActive:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+
+/* ── Keyboard Shortcuts ── */
+
+.shortcutList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.shortcutLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.shortcutKeys {
+  display: flex;
+  gap: 4px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Custom Background ── */
+
+.bgGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.bgOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  min-width: 80px;
+  flex: 1 1 0;
+}
+
+.bgOption:hover {
+  border-color: var(--border-default);
+}
+
+.bgOptionActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2);
+}
+
+.bgSwatch {
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
+.bgLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.bgOptionActive .bgLabel {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* ── Panel Description & Danger Notice ── */

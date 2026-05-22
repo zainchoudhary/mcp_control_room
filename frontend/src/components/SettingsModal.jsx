@@ -1,8 +1,10 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose } from 'lucide-react'
+import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard } from 'lucide-react'
 import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage } from '../api.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
 import { ACCENT_COLORS } from '../hooks/useAccentColor.js'
+import { STARTUP_PAGES } from '../hooks/usePreferences.js'
+import { BG_OPTIONS } from '../utils/customBackground.js'
 import styles from './SettingsModal.module.css'
 
 const PASSWORD_RULES = [
@@ -48,7 +50,30 @@ function CollapsibleSection({ panelId, openPanel, onToggle, icon: Icon, label, h
   )
 }
 
-function GeneralTab({ theme, onToggleTheme, busy, language, onLanguageChange, accentId, onAccentChange, t }) {
+const SHORTCUTS = [
+  { label: 'New Chat', keys: ['Ctrl', 'Shift', 'N'] },
+  { label: 'Toggle Sidebar', keys: ['Ctrl', 'B'] },
+  { label: 'Settings', keys: ['Ctrl', ','] },
+  { label: 'Search Chats', keys: ['Ctrl', 'K'] },
+  { label: 'Dashboard', keys: ['Ctrl', 'D'] },
+]
+
+function ToggleSwitch({ on, onToggle, disabled }) {
+  return (
+    <button
+      type="button"
+      className={`${styles.toggleSwitch} ${on ? styles.toggleSwitchOn : ''}`}
+      onClick={onToggle}
+      disabled={disabled}
+      role="switch"
+      aria-checked={on}
+    >
+      <span className={styles.toggleKnob} />
+    </button>
+  )
+}
+
+function GeneralTab({ theme, onToggleTheme, busy, language, onLanguageChange, accentId, onAccentChange, prefs, onSetPref, onTogglePref, t }) {
   const [openPanel, setOpenPanel] = useState(null)
   const togglePanel = useCallback((panel) => {
     setOpenPanel((prev) => (prev === panel ? null : panel))
@@ -166,6 +191,121 @@ function GeneralTab({ theme, onToggleTheme, busy, language, onLanguageChange, ac
                 <span className={styles.accentDot} style={{ background: color.hex }} />
                 {isActive && <Check size={10} className={styles.accentCheck} />}
                 <span className={styles.accentLabel}>{color.id === 'default' ? t('defaultColor') : color.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="sidebarDefault"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={PanelLeft}
+        label="Sidebar Collapse Default"
+        hint={prefs?.sidebarCollapsedDefault ? 'Collapsed' : 'Expanded'}
+        disabled={busy}
+      >
+        <div className={styles.toggleRow}>
+          <div>
+            <div className={styles.toggleRowLabel}>Start with sidebar collapsed</div>
+            <div className={styles.toggleRowHint}>App opens with the narrow icon-only sidebar</div>
+          </div>
+          <ToggleSwitch on={prefs?.sidebarCollapsedDefault} onToggle={() => onTogglePref?.('sidebarCollapsedDefault')} disabled={busy} />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="animations"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={Zap}
+        label="Animations"
+        hint={prefs?.animationsEnabled ? 'On' : 'Off'}
+        disabled={busy}
+      >
+        <div className={styles.toggleRow}>
+          <div>
+            <div className={styles.toggleRowLabel}>Enable animations</div>
+            <div className={styles.toggleRowHint}>Page transitions, panel slides, and hover effects</div>
+          </div>
+          <ToggleSwitch on={prefs?.animationsEnabled} onToggle={() => onTogglePref?.('animationsEnabled')} disabled={busy} />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="shortcuts"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={KeyRound}
+        label="Keyboard Shortcuts"
+        hint="View all"
+        disabled={busy}
+      >
+        <div className={styles.shortcutList}>
+          {SHORTCUTS.map((s) => (
+            <div key={s.label} className={styles.shortcutRow}>
+              <span className={styles.shortcutLabel}>{s.label}</span>
+              <div className={styles.shortcutKeys}>
+                {s.keys.map((k, i) => (
+                  <span key={i} className={styles.kbd}>{k}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="startupPage"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={LayoutDashboard}
+        label="Startup Page"
+        hint={STARTUP_PAGES.find((p) => p.id === prefs?.startupPage)?.label || 'Dashboard'}
+        disabled={busy}
+      >
+        <div className={styles.startupList}>
+          {STARTUP_PAGES.map((page) => {
+            const isActive = prefs?.startupPage === page.id
+            return (
+              <button
+                key={page.id}
+                type="button"
+                className={`${styles.startupBtn} ${isActive ? styles.startupBtnActive : ''}`}
+                onClick={() => onSetPref?.('startupPage', page.id)}
+                disabled={busy}
+              >
+                <span>{page.label}</span>
+                {isActive && <Check size={14} className={styles.langCheck} />}
+              </button>
+            )
+          })}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        panelId="customBg"
+        openPanel={openPanel}
+        onToggle={togglePanel}
+        icon={Palette}
+        label="Custom Background"
+        hint={BG_OPTIONS.find((b) => b.id === (prefs?.customBg || ''))?.label || 'Default'}
+        disabled={busy}
+      >
+        <div className={styles.bgGrid}>
+          {BG_OPTIONS.map((bg) => {
+            const isActive = (prefs?.customBg || '') === bg.id
+            return (
+              <button
+                key={bg.id}
+                type="button"
+                className={`${styles.bgOption} ${isActive ? styles.bgOptionActive : ''}`}
+                onClick={() => onSetPref?.('customBg', bg.id)}
+                disabled={busy}
+              >
+                <div className={styles.bgSwatch} style={{ background: bg.swatch, backgroundSize: bg.id === 'subtle-dots' ? '16px 16px' : bg.id === 'subtle-grid' ? '20px 20px' : undefined }} />
+                <span className={styles.bgLabel}>{bg.label}</span>
               </button>
             )
           })}
@@ -900,6 +1040,9 @@ function SettingsPanel({
   onBack,
   sidebarCollapsed = false,
   onToggleSidebarCollapse,
+  prefs,
+  onSetPref,
+  onTogglePref,
   variant = 'page',
 }) {
   const [activeTab, setActiveTab] = useState('general')
@@ -936,6 +1079,9 @@ function SettingsPanel({
           onLanguageChange={onLanguageChange}
           accentId={accentId}
           onAccentChange={onAccentChange}
+          prefs={prefs}
+          onSetPref={onSetPref}
+          onTogglePref={onTogglePref}
           t={t}
         />
       )}

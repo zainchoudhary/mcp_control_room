@@ -31,6 +31,8 @@ import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
 import { useLanguage } from './hooks/useLanguage.js'
 import { useAccentColor } from './hooks/useAccentColor.js'
+import { usePreferences, getStartupPage } from './hooks/usePreferences.js'
+import { applyCustomBg } from './utils/customBackground.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
@@ -60,9 +62,10 @@ function getAuthModeFromUrl() {
 export default function App() {
   const savedUser = getSavedUser()
   const [user, setUser] = useState(() => savedUser)
-  const { theme, toggleTheme } = useTheme()
+  const { theme, toggleTheme } = useTheme(user?.id)
   const { language, setLanguage, t } = useLanguage(user?.id)
   const { accentId, setAccentColor } = useAccentColor(user?.id)
+  const { prefs, setPref, togglePref } = usePreferences(user?.id)
   const [authChecked, setAuthChecked] = useState(!!savedUser)
   const [activePage, setActivePage] = useState(getPageFromUrl)
   const [mcps, setMcps] = useState([])
@@ -75,7 +78,8 @@ export default function App() {
   const [sending, setSending] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [initialSelectedMcp, setInitialSelectedMcp] = useState(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => prefs.sidebarCollapsedDefault)
+  const [searchFocusToken, setSearchFocusToken] = useState(0)
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
@@ -127,8 +131,9 @@ export default function App() {
         setActivePage('dashboard')
         fetchMe().then(u => { if (u) { setUser(u); localStorage.setItem('toolchain_user', JSON.stringify(u)) } })
       } else if (AUTH_PAGES.includes(path) && !hasResetToken) {
-        setActivePage('dashboard')
-        window.history.replaceState(null, '', '/dashboard')
+        const startPage = getStartupPage(user.id)
+        setActivePage(startPage)
+        window.history.replaceState(null, '', `/${startPage}`)
       } else if (path === '' || path === '/') {
         setActivePage('landing')
       }
@@ -149,14 +154,87 @@ export default function App() {
     }
   }, [user, theme])
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('no-animations', !prefs.animationsEnabled)
+  }, [prefs.animationsEnabled])
+
+  useEffect(() => {
+    if (!user) {
+      applyCustomBg('')
+      return
+    }
+    applyCustomBg(prefs.customBg || '')
+  }, [prefs.customBg, user])
+
+  useEffect(() => {
+    if (!user) return
+    setSidebarCollapsed(prefs.sidebarCollapsedDefault)
+  }, [user?.id, prefs.sidebarCollapsedDefault])
+
+  const handleNavigate = useCallback((page) => {
+    setActivePage(page)
+    window.history.pushState(null, '', `/${page}`)
+  }, [])
+
+  const focusChatSearch = useCallback(() => {
+    if (!user) return
+    handleNavigate('chat')
+    setSidebarCollapsed(false)
+    setSearchFocusToken((t) => t + 1)
+  }, [user, handleNavigate])
+
+  useEffect(() => {
+    if (!user) return
+    const onKeyDown = (e) => {
+      const mod = e.ctrlKey || e.metaKey
+      if (!mod) return
+
+      const el = document.activeElement
+      const typing = el && (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      )
+      if (typing) return
+
+      const key = e.key.toLowerCase()
+      if (key === 'b') {
+        e.preventDefault()
+        setSidebarCollapsed((c) => !c)
+      } else if (key === 'n' && e.shiftKey) {
+        e.preventDefault()
+        setSessionId(null)
+        setMessages([])
+        setStreamingId(null)
+        setInput('')
+        setActivePage('chat')
+        window.history.pushState(null, '', '/chat')
+      } else if (e.key === ',' || key === ',') {
+        e.preventDefault()
+        handleNavigate('settings')
+      } else if (key === 'k') {
+        e.preventDefault()
+        focusChatSearch()
+      } else if (key === 'd') {
+        e.preventDefault()
+        handleNavigate('dashboard')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [user, handleNavigate, focusChatSearch])
+
   const handleAuth = async (userData) => {
     setUser(userData)
     setDataLoading(false)
-    const savedPage = getPageFromUrl()
-    setActivePage(APP_PAGES.includes(savedPage) ? savedPage : 'dashboard')
-    if (!APP_PAGES.includes(window.location.pathname.replace(/^\/+/, ''))) {
-      window.history.replaceState(null, '', '/dashboard')
-    }
+    const urlPage = getPageFromUrl()
+    const onAuthRoute = AUTH_PAGES.includes(urlPage)
+    const startPage = onAuthRoute ? getStartupPage(userData.id) : (
+      APP_PAGES.includes(urlPage) ? urlPage : getStartupPage(userData.id)
+    )
+    setActivePage(startPage)
+    window.history.replaceState(null, '', `/${startPage}`)
   }
 
   const [logoutLoading, setLogoutLoading] = useState(false)
@@ -620,11 +698,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  const handleNavigate = (page) => {
-    setActivePage(page)
-    window.history.pushState(null, '', `/${page}`)
-  }
-
   const suggestions = [
     t('suggestion1'),
     t('suggestion2'),
@@ -774,6 +847,9 @@ export default function App() {
           onBack={() => handleNavigate('dashboard')}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebarCollapse={() => setSidebarCollapsed((c) => !c)}
+          prefs={prefs}
+          onSetPref={setPref}
+          onTogglePref={togglePref}
         />
         {confirmDialog && (
           <ConfirmDialog
@@ -812,6 +888,7 @@ export default function App() {
         onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
         mcpCount={mcps.length}
         connectedCount={connectedCount}
+        searchFocusToken={searchFocusToken}
         t={t}
       />
 
