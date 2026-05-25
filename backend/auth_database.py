@@ -44,11 +44,21 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[dict
     return user.to_dict(include_password=True) if user else None
 
 
+async def _get_user_row(db: AsyncSession, user_id: str) -> User | None:
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
 async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[dict]:
     """Fetch a user by id (excludes password)."""
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await _get_user_row(db, user_id)
     return user.to_dict() if user else None
+
+
+async def get_user_auth_by_id(db: AsyncSession, user_id: str) -> Optional[dict]:
+    """Fetch user with password and TOTP secret for auth verification."""
+    user = await _get_user_row(db, user_id)
+    return user.to_dict(include_password=True) if user else None
 
 
 async def email_exists(db: AsyncSession, email: str) -> bool:
@@ -150,6 +160,69 @@ async def user_device_is_registered(
         )
     )
     return result.scalar_one_or_none() is not None
+
+
+async def get_security_settings(db: AsyncSession, user_id: str) -> dict | None:
+    user = await _get_user_row(db, user_id)
+    return user.security_summary() if user else None
+
+
+async def set_recovery_email(db: AsyncSession, user_id: str, recovery_email: str | None) -> dict | None:
+    user = await _get_user_row(db, user_id)
+    if not user:
+        return None
+    user.recovery_email = recovery_email.lower().strip() if recovery_email else None
+    await db.commit()
+    await db.refresh(user)
+    return user.security_summary()
+
+
+async def set_totp_secret(db: AsyncSession, user_id: str, secret: str | None) -> None:
+    user = await _get_user_row(db, user_id)
+    if user:
+        user.totp_secret = secret
+        user.totp_enabled = False
+        await db.commit()
+
+
+async def enable_totp(db: AsyncSession, user_id: str) -> dict | None:
+    user = await _get_user_row(db, user_id)
+    if not user or not user.totp_secret:
+        return None
+    user.totp_enabled = True
+    await db.commit()
+    await db.refresh(user)
+    return user.security_summary()
+
+
+async def disable_totp(db: AsyncSession, user_id: str) -> dict | None:
+    user = await _get_user_row(db, user_id)
+    if not user:
+        return None
+    user.totp_enabled = False
+    user.totp_secret = None
+    await db.commit()
+    await db.refresh(user)
+    return user.security_summary()
+
+
+async def set_lock_pin(db: AsyncSession, user_id: str, pin_hash: str | None) -> dict | None:
+    user = await _get_user_row(db, user_id)
+    if not user:
+        return None
+    user.lock_pin_hash = pin_hash
+    await db.commit()
+    await db.refresh(user)
+    return user.security_summary()
+
+
+async def verify_user_lock_pin(db: AsyncSession, user_id: str, pin: str) -> bool:
+    from security_utils import verify_pin
+
+    user = await _get_user_row(db, user_id)
+    if not user or not user.lock_pin_hash:
+        return False
+    return verify_pin(pin, user.lock_pin_hash)
 
 
 async def delete_user_device(db: AsyncSession, user_id: str, device_id: str) -> bool:

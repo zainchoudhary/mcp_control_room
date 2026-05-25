@@ -92,6 +92,53 @@ export const registerAccountDevice = (body) =>
 export const removeAccountDevice = (deviceId) =>
   request(`/auth/account/devices/${deviceId}`, { method: 'DELETE' })
 
+// Security
+export const getSecuritySettings = () => request('/auth/security')
+
+export const setRecoveryEmail = (recoveryEmail, password) =>
+  request('/auth/security/recovery-email', {
+    method: 'PUT',
+    body: JSON.stringify({ recovery_email: recoveryEmail, password }),
+  })
+
+export const removeRecoveryEmail = (password) =>
+  request('/auth/security/recovery-email', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  })
+
+export const setup2fa = () => request('/auth/security/2fa/setup', { method: 'POST' })
+
+export const enable2fa = (code, password) =>
+  request('/auth/security/2fa/enable', {
+    method: 'POST',
+    body: JSON.stringify({ code, password }),
+  })
+
+export const disable2fa = (code, password) =>
+  request('/auth/security/2fa/disable', {
+    method: 'POST',
+    body: JSON.stringify({ code, password }),
+  })
+
+export const setLockPin = (pin, password) =>
+  request('/auth/security/lock-pin', {
+    method: 'PUT',
+    body: JSON.stringify({ pin, password }),
+  })
+
+export const removeLockPin = (password) =>
+  request('/auth/security/lock-pin', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  })
+
+export const verifyLockPin = (pin) =>
+  request('/auth/security/lock-pin/verify', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  })
+
 // Bulk session actions
 export const deleteAllSessions = () => request('/sessions', { method: 'DELETE' })
 export const exportAllChats = async () => {

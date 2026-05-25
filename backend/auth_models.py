@@ -230,6 +230,125 @@ class DeleteAccountRequest(BaseModel):
     password: str
 
 
+class RecoveryEmailRequest(BaseModel):
+    recovery_email: str
+    password: str
+
+    @field_validator("recovery_email")
+    @classmethod
+    def validate_recovery_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(pattern, v):
+            raise ValueError("Please enter a valid recovery email address.")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Password is required to confirm this change.")
+        return v
+
+
+class RemoveRecoveryEmailRequest(BaseModel):
+    password: str
+
+
+class TotpCodeRequest(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if len(cleaned) != 6:
+            raise ValueError("Enter the 6-digit code from your authenticator app.")
+        return cleaned
+
+
+class TotpEnableRequest(BaseModel):
+    code: str
+    password: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if len(cleaned) != 6:
+            raise ValueError("Enter the 6-digit verification code.")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Password is required.")
+        return v
+
+
+class TotpDisableRequest(BaseModel):
+    code: str
+    password: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if len(cleaned) != 6:
+            raise ValueError("Enter the 6-digit code from your authenticator app.")
+        return cleaned
+
+
+class LockPinRequest(BaseModel):
+    pin: str
+    password: str
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if len(cleaned) < 4 or len(cleaned) > 8:
+            raise ValueError("PIN must be 4 to 8 digits.")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Password is required.")
+        return v
+
+
+class LockPinRemoveRequest(BaseModel):
+    password: str
+
+
+class LockPinVerifyRequest(BaseModel):
+    pin: str
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if not cleaned:
+            raise ValueError("PIN is required.")
+        return cleaned
+
+
+class Verify2faLoginRequest(BaseModel):
+    pending_token: str
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        cleaned = "".join(c for c in v.strip() if c.isdigit())
+        if len(cleaned) != 6:
+            raise ValueError("Enter the 6-digit code from your authenticator app.")
+        return cleaned
+
+
 class UserResponse(BaseModel):
     id: str
     username: str
@@ -239,3 +358,4 @@ class UserResponse(BaseModel):
     subscription_status: str = "inactive"
     subscription_end_date: str | None = None
     created_at: str
+    security: dict | None = None

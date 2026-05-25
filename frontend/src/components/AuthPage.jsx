@@ -44,6 +44,8 @@ export function AuthPage({ onAuth, initialMode }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [touched, setTouched] = useState({})
+  const [pending2fa, setPending2fa] = useState(null)
+  const [totpCode, setTotpCode] = useState('')
   const emailRef = useRef(null)
   const usernameRef = useRef(null)
 
@@ -89,10 +91,12 @@ export function AuthPage({ onAuth, initialMode }) {
 
   const blur = (key) => setTouched((p) => ({ ...p, [key]: true }))
   const isSignupValid = () => form.username && form.email && form.password && form.confirm_password && !errors.username && !errors.email && !errors.password && !errors.confirm_password
-  const isLoginValid = () => form.email && form.password
+  const isLoginValid = () => (pending2fa ? totpCode.length === 6 : form.email && form.password)
 
   const switchMode = (m) => {
     setMode(m)
+    setPending2fa(null)
+    setTotpCode('')
     setForm({ username: '', email: '', password: '', confirm_password: '', full_name: '' })
     setErrors({})
     setServerError('')
@@ -130,10 +134,22 @@ export function AuthPage({ onAuth, initialMode }) {
         setSuccessMessage('Account created successfully! Please sign in.')
         setForm({ username: '', email: '', password: '', confirm_password: '', full_name: '' })
         setTimeout(() => switchMode('login'), 2000)
+      } else if (pending2fa) {
+        const { verifyLogin2fa } = await import('../auth.js')
+        const data = await verifyLogin2fa({ pending_token: pending2fa.token, code: totpCode })
+        setPending2fa(null)
+        setTotpCode('')
+        onAuth(data.user)
       } else {
         const { login } = await import('../auth.js')
         const data = await login({ email: form.email.trim(), password: form.password })
-        onAuth(data.user, data.access_token)
+        if (data.requires_2fa) {
+          setPending2fa({ token: data.pending_token, user: data.user })
+          setTotpCode('')
+          setSuccessMessage('Enter the 6-digit code from your authenticator app.')
+        } else {
+          onAuth(data.user)
+        }
       }
     } catch (err) { setServerError(err.message) } finally { setLoading(false) }
   }
@@ -245,7 +261,35 @@ export function AuthPage({ onAuth, initialMode }) {
 
             {!(successMessage && mode === 'forgot') && (
             <form onSubmit={submit} className={styles.form} noValidate>
-              {mode === 'signup' && (
+              {pending2fa && mode === 'login' && (
+                <>
+                  <p className={styles.cardSubtitle} style={{ marginBottom: 16 }}>
+                    Two-factor authentication is enabled for <strong>{pending2fa.user?.email || form.email}</strong>
+                  </p>
+                  <div className={styles.field}>
+                    <label className={styles.label}>6-digit authenticator code</label>
+                    <div className={styles.inputWrap}>
+                      <Shield size={15} className={styles.inputIcon} />
+                      <input
+                        className={styles.input}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={totpCode}
+                        onChange={(e) => { setTotpCode(e.target.value.replace(/\D/g, '')); setServerError('') }}
+                        placeholder="000000"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <button type="button" className={styles.forgotLink} onClick={() => { setPending2fa(null); setTotpCode(''); setSuccessMessage('') }}>
+                    ← Back to sign in
+                  </button>
+                </>
+              )}
+
+              {!pending2fa && mode === 'signup' && (
                 <div className={styles.row}>
                   <div className={styles.field}>
                     <label className={styles.label}>Username</label>
@@ -270,7 +314,7 @@ export function AuthPage({ onAuth, initialMode }) {
                 </div>
               )}
 
-              {(mode === 'login' || mode === 'signup' || mode === 'forgot') && (
+              {!pending2fa && (mode === 'login' || mode === 'signup' || mode === 'forgot') && (
                 <div className={styles.field}>
                   <label className={styles.label}>Email address</label>
                   <div className={styles.inputWrap}>
@@ -286,7 +330,7 @@ export function AuthPage({ onAuth, initialMode }) {
                 </div>
               )}
 
-              {(mode === 'login' || mode === 'signup' || mode === 'reset') && (
+              {!pending2fa && (mode === 'login' || mode === 'signup' || mode === 'reset') && (
                 <div className={styles.field}>
                   <div className={styles.labelRow}>
                     <label className={styles.label}>{mode === 'reset' ? 'New password' : 'Password'}</label>
@@ -299,7 +343,13 @@ export function AuthPage({ onAuth, initialMode }) {
                   <div className={styles.inputWrap}>
                     <Lock size={15} className={styles.inputIcon} />
                     <input className={`${styles.input} ${touched.password && errors.password && (mode === 'signup' || mode === 'reset') ? styles.inputError : ''}`} type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => update('password', e.target.value)} onBlur={() => blur('password')} placeholder="••••••••" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-                    <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword((p) => !p)} tabIndex={-1}>
+                    <button
+                      type="button"
+                      className={styles.eyeBtn}
+                      onClick={() => setShowPassword((p) => !p)}
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
@@ -335,7 +385,13 @@ export function AuthPage({ onAuth, initialMode }) {
                   <div className={styles.inputWrap}>
                     <Lock size={15} className={styles.inputIcon} />
                     <input className={`${styles.input} ${touched.confirm_password && errors.confirm_password ? styles.inputError : ''} ${touched.confirm_password && !errors.confirm_password && form.confirm_password ? styles.inputSuccess : ''}`} type={showConfirm ? 'text' : 'password'} value={form.confirm_password} onChange={(e) => update('confirm_password', e.target.value)} onBlur={() => blur('confirm_password')} placeholder="••••••••" autoComplete="new-password" />
-                    <button type="button" className={styles.eyeBtn} onClick={() => setShowConfirm((p) => !p)} tabIndex={-1}>
+                    <button
+                      type="button"
+                      className={styles.eyeBtn}
+                      onClick={() => setShowConfirm((p) => !p)}
+                      tabIndex={-1}
+                      aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    >
                       {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
@@ -348,7 +404,7 @@ export function AuthPage({ onAuth, initialMode }) {
               <button type="submit" className={styles.submitBtn} disabled={loading || (mode === 'signup' ? !isSignupValid() : mode === 'forgot' ? !form.email || !!errors.email : mode === 'reset' ? !form.password || !form.confirm_password || !!errors.password || !!errors.confirm_password : !isLoginValid())}>
                 {loading ? <span className={styles.spinner} /> : (
                   <>
-                    {mode === 'login' && 'Sign In'}
+                    {mode === 'login' && (pending2fa ? 'Verify & Sign In' : 'Sign In')}
                     {mode === 'signup' && 'Create Account'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     {mode === 'reset' && 'Reset Password'}

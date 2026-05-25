@@ -8,6 +8,9 @@ Routes:
   GET  /api/auth/me            → current user profile
   GET  /api/auth/username/check → username availability
   GET  /api/auth/account/devices → connected devices
+  GET  /api/auth/security → security settings summary
+  POST /api/auth/security/2fa/setup → begin 2FA setup
+  PUT  /api/auth/security/lock-pin → set website lock PIN
   POST /api/auth/account/devices → register current device
   GET  /api/mcps               → list all registered MCPs
   POST /api/mcps               → register a new MCP

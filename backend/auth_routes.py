@@ -15,17 +15,30 @@ from auth_models import (
     ForgotPasswordRequest, ResetPasswordRequest,
     ChangePasswordRequest, ChangeUsernameRequest, DeleteAccountRequest,
     RegisterDeviceRequest,
+    RecoveryEmailRequest, RemoveRecoveryEmailRequest,
+    TotpCodeRequest, TotpEnableRequest, TotpDisableRequest,
+    LockPinRequest, LockPinRemoveRequest, LockPinVerifyRequest,
+    Verify2faLoginRequest,
 )
 from auth_database import (
     create_user, get_user_by_email, get_user_by_id,
     email_exists, username_exists,
     update_user_password, update_user_username, delete_user_account,
     list_user_devices, register_user_device,
+    get_security_settings, set_recovery_email,
+    set_totp_secret, enable_totp, disable_totp,
+    set_lock_pin, verify_user_lock_pin,
+    get_user_auth_by_id,
 )
 
 from auth_utils import (
     hash_password, verify_password, create_access_token, get_current_user,
     create_reset_token, decode_reset_token, send_reset_email,
+    create_pending_2fa_token, decode_pending_2fa_token,
+)
+from security_utils import (
+    generate_totp_secret, totp_provisioning_uri, verify_totp_code,
+    hash_pin,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,9 +78,9 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(access_token=token, user=user)
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login")
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Authenticate with email and password."""
+    """Authenticate with email and password. May require a second 2FA step."""
     user = await get_user_by_email(db, body.email)
 
     if user is None or not verify_password(body.password, user["password"]):
@@ -76,10 +89,45 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid email or password.",
         )
 
+    safe_user = {k: v for k, v in user.items() if k not in ("password", "totp_secret")}
+
+    if user.get("totp_enabled") and user.get("totp_secret"):
+        pending = create_pending_2fa_token(user["id"])
+        logger.info("2FA required for login: %s", user["email"])
+        return {
+            "requires_2fa": True,
+            "pending_token": pending,
+            "user": safe_user,
+        }
+
     token = create_access_token(user["id"])
     logger.info("User logged in: %s", user["email"])
+    return AuthResponse(access_token=token, user=safe_user)
 
-    safe_user = {k: v for k, v in user.items() if k != "password"}
+
+@router.post("/login/verify-2fa", response_model=AuthResponse)
+async def verify_login_2fa(body: Verify2faLoginRequest, db: AsyncSession = Depends(get_db)):
+    """Complete login after password step when 2FA is enabled."""
+    user_id = decode_pending_2fa_token(body.pending_token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Login session expired. Please sign in again.",
+        )
+
+    user = await get_user_auth_by_id(db, user_id)
+    if user is None or not user.get("totp_enabled") or not user.get("totp_secret"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is not enabled.")
+
+    if not verify_totp_code(user["totp_secret"], body.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code. Try again.",
+        )
+
+    token = create_access_token(user_id)
+    safe_user = {k: v for k, v in user.items() if k not in ("password", "totp_secret")}
+    logger.info("2FA login completed for user: %s", user_id)
     return AuthResponse(access_token=token, user=safe_user)
 
 
@@ -286,6 +334,142 @@ async def change_username(
 
     logger.info("Username changed for user %s: %s → %s", current_user["id"], current_user.get("username"), body.new_username)
     return {"message": "Username updated successfully.", "user": updated_user}
+
+
+async def _verify_current_password(db: AsyncSession, email: str, password: str):
+    full_user = await get_user_by_email(db, email)
+    if not full_user or not verify_password(password, full_user["password"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is incorrect.",
+        )
+
+
+@router.get("/security")
+async def get_security(current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Return security settings summary for the settings UI."""
+    security = await get_security_settings(db, current_user["id"])
+    if security is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"security": security}
+
+
+@router.put("/security/recovery-email")
+async def update_recovery_email(
+    body: RecoveryEmailRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    if body.recovery_email == current_user["email"].lower():
+        raise HTTPException(
+            status_code=400,
+            detail="Recovery email must be different from your account email.",
+        )
+    security = await set_recovery_email(db, current_user["id"], body.recovery_email)
+    return {"message": "Recovery email saved.", "security": security}
+
+
+@router.delete("/security/recovery-email")
+async def remove_recovery_email(
+    body: RemoveRecoveryEmailRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    security = await set_recovery_email(db, current_user["id"], None)
+    return {"message": "Recovery email removed.", "security": security}
+
+
+@router.post("/security/2fa/setup")
+async def setup_2fa(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new TOTP secret (replaces any pending setup)."""
+    security = await get_security_settings(db, current_user["id"])
+    if security and security.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is already enabled.")
+
+    secret = generate_totp_secret()
+    await set_totp_secret(db, current_user["id"], secret)
+    uri = totp_provisioning_uri(secret, current_user["email"])
+    return {
+        "secret": secret,
+        "provisioning_uri": uri,
+        "issuer": "ToolChain AI",
+    }
+
+
+@router.post("/security/2fa/enable")
+async def enable_2fa(
+    body: TotpEnableRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    auth_user = await get_user_auth_by_id(db, current_user["id"])
+    if not auth_user or not auth_user.get("totp_secret"):
+        raise HTTPException(status_code=400, detail="Run 2FA setup first.")
+
+    if not verify_totp_code(auth_user["totp_secret"], body.code):
+        raise HTTPException(status_code=400, detail="Invalid verification code.")
+
+    security = await enable_totp(db, current_user["id"])
+    return {"message": "Two-factor authentication enabled.", "security": security}
+
+
+@router.post("/security/2fa/disable")
+async def disable_2fa(
+    body: TotpDisableRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    auth_user = await get_user_auth_by_id(db, current_user["id"])
+    if not auth_user or not auth_user.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is not enabled.")
+
+    if not verify_totp_code(auth_user["totp_secret"], body.code):
+        raise HTTPException(status_code=400, detail="Invalid verification code.")
+
+    security = await disable_totp(db, current_user["id"])
+    return {"message": "Two-factor authentication disabled.", "security": security}
+
+
+@router.put("/security/lock-pin")
+async def update_lock_pin(
+    body: LockPinRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    pin_hash = hash_pin(body.pin)
+    security = await set_lock_pin(db, current_user["id"], pin_hash)
+    return {"message": "Website lock PIN saved.", "security": security}
+
+
+@router.delete("/security/lock-pin")
+async def remove_lock_pin(
+    body: LockPinRemoveRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _verify_current_password(db, current_user["email"], body.password)
+    security = await set_lock_pin(db, current_user["id"], None)
+    return {"message": "Website lock PIN removed.", "security": security}
+
+
+@router.post("/security/lock-pin/verify")
+async def verify_lock_pin(
+    body: LockPinVerifyRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ok = await verify_user_lock_pin(db, current_user["id"], body.pin)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Incorrect PIN.")
+    return {"verified": True}
 
 
 @router.delete("/account")

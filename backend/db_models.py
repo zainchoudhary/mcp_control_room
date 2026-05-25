@@ -31,7 +31,19 @@ class User(Base):
     plan: Mapped[str] = mapped_column(String(30), nullable=False, default="free")
     subscription_end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    recovery_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    lock_pin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     devices: Mapped[list["UserDevice"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+    def security_summary(self) -> dict:
+        return {
+            "recovery_email": self.recovery_email,
+            "totp_enabled": bool(self.totp_enabled),
+            "lock_pin_set": bool(self.lock_pin_hash),
+        }
 
     def to_dict(self, include_password: bool = False) -> dict:
         d = {
@@ -44,9 +56,12 @@ class User(Base):
             "subscription_end_date": self.subscription_end_date.isoformat() if self.subscription_end_date else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "security": self.security_summary(),
         }
         if include_password:
             d["password"] = self.password
+            d["totp_secret"] = self.totp_secret
+            d["totp_enabled"] = bool(self.totp_enabled)
         return d
 
 

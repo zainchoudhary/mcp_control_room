@@ -54,6 +54,15 @@ async function signup({ username, email, password, confirm_password, full_name }
 
 async function login({ email, password }) {
   const data = await authRequest('/login', { email, password })
+  if (data.requires_2fa) {
+    return data
+  }
+  setAuth(data.access_token, data.user)
+  return data
+}
+
+async function verifyLogin2fa({ pending_token, code }) {
+  const data = await authRequest('/login/verify-2fa', { pending_token, code })
   setAuth(data.access_token, data.user)
   return data
 }
@@ -117,4 +126,4 @@ async function fetchMe() {
   return user
 }
 
-export { getToken, getSavedUser, signup, login, logout, fetchMe, forgotPassword, resetPassword, updateToken }
+export { getToken, getSavedUser, signup, login, verifyLogin2fa, logout, fetchMe, forgotPassword, resetPassword, updateToken }

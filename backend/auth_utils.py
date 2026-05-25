@@ -27,6 +27,7 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "toolchain-ai-secret-change-in-producti
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 RESET_TOKEN_EXPIRE_MINUTES = 15
+PENDING_2FA_EXPIRE_MINUTES = 10
 
 security = HTTPBearer(auto_error=False)
 
@@ -53,11 +54,32 @@ def create_access_token(
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_pending_2fa_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=PENDING_2FA_EXPIRE_MINUTES)
+    payload = {
+        "sub": user_id,
+        "purpose": "2fa_pending",
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_pending_2fa_token(token: str) -> Optional[str]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "2fa_pending":
+            return None
+        return payload.get("sub")
+    except jwt.InvalidTokenError:
+        return None
+
+
 def decode_access_token(token: str) -> tuple[Optional[str], Optional[str]]:
     """Return (user_id, client_device_id) from token, or (None, None) if invalid/expired."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("purpose") == "password_reset":
+        if payload.get("purpose") in ("password_reset", "2fa_pending"):
             return None, None
         return payload.get("sub"), payload.get("did")
     except jwt.ExpiredSignatureError:

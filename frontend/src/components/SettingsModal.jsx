@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard, Monitor, SearchCheck, XCircle } from 'lucide-react'
-import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, checkUsernameAvailability, listAccountDevices, removeAccountDevice } from '../api.js'
+import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, checkUsernameAvailability, listAccountDevices, removeAccountDevice, getSecuritySettings } from '../api.js'
+import { SecurityFeatures } from './SecurityFeatures.jsx'
 import { logout } from '../auth.js'
 import { getClientDeviceId, clearClientDeviceId } from '../utils/deviceId.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
@@ -668,6 +669,7 @@ function AccountTab({ user, onLogout, busy, onBusyChange }) {
 
 function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
   const [openPanel, setOpenPanel] = useState(null)
+  const [security, setSecurity] = useState(user?.security || {})
   const [username, setUsername] = useState(user?.username || '')
   const [usernameMsg, setUsernameMsg] = useState(null)
   const [usernameSaving, setUsernameSaving] = useState(false)
@@ -688,6 +690,7 @@ function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
   const [pwSaving, setPwSaving] = useState(false)
   const [showCurrentPw, setShowCurrentPw] = useState(false)
   const [showNewPw, setShowNewPw] = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
 
   const passStrength = useMemo(() => {
     if (!newPw) return { level: 0, label: '', color: '' }
@@ -707,6 +710,22 @@ function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
     if (user?.username) setUsername(user.username)
   }, [user?.username])
 
+  useEffect(() => {
+    if (user?.security) setSecurity(user.security)
+  }, [user?.security])
+
+  useEffect(() => {
+    if (!user?.id) return
+    getSecuritySettings()
+      .then((res) => setSecurity(res.security || {}))
+      .catch(() => {})
+  }, [user?.id])
+
+  const handleSecurityChange = useCallback((next) => {
+    setSecurity(next)
+    if (onUserUpdated && user) onUserUpdated({ ...user, security: next })
+  }, [user, onUserUpdated])
+
   const togglePanel = useCallback((panel) => {
     setOpenPanel((prev) => {
       if (prev === panel) return null
@@ -721,6 +740,7 @@ function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
         setConfirmPw('')
         setShowCurrentPw(false)
         setShowNewPw(false)
+        setShowConfirmPw(false)
       }
       return panel
     })
@@ -896,14 +916,19 @@ function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
           </div>
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Confirm New Password</label>
-            <input
-              className={styles.formInput}
-              type="password"
-              value={confirmPw}
-              onChange={(e) => { setConfirmPw(e.target.value); setPwMsg(null) }}
-              placeholder="Confirm new password"
-              disabled={busy}
-            />
+            <div className={styles.inputWrap}>
+              <input
+                className={styles.formInput}
+                type={showConfirmPw ? 'text' : 'password'}
+                value={confirmPw}
+                onChange={(e) => { setConfirmPw(e.target.value); setPwMsg(null) }}
+                placeholder="Confirm new password"
+                disabled={busy}
+              />
+              <button type="button" className={styles.inputToggle} onClick={() => setShowConfirmPw(!showConfirmPw)} disabled={busy}>
+                {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
             {confirmErr && <span className={styles.validationErr}>{confirmErr}</span>}
           </div>
           <div className={styles.formActions}>
@@ -919,6 +944,17 @@ function SecurityTab({ user, onUserUpdated, busy, onBusyChange }) {
           )}
         </form>
       </CollapsibleSection>
+
+        <SecurityFeatures
+          user={user}
+          security={security}
+          onSecurityChange={handleSecurityChange}
+          busy={busy}
+          onBusyChange={onBusyChange}
+          openPanel={openPanel}
+          onTogglePanel={togglePanel}
+          CollapsibleSection={CollapsibleSection}
+        />
       </SettingsGroup>
     </div>
   )

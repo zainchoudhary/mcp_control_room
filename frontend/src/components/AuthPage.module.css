@@ -392,11 +392,18 @@
   background: var(--bg-secondary);
   border: 1.5px solid var(--border-default);
   border-radius: var(--radius);
-  padding: 10px 38px 10px 36px;
+  padding: 10px 44px 10px 36px;
   font-size: 14px;
   color: var(--text-primary);
   transition: all 0.15s ease;
   font-family: var(--font-sans);
+}
+
+/* Browser password reveal hidden globally in index.css — scoped backup */
+.input[type='password']::-ms-reveal,
+.input[type='password']::-ms-clear,
+.input[type='password']::-webkit-password-reveal-button {
+  display: none !important;
 }
 
 .input::placeholder {
@@ -444,22 +451,27 @@
 
 .eyeBtn {
   position: absolute;
-  right: 8px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  padding: 4px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border-radius: 4px;
+  background: none;
+  box-shadow: none;
   color: var(--text-tertiary);
-  transition: all 0.15s ease;
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
 
-.eyeBtn:hover {
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
+.eyeBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  box-shadow: none;
 }
 
 /* ── Errors ── */

@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision: str = 'b8c9d0e1f2a3'
@@ -18,6 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if 'user_devices' in inspector.get_table_names():
+        return
+
     op.create_table(
         'user_devices',
         sa.Column('id', sa.String(length=36), nullable=False),

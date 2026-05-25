@@ -34,6 +34,8 @@ import { useAccentColor } from './hooks/useAccentColor.js'
 import { usePreferences, getStartupPage } from './hooks/usePreferences.js'
 import { applyCustomBg } from './utils/customBackground.js'
 import { registerCurrentDevice } from './utils/registerDevice.js'
+import { WebsiteLockOverlay } from './components/WebsiteLockOverlay.jsx'
+import { shouldShowLock, clearUnlockSession } from './utils/websiteLock.js'
 import { Bot, Menu } from 'lucide-react'
 import styles from './App.module.css'
 
@@ -87,6 +89,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
   const [toolExecState, setToolExecState] = useState({ mcpId: null, toolName: null, tools: null, formCache: {} })
+  const [appLocked, setAppLocked] = useState(false)
   const userId = user?.id || 'anon'
   const disabledKeyRef = useRef(`toolchain_disabled_mcps_${userId}`)
   const loadDisabled = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } }
@@ -227,8 +230,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [user, handleNavigate, focusChatSearch])
 
+  useEffect(() => {
+    if (user) setAppLocked(shouldShowLock(user.id, user.security))
+    else setAppLocked(false)
+  }, [user?.id, user?.security])
+
   const handleAuth = async (userData) => {
     setUser(userData)
+    setAppLocked(shouldShowLock(userData.id, userData.security))
     setDataLoading(false)
     await registerCurrentDevice(userData.id)
     const urlPage = getPageFromUrl()
@@ -254,8 +263,10 @@ export default function App() {
         setTimeout(() => {
           setLogoutLoading(false)
           setConfirmDialog(null)
+          clearUnlockSession(user?.id)
           logout()
           setUser(null)
+          setAppLocked(false)
           setMcps([])
           setMcpsLoading(true)
           setSessions([])
@@ -868,6 +879,13 @@ export default function App() {
           />
         )}
         <ToastContainer toasts={toasts} dismiss={dismiss} />
+        {user && appLocked && user.security?.lock_pin_set && (
+          <WebsiteLockOverlay
+            user={user}
+            security={user.security}
+            onUnlocked={() => setAppLocked(false)}
+          />
+        )}
       </div>
     )
   }
@@ -1060,6 +1078,13 @@ export default function App() {
       )}
 
       <ToastContainer toasts={toasts} dismiss={dismiss} />
+      {user && appLocked && user.security?.lock_pin_set && (
+        <WebsiteLockOverlay
+          user={user}
+          security={user.security}
+          onUnlocked={() => setAppLocked(false)}
+        />
+      )}
     </div>
   )
 }
