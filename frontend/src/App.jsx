@@ -257,6 +257,7 @@ export default function App() {
       message: 'Are you sure you want to sign out? You will need to log in again.',
       confirmLabel: 'Sign Out',
       icon: 'logout',
+      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: () => {
         setLogoutLoading(true)
@@ -644,6 +645,7 @@ export default function App() {
       message: `Disconnect "${name}"? You will need to re-authenticate to use it again.`,
       confirmLabel: 'Disconnect',
       icon: 'disconnect',
+      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: async () => {
         setConfirmDialog(null)
@@ -682,6 +684,7 @@ export default function App() {
       message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
       confirmLabel: 'Delete',
       icon: 'delete',
+      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: async () => {
         setDeleteLoading(true)
@@ -872,6 +875,7 @@ export default function App() {
             message={confirmDialog.message}
             confirmLabel={confirmDialog.confirmLabel}
             icon={confirmDialog.icon}
+            animation={confirmDialog.animation}
             variant={confirmDialog.variant}
             onConfirm={confirmDialog.onConfirm}
             onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}
@@ -1070,6 +1074,7 @@ export default function App() {
           message={confirmDialog.message}
           confirmLabel={confirmDialog.confirmLabel}
           icon={confirmDialog.icon}
+          animation={confirmDialog.animation}
           variant={confirmDialog.variant}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}

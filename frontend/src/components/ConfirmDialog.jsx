@@ -9,6 +9,7 @@ const ICONS = {
   disconnect: Unplug,
 }
 
+/** 'pageFlip' = book page turn; 'default' = simple drop */
 export function ConfirmDialog({
   open,
   title,
@@ -17,6 +18,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   variant = 'danger',
   icon = 'warning',
+  animation = 'default',
   onConfirm,
   onCancel,
   loading = false,
@@ -33,32 +35,41 @@ export function ConfirmDialog({
   if (!open) return null
 
   const Icon = ICONS[icon] || AlertTriangle
+  const isPageFlip = animation === 'pageFlip'
 
   return (
     <div
-      className={styles.overlay}
+      className={`${styles.overlay} ${isPageFlip ? styles.overlayFlip : ''}`}
       ref={overlayRef}
       onClick={(e) => { if (e.target === overlayRef.current && !loading) onCancel() }}
     >
-      <div className={styles.modal}>
-        
-        <div className={styles.body}>
-          <div className={`${styles.badge} ${styles[`badge_${variant}`]}`}>
-            <Icon size={20} strokeWidth={2.5} />
-          </div>
-          
-          <div className={styles.text}>
-            <h2 className={styles.title}>{title}</h2>
-            <p className={styles.msg}>{message}</p>
-          </div>
+      <div className={isPageFlip ? styles.flipStage : undefined}>
+        <div
+          className={`${styles.modal} ${isPageFlip ? styles.modalPageFlip : styles.modalDefault} ${styles[`modal_${variant}`]}`}
+          key={`${title}-${animation}`}
+        >
+          <div className={styles.body}>
+            <div className={`${styles.badge} ${styles[`badge_${variant}`]}`}>
+              <Icon size={20} strokeWidth={2.5} />
+            </div>
 
-          <div className={styles.actions}>
-            <button className={`${styles.btn} ${styles[`btn_${variant}`]}`} onClick={onConfirm} disabled={loading}>
-              {loading ? <span className={styles.spin} /> : confirmLabel}
-            </button>
-            <button className={styles.btnGhost} onClick={onCancel} disabled={loading}>
-              {cancelLabel}
-            </button>
+            <div className={styles.text}>
+              <h2 className={styles.title}>{title}</h2>
+              <p className={styles.msg}>{message}</p>
+            </div>
+
+            <div className={styles.actions}>
+              <button
+                className={`${styles.btn} ${styles[`btn_${variant}`]}`}
+                onClick={onConfirm}
+                disabled={loading}
+              >
+                {loading ? <span className={styles.spin} /> : confirmLabel}
+              </button>
+              <button className={styles.btnGhost} onClick={onCancel} disabled={loading}>
+                {cancelLabel}
+              </button>
+            </div>
           </div>
         </div>
       </div>
