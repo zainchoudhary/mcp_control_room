@@ -4,6 +4,10 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Copy, Check, User, Bot, Wrench, ChevronDown, ChevronUp, Pencil, X, Send } from 'lucide-react'
+import { fetchAttachmentBlob } from '../api.js'
+import { parseUserMessageContent } from '../utils/chatAttachments.js'
+import { stabilizeStreamingMarkdown } from '../utils/streamingMarkdown.js'
+import { FileAttachmentCard } from './FileAttachmentCard.jsx'
 import styles from './ChatMessage.module.css'
 
 function CodeBlock({ language, children }) {
@@ -216,9 +220,90 @@ const markdownComponents = {
   hr() { return <hr className={styles.hr} /> },
 }
 
-export function ChatMessage({ message, isStreaming, onEdit }) {
+function AssistantMessageContent({ content, isStreaming }) {
+  const parts = useMemo(() => parseContent(content), [content])
+
+  if (!parts?.length && !content) return null
+
+  return (
+    <div className={isStreaming ? styles.streamingMarkdown : undefined}>
+      {parts.map((part, i) => {
+        if (part.type === 'tool_use') {
+          return <ToolCall key={`tool-${i}`} tool={part.tool} input={part.input} />
+        }
+        if (part.type === 'tool_result') {
+          return <ToolResult key={`result-${i}`} tool={part.tool} content={part.content} />
+        }
+        const md = isStreaming ? stabilizeStreamingMarkdown(part.content) : part.content
+        if (!md?.trim() && isStreaming) return null
+        return (
+          <ReactMarkdown
+            key={`md-${i}`}
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {md}
+          </ReactMarkdown>
+        )
+      })}
+      {isStreaming && <span className={styles.cursor} aria-hidden />}
+    </div>
+  )
+}
+
+function UserAttachments({ attachments, sessionId }) {
+  const [previews, setPreviews] = useState({})
+
+  useEffect(() => {
+    if (!sessionId || !attachments?.length) return
+    let cancelled = false
+    const urls = []
+
+    ;(async () => {
+      const next = {}
+      for (const att of attachments) {
+        if (att.kind !== 'image') continue
+        try {
+          const blob = await fetchAttachmentBlob(sessionId, att.id)
+          const url = URL.createObjectURL(blob)
+          urls.push(url)
+          next[att.id] = url
+        } catch {
+          /* skip */
+        }
+      }
+      if (!cancelled) setPreviews(next)
+    })()
+
+    return () => {
+      cancelled = true
+      urls.forEach((u) => URL.revokeObjectURL(u))
+    }
+  }, [sessionId, attachments])
+
+  if (!attachments?.length) return null
+
+  return (
+    <div className={styles.userAttachments}>
+      {attachments.map((att) => (
+        <FileAttachmentCard
+          key={att.id}
+          name={att.name}
+          kind={att.kind === 'text' ? 'document' : att.kind}
+          previewUrl={previews[att.id]}
+          variant="message"
+        />
+      ))}
+    </div>
+  )
+}
+
+export function ChatMessage({ message, sessionId, isStreaming, onEdit }) {
   const isUser = message.role === 'user'
-  const parts = useMemo(() => isUser ? null : parseContent(message.content), [message.content, isUser])
+  const userParsed = useMemo(
+    () => (isUser ? parseUserMessageContent(message.content) : null),
+    [isUser, message.content]
+  )
   const [contentCopied, setContentCopied] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
@@ -233,13 +318,14 @@ export function ChatMessage({ message, isStreaming, onEdit }) {
   }, [editing])
 
   const handleCopyAll = async () => {
-    await navigator.clipboard.writeText(message.content)
+    const copyText = isUser ? (userParsed?.text ?? message.content) : message.content
+    await navigator.clipboard.writeText(copyText)
     setContentCopied(true)
     setTimeout(() => setContentCopied(false), 2000)
   }
 
   const startEdit = () => {
-    setEditText(message.content)
+    setEditText(userParsed?.text ?? message.content)
     setEditing(true)
   }
 
@@ -250,7 +336,8 @@ export function ChatMessage({ message, isStreaming, onEdit }) {
 
   const submitEdit = () => {
     const trimmed = editText.trim()
-    if (!trimmed || trimmed === message.content) {
+    const originalText = userParsed?.text ?? message.content
+    if (!trimmed || trimmed === originalText) {
       cancelEdit()
       return
     }
@@ -307,25 +394,23 @@ export function ChatMessage({ message, isStreaming, onEdit }) {
                   </div>
                 </div>
               ) : (
-                <p className={styles.paragraph}>{message.content}</p>
+                <>
+                  {userParsed?.attachments?.length > 0 && (
+                    <UserAttachments
+                      attachments={userParsed.attachments}
+                      sessionId={sessionId}
+                    />
+                  )}
+                  {(userParsed?.text || '').trim() && (
+                    <p className={styles.paragraph}>{userParsed.text}</p>
+                  )}
+                </>
               )
             ) : (
-              <>
-                {parts?.map((part, i) => {
-                  if (part.type === 'tool_use') {
-                    return <ToolCall key={i} tool={part.tool} input={part.input} />
-                  }
-                  if (part.type === 'tool_result') {
-                    return <ToolResult key={i} tool={part.tool} content={part.content} />
-                  }
-                  return (
-                    <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {part.content}
-                    </ReactMarkdown>
-                  )
-                })}
-                {isStreaming && <span className={styles.cursor} />}
-              </>
+              <AssistantMessageContent
+                content={message.content}
+                isStreaming={isStreaming}
+              />
             )}
           </div>
 

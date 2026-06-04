@@ -7,6 +7,13 @@
   background: transparent;
 }
 
+.userAttachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .assistantMessage {
   background: var(--bg-secondary);
 }
@@ -63,6 +70,37 @@
   line-height: 1.7;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.streamingMarkdown {
+  min-height: 1.5em;
+}
+
+.streamingMarkdown .paragraph:last-child,
+.streamingMarkdown .heading:last-child,
+.streamingMarkdown .list:last-child {
+  margin-bottom: 0;
+}
+
+.streamingMarkdown .cursor {
+  margin-top: 2px;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: cursorBlink 1s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .paragraph {
@@ -267,16 +305,6 @@
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-}
-
-.cursor {
-  display: inline-block;
-  width: 2px;
-  height: 18px;
-  background: var(--accent);
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  animation: blink 1s infinite;
 }
 
 .actions {

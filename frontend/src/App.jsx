@@ -12,7 +12,11 @@ import {
   probeMCP,
   streamChat,
   getWeeklyStats,
+  uploadChatAttachment,
+  deleteChatAttachment,
+  fetchAttachmentBlob,
 } from './api.js'
+import { formatUserMessageForDisplay } from './utils/chatAttachments.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
 import { DashboardPage } from './components/DashboardPage.jsx'
@@ -85,6 +89,9 @@ export default function App() {
   const [searchFocusToken, setSearchFocusToken] = useState(0)
   const [streamingId, setStreamingId] = useState(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [chatAttachments, setChatAttachments] = useState([])
+  const [pendingUploads, setPendingUploads] = useState([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [dataLoading, setDataLoading] = useState(!!savedUser)
   const [weeklyStats, setWeeklyStats] = useState(null)
@@ -104,6 +111,44 @@ export default function App() {
   const messagesEndRef = useRef(null)
   const chatAreaRef = useRef(null)
   const pendingPromptRef = useRef(null)
+  const attachmentUrlsRef = useRef([])
+  const streamPendingRef = useRef('')
+  const streamFlushTimerRef = useRef(null)
+  const STREAM_RENDER_MS = 45
+
+  const flushStreamContent = useCallback((assistantId) => {
+    if (streamFlushTimerRef.current) {
+      clearTimeout(streamFlushTimerRef.current)
+      streamFlushTimerRef.current = null
+    }
+    const delta = streamPendingRef.current
+    streamPendingRef.current = ''
+    if (!delta) return
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId ? { ...m, content: m.content + delta } : m
+      )
+    )
+  }, [])
+
+  const appendStreamContent = useCallback((assistantId, chunk) => {
+    if (!chunk) return
+    streamPendingRef.current += chunk
+    if (streamFlushTimerRef.current) return
+    streamFlushTimerRef.current = setTimeout(() => {
+      streamFlushTimerRef.current = null
+      flushStreamContent(assistantId)
+    }, STREAM_RENDER_MS)
+  }, [flushStreamContent])
+
+  const appendStreamLine = useCallback((assistantId, line) => {
+    flushStreamContent(assistantId)
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId ? { ...m, content: m.content + line } : m
+      )
+    )
+  }, [flushStreamContent])
 
   useEffect(() => {
     let cancelled = false
@@ -207,7 +252,7 @@ export default function App() {
       if (key === 'b') {
         e.preventDefault()
         setSidebarCollapsed((c) => !c)
-      } else if (key === 'n' && e.shiftKey) {
+      } else if (key === 'n' && e.altKey) {
         e.preventDefault()
         setSessionId(null)
         setMessages([])
@@ -372,14 +417,115 @@ export default function App() {
     return data.id
   }
 
+  const clearComposerAttachments = useCallback(() => {
+    attachmentUrlsRef.current.forEach((url) => {
+      if (url) URL.revokeObjectURL(url)
+    })
+    attachmentUrlsRef.current = []
+    setChatAttachments([])
+    setPendingUploads((prev) => {
+      prev.forEach((p) => {
+        if (p.previewUrl) URL.revokeObjectURL(p.previewUrl)
+      })
+      return []
+    })
+  }, [])
+
+  const handleAddFiles = async (files) => {
+    if (!files?.length) return
+
+    const batch = files.map((file) => {
+      const isImage = file.type.startsWith('image/')
+      const previewUrl = isImage ? URL.createObjectURL(file) : null
+      if (previewUrl) attachmentUrlsRef.current.push(previewUrl)
+      return {
+        tempId: crypto.randomUUID(),
+        name: file.name,
+        kind: isImage ? 'image' : 'document',
+        previewUrl,
+        file,
+      }
+    })
+
+    setPendingUploads((prev) => [
+      ...prev,
+      ...batch.map(({ file, ...rest }) => rest),
+    ])
+    setUploadingFiles(true)
+
+    try {
+      const sid = await ensureSession()
+      for (const item of batch) {
+        try {
+          const att = await uploadChatAttachment(sid, item.file)
+          let previewUrl = item.previewUrl
+          if (att.kind === 'image' && !previewUrl) {
+            try {
+              const blob = await fetchAttachmentBlob(sid, att.id)
+              previewUrl = URL.createObjectURL(blob)
+              attachmentUrlsRef.current.push(previewUrl)
+            } catch {
+              /* ignore */
+            }
+          }
+          setChatAttachments((prev) => [...prev, { ...att, previewUrl }])
+        } catch (err) {
+          toast(err.message, 'error')
+        } finally {
+          if (item.previewUrl) {
+            URL.revokeObjectURL(item.previewUrl)
+            attachmentUrlsRef.current = attachmentUrlsRef.current.filter((u) => u !== item.previewUrl)
+          }
+          setPendingUploads((prev) => prev.filter((p) => p.tempId !== item.tempId))
+        }
+      }
+    } finally {
+      setUploadingFiles(false)
+    }
+  }
+
+  const handleRemoveAttachment = async (attachmentId) => {
+    const pending = pendingUploads.find((p) => p.tempId === attachmentId)
+    if (pending) {
+      if (pending.previewUrl) URL.revokeObjectURL(pending.previewUrl)
+      setPendingUploads((prev) => prev.filter((p) => p.tempId !== attachmentId))
+      return
+    }
+
+    const att = chatAttachments.find((a) => a.id === attachmentId)
+    if (att?.previewUrl) {
+      URL.revokeObjectURL(att.previewUrl)
+      attachmentUrlsRef.current = attachmentUrlsRef.current.filter((u) => u !== att.previewUrl)
+    }
+    setChatAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
+    if (sessionId) {
+      try {
+        await deleteChatAttachment(sessionId, attachmentId)
+      } catch (err) {
+        toast(err.message, 'error')
+      }
+    }
+  }
+
   const send = async (overrideText) => {
     const text = (typeof overrideText === 'string' ? overrideText : input).trim()
-    if (!text || sending) return
+    const hasAttachments = chatAttachments.length > 0
+    if ((!text && !hasAttachments) || sending || uploadingFiles) return
+
+    const messageText =
+      text || 'Please review the attached file(s) and answer my questions about them.'
+    const sentAttachments = [...chatAttachments]
+    const attachmentIds = sentAttachments.map((a) => a.id)
 
     setInput('')
+    clearComposerAttachments()
     setSending(true)
 
-    const userMsg = { id: crypto.randomUUID(), role: 'user', content: text }
+    const userMsg = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: formatUserMessageForDisplay(messageText, sentAttachments),
+    }
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '' }])
     setStreamingId(assistantId)
@@ -388,27 +534,21 @@ export default function App() {
       const sid = await ensureSession()
 
       if (messages.length === 0) {
-        const title = text.length > 80 ? text.slice(0, 80) + '...' : text
+        const titleSource = messageText
+        const title = titleSource.length > 80 ? titleSource.slice(0, 80) + '...' : titleSource
         setSessions((prev) =>
           prev.map((s) => (s.id === sid ? { ...s, title } : s))
         )
       }
 
-      for await (const event of streamChat(sid, text, [...enabledMcpIds])) {
+      streamPendingRef.current = ''
+      for await (const event of streamChat(sid, messageText, [...enabledMcpIds], attachmentIds)) {
         if (event.type === 'token') {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: m.content + (event.content || '') } : m
-            )
-          )
+          appendStreamContent(assistantId, event.content || '')
         }
         if (event.type === 'tool_use') {
           const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: m.content + line } : m
-            )
-          )
+          appendStreamLine(assistantId, line)
         }
         if (event.type === 'tool_result') {
           let displayContent = event.content || ''
@@ -418,11 +558,7 @@ export default function App() {
           } catch {}
           const encoded = btoa(unescape(encodeURIComponent(displayContent)))
           const line = `Result: ${event.tool} -> @@JSON@@${encoded}@@END@@\n`
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: m.content + line } : m
-            )
-          )
+          appendStreamLine(assistantId, line)
         }
         if (event.type === 'error') {
           const msg = event.content || 'Stream error'
@@ -430,6 +566,7 @@ export default function App() {
           if (!isRetryable) toast(msg, 'error')
         }
       }
+      flushStreamContent(assistantId)
     } catch (err) {
       toast(err.message, 'error')
       setMessages((prev) =>
@@ -438,6 +575,7 @@ export default function App() {
         )
       )
     } finally {
+      flushStreamContent(assistantId)
       setSending(false)
       setStreamingId(null)
     }
@@ -459,26 +597,22 @@ export default function App() {
 
     try {
       const sid = await ensureSession()
-      for await (const event of streamChat(sid, newText, [...enabledMcpIds])) {
+      const attachmentIds = chatAttachments.map((a) => a.id)
+      streamPendingRef.current = ''
+      for await (const event of streamChat(sid, newText, [...enabledMcpIds], attachmentIds)) {
         if (event.type === 'token') {
-          setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + (event.content || '') } : m)
-          )
+          appendStreamContent(assistantId, event.content || '')
         }
         if (event.type === 'tool_use') {
           const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
-          setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + line } : m)
-          )
+          appendStreamLine(assistantId, line)
         }
         if (event.type === 'tool_result') {
           let displayContent = event.content || ''
           try { displayContent = JSON.stringify(JSON.parse(displayContent), null, 2) } catch {}
           const encoded = btoa(unescape(encodeURIComponent(displayContent)))
           const line = `Result: ${event.tool} -> @@JSON@@${encoded}@@END@@\n`
-          setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, content: m.content + line } : m)
-          )
+          appendStreamLine(assistantId, line)
         }
         if (event.type === 'error') {
           const msg = event.content || 'Stream error'
@@ -486,18 +620,21 @@ export default function App() {
           if (!isRetryable) toast(msg, 'error')
         }
       }
+      flushStreamContent(assistantId)
     } catch (err) {
       toast(err.message, 'error')
       setMessages((prev) =>
         prev.map((m) => m.id === assistantId ? { ...m, content: 'Failed to get response. Please try again.' } : m)
       )
     } finally {
+      flushStreamContent(assistantId)
       setSending(false)
       setStreamingId(null)
     }
   }
 
   const handleNewChat = () => {
+    clearComposerAttachments()
     setSessionId(null)
     setMessages([])
     setStreamingId(null)
@@ -505,6 +642,8 @@ export default function App() {
     setActivePage('chat')
     window.history.pushState(null, '', '/chat')
   }
+
+  useEffect(() => () => clearComposerAttachments(), [clearComposerAttachments])
 
   useEffect(() => {
     if (activePage === 'chat' && pendingPromptRef.current && !sending) {
@@ -525,6 +664,7 @@ export default function App() {
     setActivePage('chat')
     window.history.pushState(null, '', '/chat')
     try {
+      clearComposerAttachments()
       const msgs = await getMessages(id)
       setMessages(msgs.map((m) => ({ id: crypto.randomUUID(), ...m })))
     } catch {
@@ -1038,6 +1178,7 @@ export default function App() {
                     <ChatMessage
                       key={m.id}
                       message={m}
+                      sessionId={sessionId}
                       isStreaming={m.id === streamingId}
                       onEdit={m.role === 'user' && !sending ? handleEditMessage : undefined}
                     />
@@ -1057,6 +1198,11 @@ export default function App() {
               mcps={connectedMcps}
               enabledIds={enabledMcpIds}
               onToggle={onChatToggle}
+              attachments={chatAttachments}
+              pendingUploads={pendingUploads}
+              onAddFiles={handleAddFiles}
+              onRemoveAttachment={handleRemoveAttachment}
+              uploadingFiles={uploadingFiles}
               t={t}
             />
           </div>

@@ -161,12 +161,51 @@ export const exportAllChats = async () => {
   URL.revokeObjectURL(url)
 }
 
+// Chat attachments
+export const listChatAttachments = (sessionId) =>
+  request(`/sessions/${sessionId}/attachments`)
+
+export async function uploadChatAttachment(sessionId, file) {
+  const token = getToken()
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${BASE}/sessions/${sessionId}/attachments`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    const detail = err.detail
+    throw new Error(typeof detail === 'string' ? detail : `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export const deleteChatAttachment = (sessionId, attachmentId) =>
+  request(`/sessions/${sessionId}/attachments/${attachmentId}`, { method: 'DELETE' })
+
+export async function fetchAttachmentBlob(sessionId, attachmentId) {
+  const token = getToken()
+  const res = await fetch(
+    `${BASE}/sessions/${sessionId}/attachments/${attachmentId}/file`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  )
+  if (!res.ok) throw new Error('Failed to load file')
+  return res.blob()
+}
+
 // Chat Stream
-export async function* streamChat(sessionId, message, mcpIds = []) {
+export async function* streamChat(sessionId, message, mcpIds = [], attachmentIds = []) {
   const res = await fetch(`${BASE}/chat/stream`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ session_id: sessionId, message, mcp_ids: mcpIds }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      message,
+      mcp_ids: mcpIds,
+      attachment_ids: attachmentIds.length ? attachmentIds : undefined,
+    }),
   })
 
   if (!res.ok) {

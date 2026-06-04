@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,6 +48,15 @@ from database import (
 )
 from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
+from chat_attachments import (
+    verify_session_owner,
+    save_attachment,
+    list_attachments,
+    delete_attachment,
+    get_attachment_file,
+    build_agent_attachment_context,
+    format_stored_user_message,
+)
 from auth_routes import router as auth_router
 from stripe_routes import router as stripe_router, get_user_limits
 from auth_utils import get_current_user, send_contact_email
@@ -129,6 +138,7 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     mcp_ids: Optional[list[str]] = None
+    attachment_ids: Optional[list[str]] = None
 
 
 class ContactRequest(BaseModel):
@@ -648,6 +658,53 @@ async def api_get_messages(
     return messages
 
 
+# ─── Routes: Chat attachments ────────────────────────────────────────────────
+
+@app.get("/api/sessions/{session_id}/attachments")
+async def api_list_attachments(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_session_owner(db, session_id, user["id"])
+    return list_attachments(user["id"], session_id)
+
+
+@app.post("/api/sessions/{session_id}/attachments")
+async def api_upload_attachment(
+    session_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_session_owner(db, session_id, user["id"])
+    return await save_attachment(user["id"], session_id, file)
+
+
+@app.delete("/api/sessions/{session_id}/attachments/{attachment_id}", status_code=204)
+async def api_delete_attachment(
+    session_id: str,
+    attachment_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_session_owner(db, session_id, user["id"])
+    if not delete_attachment(user["id"], session_id, attachment_id):
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+
+
+@app.get("/api/sessions/{session_id}/attachments/{attachment_id}/file")
+async def api_get_attachment_file(
+    session_id: str,
+    attachment_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await verify_session_owner(db, session_id, user["id"])
+    path, mime = get_attachment_file(user["id"], session_id, attachment_id)
+    return FileResponse(path, media_type=mime, filename=path.name.split("_", 1)[-1])
+
+
 # ─── Routes: Chat (SSE streaming) ────────────────────────────────────────────
 
 @app.post("/api/chat/stream")
@@ -660,14 +717,23 @@ async def api_chat_stream(
     SSE endpoint. Opens MCP connections, runs the LangGraph agent,
     and streams tokens back to the client. Enforces daily message limit.
     """
+    await verify_session_owner(db, body.session_id, user["id"])
     history = await get_session_messages(db, body.session_id)
-    await save_message(db, body.session_id, "user", body.message)
+    current_user_id = str(user["id"])
+
+    manifest = list_attachments(current_user_id, body.session_id)
+    att_meta = manifest
+    if body.attachment_ids:
+        allowed_ids = set(body.attachment_ids)
+        att_meta = [a for a in manifest if a["id"] in allowed_ids]
+
+    stored_user = format_stored_user_message(body.message, att_meta)
+    await save_message(db, body.session_id, "user", stored_user)
 
     if not history:
         title = body.message[:80] + ("..." if len(body.message) > 80 else "")
         await update_session_title(db, body.session_id, title)
 
-    current_user_id = str(user["id"])
     logging.info("Chat stream: user_id=%s type=%s", current_user_id, type(current_user_id).__name__)
     connected_mcps = await get_connected_mcps(db, current_user_id)
     if body.mcp_ids is not None:
@@ -675,12 +741,21 @@ async def api_chat_stream(
         connected_mcps = [m for m in connected_mcps if m["id"] in allowed]
     session_id = body.session_id
     user_message = body.message
+    attachment_context = build_agent_attachment_context(
+        current_user_id,
+        session_id,
+        body.attachment_ids,
+        history=history,
+        user_message=user_message,
+    )
 
     async def event_generator():
         full_response_parts = []
 
         async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
-            async for sse_chunk in stream_agent_response(user_message, history, tools):
+            async for sse_chunk in stream_agent_response(
+                user_message, history, tools, attachment_context
+            ):
                 yield sse_chunk
 
                 if sse_chunk.startswith("data: "):

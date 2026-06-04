@@ -54,7 +54,7 @@ function CollapsibleSection({ panelId, openPanel, onToggle, icon: Icon, label, h
 }
 
 const SHORTCUTS = [
-  { label: 'New Chat', keys: ['Ctrl', 'Shift', 'N'] },
+  { label: 'New Chat', keys: ['Ctrl', 'Alt', 'N'] },
   { label: 'Toggle Sidebar', keys: ['Ctrl', 'B'] },
   { label: 'Settings', keys: ['Ctrl', ','] },
   { label: 'Search Chats', keys: ['Ctrl', 'K'] },

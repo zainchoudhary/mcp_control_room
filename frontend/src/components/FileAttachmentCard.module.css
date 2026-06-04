@@ -1,0 +1,244 @@
+.card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  max-width: 220px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  overflow: hidden;
+  flex-shrink: 0;
+  animation: attachIn 0.22s ease;
+}
+
+@keyframes attachIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.composer {
+  max-width: 200px;
+}
+
+.message {
+  max-width: 240px;
+}
+
+.imageCard {
+  flex-direction: column;
+  max-width: 120px;
+  padding: 0;
+}
+
+.imageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.imagePreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.imageMeta {
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.docBody {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 28px 8px 10px;
+  min-height: 52px;
+}
+
+.badge {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.badgePdf {
+  background: #c44e45;
+}
+
+.badgeDoc {
+  background: #3b6fd9;
+}
+
+.badgeText {
+  background: #5c6b7a;
+}
+
+.badgeData {
+  background: #6b5b95;
+}
+
+.badgeDefault {
+  background: #6b7280;
+}
+
+.badgeImage {
+  background: #0d9488;
+}
+
+.meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.fileName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.fileType {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.card:hover .removeBtn,
+.card:focus-within .removeBtn {
+  opacity: 1;
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.removeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Upload skeleton */
+.uploading .badge,
+.uploading .imageWrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.uploading .badge::after,
+.uploading .imageWrap::after,
+.skeletonBlock::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.12) 55%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.skeletonCard {
+  border-color: var(--border-subtle, var(--border-default));
+  background: var(--bg-tertiary);
+  pointer-events: none;
+}
+
+.skeletonBlock {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.skeletonLines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 8px;
+}
+
+.skeletonLine {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonLineWide {
+  width: 88%;
+}
+
+.skeletonLineShort {
+  width: 42%;
+}
+
+.skeletonImage {
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  background: var(--bg-hover);
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

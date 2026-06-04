@@ -103,6 +103,8 @@ async def delete_session(db: AsyncSession, session_id: str, user_id: str):
     )
     session = result.scalar_one_or_none()
     if session:
+        from chat_attachments import clear_session_attachments
+        clear_session_attachments(user_id, session_id)
         await db.delete(session)
         await db.commit()
         return True

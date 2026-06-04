@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Plus, Server, Plug, ChevronRight } from 'lucide-react'
+import { ArrowUp, Loader2, Plus, Server, Plug, ChevronRight, Paperclip, ImageIcon, FileText } from 'lucide-react'
+import { FileAttachmentCard } from './FileAttachmentCard.jsx'
 import styles from './ChatInput.module.css'
 
 export function ChatInput({
@@ -12,13 +13,31 @@ export function ChatInput({
   mcps,
   enabledIds,
   onToggle,
+  attachments = [],
+  pendingUploads = [],
+  onAddFiles,
+  onRemoveAttachment,
+  uploadingFiles = false,
   t: _t,
 }) {
   const t = _t || ((k) => k)
   const textareaRef = useRef(null)
   const wrapperRef = useRef(null)
+  const attachRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const imageInputRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+
+  const FILE_ACCEPT =
+    '.pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.html,.py,.js,.ts,.jsx,.tsx,.css,.yaml,.yml,.java,.c,.cpp,.go,.rs,.sql,.log'
+
+  const composerItems = [
+    ...pendingUploads.map((p) => ({ ...p, uploading: true })),
+    ...attachments.map((a) => ({ ...a, uploading: false })),
+  ]
+  const hasComposerFiles = composerItems.length > 0
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current
@@ -31,16 +50,19 @@ export function ChatInput({
   useEffect(() => { textareaRef.current?.focus() }, [])
 
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen && !attachMenuOpen) return
     const handleClick = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+      if (menuOpen && wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setMenuOpen(false)
         setShowConnectors(false)
+      }
+      if (attachMenuOpen && attachRef.current && !attachRef.current.contains(e.target)) {
+        setAttachMenuOpen(false)
       }
     }
     window.addEventListener('mousedown', handleClick)
     return () => window.removeEventListener('mousedown', handleClick)
-  }, [menuOpen])
+  }, [menuOpen, attachMenuOpen])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -50,17 +72,44 @@ export function ChatInput({
   }
 
   const toggleMenu = () => {
+    setAttachMenuOpen(false)
     setMenuOpen((v) => {
       if (v) setShowConnectors(false)
       return !v
     })
   }
 
-  const canSend = value.trim() && !sending
+  const canSend =
+    (value.trim() || attachments.length > 0) &&
+    !sending &&
+    !uploadingFiles &&
+    pendingUploads.length === 0
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length && onAddFiles) onAddFiles(files)
+    e.target.value = ''
+    setAttachMenuOpen(false)
+  }
+
+  const toggleAttachMenu = () => {
+    setAttachMenuOpen((v) => !v)
+    setMenuOpen(false)
+    setShowConnectors(false)
+  }
+
+  const openFilePicker = (mode) => {
+    setAttachMenuOpen(false)
+    if (mode === 'image') {
+      imageInputRef.current?.click()
+    } else {
+      fileInputRef.current?.click()
+    }
+  }
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.container}>
+      <div className={`${styles.container} ${hasComposerFiles ? styles.containerWithFiles : ''}`}>
         <div className={styles.inputArea}>
           <textarea
             ref={textareaRef}
@@ -72,6 +121,27 @@ export function ChatInput({
             rows={1}
             disabled={sending}
           />
+
+          {hasComposerFiles && (
+            <div className={styles.attachmentsRow}>
+              {composerItems.map((item) => (
+                <FileAttachmentCard
+                  key={item.tempId || item.id}
+                  name={item.name}
+                  kind={item.kind}
+                  previewUrl={item.previewUrl}
+                  uploading={item.uploading}
+                  variant="composer"
+                  disabled={sending || item.uploading}
+                  onRemove={
+                    item.uploading
+                      ? undefined
+                      : () => onRemoveAttachment?.(item.tempId || item.id)
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={styles.toolbar}>
@@ -87,6 +157,64 @@ export function ChatInput({
                 <span className={styles.badge}>{connectedCount}</span>
               )}
             </button>
+
+            <div className={styles.attachWrap} ref={attachRef}>
+              <input
+                ref={imageInputRef}
+                type="file"
+                className={styles.hiddenFileInput}
+                multiple
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleFileChange}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                className={styles.hiddenFileInput}
+                multiple
+                accept={FILE_ACCEPT}
+                onChange={handleFileChange}
+              />
+              <button
+                type="button"
+                className={`${styles.attachBtn} ${attachMenuOpen ? styles.attachBtnActive : ''}`}
+                onClick={toggleAttachMenu}
+                title="Attach"
+                disabled={sending}
+                aria-expanded={attachMenuOpen}
+              >
+                <Paperclip size={17} />
+              </button>
+
+              {attachMenuOpen && (
+                <div className={styles.attachMenuFloat}>
+                  <div className={styles.plusMenu}>
+                    <button
+                      type="button"
+                      className={styles.plusMenuItem}
+                      onClick={() => openFilePicker('file')}
+                    >
+                      <div className={styles.plusMenuIcon}><FileText size={15} /></div>
+                      <div className={styles.plusMenuText}>
+                        <span className={styles.plusMenuTitle}>Attach file</span>
+                        <span className={styles.plusMenuHint}>PDF, Word, Excel, text, code</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.plusMenuItem}
+                      onClick={() => openFilePicker('image')}
+                    >
+                      <div className={styles.plusMenuIcon}><ImageIcon size={15} /></div>
+                      <div className={styles.plusMenuText}>
+                        <span className={styles.plusMenuTitle}>Attach photo</span>
+                        <span className={styles.plusMenuHint}>JPG, PNG, GIF, WebP</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {menuOpen && (
               <div className={styles.floatingGroup}>
