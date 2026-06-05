@@ -1,10 +1,27 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
   Settings, Wrench, Crown, Zap, Sparkles, Search, X,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
+
+function groupSessionsByDate(sessions) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today - 86400000)
+  const weekAgo = new Date(today - 604800000)
+
+  const groups = { today: [], yesterday: [], week: [], older: [] }
+  sessions.forEach(s => {
+    const d = new Date(s.created_at)
+    if (d >= today) groups.today.push(s)
+    else if (d >= yesterday) groups.yesterday.push(s)
+    else if (d >= weekAgo) groups.week.push(s)
+    else groups.older.push(s)
+  })
+  return groups
+}
 
 export function Sidebar({
   activePage,
@@ -30,15 +47,53 @@ export function Sidebar({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(true)
   const [sessionSearch, setSessionSearch] = useState('')
+  const [searchPopupOpen, setSearchPopupOpen] = useState(false)
   const menuRef = useRef(null)
   const collapsedMenuRef = useRef(null)
   const searchInputRef = useRef(null)
+  const searchPopupRef = useRef(null)
 
-  const filteredSessions = useMemo(() => {
+  const popupSessions = useMemo(() => {
     if (!sessionSearch.trim()) return sessions
     const q = sessionSearch.toLowerCase()
     return sessions.filter(s => (s.title || '').toLowerCase().includes(q))
   }, [sessions, sessionSearch])
+
+  const closeSearchPopup = useCallback(() => {
+    setSearchPopupOpen(false)
+    setSessionSearch('')
+  }, [])
+
+  const openSearchPopup = useCallback(() => {
+    setSearchPopupOpen(true)
+  }, [])
+
+  const handlePopupSelectSession = useCallback((id) => {
+    onNavigate('chat')
+    onSelectSession(id)
+    closeSearchPopup()
+  }, [onNavigate, onSelectSession, closeSearchPopup])
+
+  useEffect(() => {
+    if (!searchPopupOpen) return
+    const rafId = requestAnimationFrame(() => {
+      searchInputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [searchPopupOpen])
+
+  useEffect(() => {
+    if (!searchPopupOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeSearchPopup()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [searchPopupOpen, closeSearchPopup])
 
   useEffect(() => {
     if (!userMenuOpen) return
@@ -57,15 +112,54 @@ export function Sidebar({
 
   useEffect(() => {
     if (!searchFocusToken) return
-    setChatExpanded(true)
-    const rafId = requestAnimationFrame(() => {
-      searchInputRef.current?.focus()
-      searchInputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(rafId)
+    setSearchPopupOpen(true)
   }, [searchFocusToken])
 
   const tr = t || ((k) => k)
+
+  const renderSessionGroups = (list, { inPopup = false, onSelect } = {}) => {
+    const groups = groupSessionsByDate(list)
+    const renderGroup = (label, items) => items.length === 0 ? null : (
+      <div key={label} className={inPopup ? styles.popupGroup : undefined}>
+        <div className={inPopup ? styles.popupGroupLabel : styles.sessionGroup}>{label}</div>
+        {items.map(s => (
+          <button
+            key={s.id}
+            type="button"
+            className={`${inPopup ? styles.popupSessionItem : styles.sessionItem} ${s.id === currentSessionId ? (inPopup ? styles.popupSessionActive : styles.active) : ''}`}
+            onClick={() => (onSelect ? onSelect(s.id) : onSelectSession(s.id))}
+            onMouseEnter={() => !inPopup && setHoveredSession(s.id)}
+            onMouseLeave={() => !inPopup && setHoveredSession(null)}
+          >
+            <span className={inPopup ? styles.popupSessionTitle : styles.sessionTitle}>
+              {s.title || tr('newConversation')}
+            </span>
+            {!inPopup && hoveredSession === s.id && (
+              <span
+                role="button"
+                tabIndex={0}
+                className={styles.deleteSessionBtn}
+                onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDeleteSession(s.id) } }}
+                title="Delete"
+              >
+                <Trash2 size={12} />
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    )
+    return (
+      <>
+        {renderGroup(tr('today'), groups.today)}
+        {renderGroup(tr('yesterday'), groups.yesterday)}
+        {renderGroup(tr('thisWeek'), groups.week)}
+        {renderGroup(tr('older'), groups.older)}
+      </>
+    )
+  }
+
   const navItems = [
     { id: 'dashboard', label: tr('dashboard'), icon: LayoutDashboard },
     { id: 'mcp-servers', label: tr('mcpServers'), icon: Server, badge: mcpCount || null },
@@ -83,10 +177,21 @@ export function Sidebar({
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
         </button>
         {!collapsed && (
-          <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
-            <div className={styles.brandIcon}><Bot size={16} /></div>
-            <span className={styles.brandName}>ToolChain AI</span>
-          </div>
+          <>
+            <div className={styles.brand} onClick={onBrandClick} style={{ cursor: 'pointer' }}>
+              <div className={styles.brandIcon}><Bot size={16} /></div>
+              <span className={styles.brandName}>ToolChain AI</span>
+            </div>
+            <button
+              type="button"
+              className={styles.topSearchBtn}
+              onClick={openSearchPopup}
+              title={tr('searchChats') || 'Search chats'}
+              aria-label={tr('searchChats') || 'Search chats'}
+            >
+              <Search size={17} />
+            </button>
+          </>
         )}
       </div>
 
@@ -107,6 +212,14 @@ export function Sidebar({
           })}
 
           <div className={styles.collapsedSpacer} />
+
+          <button
+            className={styles.collapsedBtn}
+            onClick={openSearchPopup}
+            title={tr('searchChats') || 'Search chats'}
+          >
+            <Search size={18} />
+          </button>
 
           <button
             className={`${styles.collapsedBtn} ${activePage === 'settings' ? styles.collapsedBtnActive : ''}`}
@@ -148,7 +261,7 @@ export function Sidebar({
               const isChat = item.id === 'chat'
 
               return (
-                <div key={item.id}>
+                <div key={item.id} className={isChat && isActive && chatExpanded ? styles.chatNavBlock : undefined}>
                   {isChat ? (
                     <button
                       className={`${styles.navItem} ${styles.navItemCollapsible} ${isActive ? styles.navItemActive : ''}`}
@@ -185,38 +298,16 @@ export function Sidebar({
 
                   {isChat && isActive && chatExpanded && (
                     <div className={styles.chatSub}>
-                      <div className={styles.chatToolbar}>
-                        <button
-                          type="button"
-                          className={styles.newChatIconBtn}
-                          onClick={onNewChat}
-                          title={tr('newChat') || 'New chat'}
-                          aria-label={tr('newChat') || 'New chat'}
-                        >
-                          <Plus size={16} />
-                        </button>
-                        <div className={styles.searchWrap}>
-                          <Search size={13} className={styles.searchIcon} />
-                          <input
-                            ref={searchInputRef}
-                            className={styles.searchInput}
-                            type="text"
-                            placeholder={tr('searchChats') || 'Search chats...'}
-                            value={sessionSearch}
-                            onChange={(e) => setSessionSearch(e.target.value)}
-                          />
-                          {sessionSearch && (
-                            <button
-                              type="button"
-                              className={styles.searchClear}
-                              onClick={() => setSessionSearch('')}
-                              aria-label="Clear search"
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        className={styles.newChatBtn}
+                        onClick={onNewChat}
+                      >
+                        <span className={styles.newChatIcon}>
+                          <Plus size={15} strokeWidth={2.5} />
+                        </span>
+                        <span className={styles.newChatLabel}>{tr('newChat') || 'New chat'}</span>
+                      </button>
 
                       <div className={styles.sessions}>
                         {sessionsLoading ? (
@@ -230,59 +321,10 @@ export function Sidebar({
                               <div key={i} className={styles.skelItem} style={{ animationDelay: `${i * 0.1}s` }} />
                             ))}
                           </div>
-                        ) : filteredSessions.length === 0 ? (
-                          <div className={styles.empty}>{sessionSearch ? (tr('noResults') || 'No results') : tr('noConversations')}</div>
+                        ) : sessions.length === 0 ? (
+                          <div className={styles.empty}>{tr('noConversations')}</div>
                         ) : (
-                          (() => {
-                            const now = new Date()
-                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                            const yesterday = new Date(today - 86400000)
-                            const weekAgo = new Date(today - 604800000)
-
-                            const groups = { today: [], yesterday: [], week: [], older: [] }
-                            filteredSessions.forEach(s => {
-                              const d = new Date(s.created_at)
-                              if (d >= today) groups.today.push(s)
-                              else if (d >= yesterday) groups.yesterday.push(s)
-                              else if (d >= weekAgo) groups.week.push(s)
-                              else groups.older.push(s)
-                            })
-
-                            const renderGroup = (label, items) => items.length === 0 ? null : (
-                              <div key={label}>
-                                <div className={styles.sessionGroup}>{label}</div>
-                                {items.map(s => (
-                                  <button
-                                    key={s.id}
-                                    className={`${styles.sessionItem} ${s.id === currentSessionId ? styles.active : ''}`}
-                                    onClick={() => onSelectSession(s.id)}
-                                    onMouseEnter={() => setHoveredSession(s.id)}
-                                    onMouseLeave={() => setHoveredSession(null)}
-                                  >
-                                    <span className={styles.sessionTitle}>{s.title || tr('newConversation')}</span>
-                                    {hoveredSession === s.id && (
-                                      <span
-                                        role="button"
-                                        tabIndex={0}
-                                        className={styles.deleteSessionBtn}
-                                        onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id) }}
-                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDeleteSession(s.id) } }}
-                                        title="Delete"
-                                      >
-                                        <Trash2 size={12} />
-                                      </span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )
-                            return <>
-                              {renderGroup(tr('today'), groups.today)}
-                              {renderGroup(tr('yesterday'), groups.yesterday)}
-                              {renderGroup(tr('thisWeek'), groups.week)}
-                              {renderGroup(tr('older'), groups.older)}
-                            </>
-                          })()
+                          renderSessionGroups(sessions)
                         )}
                       </div>
                     </div>
@@ -341,6 +383,48 @@ export function Sidebar({
         </>
       )}
     </aside>
+
+    {searchPopupOpen && (
+      <div
+        className={styles.searchOverlay}
+        onClick={(e) => { if (e.target === e.currentTarget) closeSearchPopup() }}
+      >
+        <div className={styles.searchModal} ref={searchPopupRef} role="dialog" aria-modal="true" aria-label={tr('searchChats') || 'Search chats'}>
+          <div className={styles.searchModalHeader}>
+            <Search size={18} className={styles.searchModalIcon} />
+            <input
+              ref={searchInputRef}
+              className={styles.searchModalInput}
+              type="text"
+              placeholder={tr('searchChats') || 'Search chats…'}
+              value={sessionSearch}
+              onChange={(e) => setSessionSearch(e.target.value)}
+              aria-label={tr('searchChats') || 'Search chats'}
+            />
+            <button
+              type="button"
+              className={styles.searchModalClose}
+              onClick={closeSearchPopup}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className={styles.searchModalBody}>
+            {sessionsLoading ? (
+              <div className={styles.searchModalEmpty}>{tr('loading') || 'Loading…'}</div>
+            ) : popupSessions.length === 0 ? (
+              <div className={styles.searchModalEmpty}>
+                {sessionSearch ? (tr('noResults') || 'No results') : tr('noConversations')}
+              </div>
+            ) : (
+              renderSessionGroups(popupSessions, { inPopup: true, onSelect: handlePopupSelectSession })
+            )}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   )
 }

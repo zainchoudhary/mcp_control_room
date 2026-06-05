@@ -533,16 +533,13 @@ export default function App() {
     try {
       const sid = await ensureSession()
 
-      if (messages.length === 0) {
-        const titleSource = messageText
-        const title = titleSource.length > 80 ? titleSource.slice(0, 80) + '...' : titleSource
-        setSessions((prev) =>
-          prev.map((s) => (s.id === sid ? { ...s, title } : s))
-        )
-      }
-
       streamPendingRef.current = ''
       for await (const event of streamChat(sid, messageText, [...enabledMcpIds], attachmentIds)) {
+        if (event.type === 'session_title' && event.title) {
+          setSessions((prev) =>
+            prev.map((s) => (s.id === sid ? { ...s, title: event.title } : s))
+          )
+        }
         if (event.type === 'token') {
           appendStreamContent(assistantId, event.content || '')
         }

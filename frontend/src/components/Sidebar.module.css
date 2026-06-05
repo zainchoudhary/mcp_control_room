@@ -20,7 +20,7 @@
 .top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 12px 10px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -51,6 +51,28 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1;
+}
+
+.topSearchBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  margin-left: auto;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.topSearchBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .brandIcon {
@@ -183,11 +205,12 @@
 
 .nav {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 4px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
 }
 
 .navItem {
@@ -261,103 +284,246 @@
   color: var(--accent);
 }
 
-/* ── Chat Sub-section ── */
+/* ── Chat Sub-section (Claude-style) ── */
+
+.chatNavBlock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 
 .chatSub {
-  padding: 4px 0 4px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px 0 4px 12px;
   animation: fadeIn 0.15s ease;
 }
 
-.chatToolbar {
+.newChatBtn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
+  gap: 10px;
   width: calc(100% - 8px);
+  margin: 0 0 10px;
+  padding: 7px 8px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.newChatIconBtn {
+.newChatBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.newChatIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  border: 1px solid var(--border-default);
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-}
-
-.newChatIconBtn:hover {
-  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.14);
   color: var(--accent);
-  background: rgba(var(--accent-rgb), 0.08);
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
-.searchWrap {
-  position: relative;
+.newChatBtn:hover .newChatIcon {
+  background: rgba(var(--accent-rgb), 0.22);
+  transform: scale(1.04);
+}
+
+.newChatLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Search popup ── */
+
+.searchOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 72px 16px 24px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  animation: overlayIn 0.18s ease-out;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.searchModal {
+  width: min(520px, 100%);
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.18),
+    0 8px 16px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.searchModalHeader {
   display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.searchModalIcon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.searchModalInput {
   flex: 1;
   min-width: 0;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  color: var(--text-tertiary);
-  pointer-events: none;
-  flex-shrink: 0;
-}
-
-.searchInput {
-  width: 100%;
-  height: 34px;
-  padding: 0 28px 0 30px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-primary);
+  border: none;
+  background: transparent;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 15px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s ease;
 }
 
-.searchInput::placeholder {
+.searchModalInput::placeholder {
   color: var(--text-tertiary);
 }
 
-.searchInput:focus {
-  border-color: rgba(var(--accent-rgb), 0.4);
-}
-
-.searchClear {
-  position: absolute;
-  right: 6px;
+.searchModalClose {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 50%;
-  background: var(--bg-tertiary);
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.searchClear:hover {
-  background: var(--bg-hover);
+.searchModalClose:hover {
+  background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.searchModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.15) transparent;
+}
+
+.searchModalBody::-webkit-scrollbar { width: 5px; }
+.searchModalBody::-webkit-scrollbar-track { background: transparent; }
+.searchModalBody::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-radius: 99px;
+}
+
+.searchModalEmpty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.popupGroup {
+  margin-bottom: 8px;
+}
+
+.popupGroupLabel {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.popupSessionItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.popupSessionItem:hover {
+  background: var(--bg-tertiary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.popupSessionActive {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.popupSessionActive:hover {
+  background: var(--accent-light);
+}
+
+.popupSessionTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sessions {
   flex: 1;
-  max-height: calc(100vh - 420px);
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

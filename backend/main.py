@@ -26,6 +26,8 @@ Routes:
   GET  /api/sessions/{id}/messages → get session history
   POST /api/chat/stream        → SSE streaming chat endpoint
 """
+import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -50,6 +52,7 @@ from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
 from control_room import classify_turn_intent, apply_turn_routing
 from agent import build_llm
+from session_title import generate_session_title
 from chat_attachments import (
     verify_session_owner,
     save_attachment,
@@ -732,9 +735,8 @@ async def api_chat_stream(
     stored_user = format_stored_user_message(body.message, att_meta)
     await save_message(db, body.session_id, "user", stored_user)
 
-    if not history:
-        title = body.message[:80] + ("..." if len(body.message) > 80 else "")
-        await update_session_title(db, body.session_id, title)
+    is_first_message = not history
+    attachment_names = [a.get("name", "") for a in att_meta if a.get("name")]
 
     logging.info("Chat stream: user_id=%s type=%s", current_user_id, type(current_user_id).__name__)
     connected_mcps = await get_connected_mcps(db, current_user_id)
@@ -753,6 +755,20 @@ async def api_chat_stream(
 
     async def event_generator():
         full_response_parts = []
+        title_sent = False
+        title_task = None
+
+        if is_first_message:
+            async def _save_title():
+                title = await generate_session_title(user_message, attachment_names)
+                async with AsyncSessionLocal() as title_db:
+                    await update_session_title(title_db, session_id, title)
+                return title
+
+            title_task = asyncio.create_task(_save_title())
+
+        def _title_sse(title: str) -> str:
+            return f'data: {json.dumps({"type": "session_title", "title": title})}\n\n'
 
         async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
             router_llm = build_llm(vision=False)
@@ -777,10 +793,18 @@ async def api_chat_stream(
                 attachment_ids=body.attachment_ids,
                 turn_intent=turn_intent,
             ):
+                if title_task and not title_sent and title_task.done():
+                    try:
+                        generated_title = title_task.result()
+                        if generated_title:
+                            yield _title_sse(generated_title)
+                            title_sent = True
+                    except Exception:
+                        logger.exception("Session title task failed")
+
                 yield sse_chunk
 
                 if sse_chunk.startswith("data: "):
-                    import json
                     try:
                         data = json.loads(sse_chunk[6:])
                         evt_type = data.get("type")
@@ -804,6 +828,14 @@ async def api_chat_stream(
                             full_response_parts.append(line)
                     except Exception:
                         pass
+
+        if title_task and not title_sent:
+            try:
+                generated_title = await title_task
+                if generated_title:
+                    yield _title_sse(generated_title)
+            except Exception:
+                logger.exception("Session title task failed")
 
         full_text = "".join(full_response_parts)
         if full_text.strip():
