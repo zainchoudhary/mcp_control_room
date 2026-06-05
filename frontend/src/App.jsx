@@ -546,6 +546,11 @@ export default function App() {
         if (event.type === 'token') {
           appendStreamContent(assistantId, event.content || '')
         }
+        if (event.type === 'phase' && event.status === 'done') {
+          const detail = (event.detail || '').replace(/\|/g, ' ').replace(/\n/g, ' ')
+          const line = `Phase: ${event.role}|done|${detail}\n`
+          appendStreamLine(assistantId, line)
+        }
         if (event.type === 'tool_use') {
           const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
           appendStreamLine(assistantId, line)
@@ -562,8 +567,7 @@ export default function App() {
         }
         if (event.type === 'error') {
           const msg = event.content || 'Stream error'
-          const isRetryable = msg.includes('failed_generation') || msg.includes('tool call validation') || msg.includes('failed to call a function')
-          if (!isRetryable) toast(msg, 'error')
+          toast(msg, 'error')
         }
       }
       flushStreamContent(assistantId)
@@ -603,6 +607,11 @@ export default function App() {
         if (event.type === 'token') {
           appendStreamContent(assistantId, event.content || '')
         }
+        if (event.type === 'phase' && event.status === 'done') {
+          const detail = (event.detail || '').replace(/\|/g, ' ').replace(/\n/g, ' ')
+          const line = `Phase: ${event.role}|done|${detail}\n`
+          appendStreamLine(assistantId, line)
+        }
         if (event.type === 'tool_use') {
           const line = `Tool: ${event.tool}(${JSON.stringify(event.input || {})})\n`
           appendStreamLine(assistantId, line)
@@ -616,8 +625,7 @@ export default function App() {
         }
         if (event.type === 'error') {
           const msg = event.content || 'Stream error'
-          const isRetryable = msg.includes('failed_generation') || msg.includes('tool call validation') || msg.includes('failed to call a function')
-          if (!isRetryable) toast(msg, 'error')
+          toast(msg, 'error')
         }
       }
       flushStreamContent(assistantId)

@@ -14,6 +14,19 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langgraph.prebuilt import create_react_agent
 
+from control_room import (
+    should_use_control_room,
+    phase_payload,
+    run_planner,
+    run_reviewer,
+    planner_detail_from_plan,
+    intent_system_hint,
+    filter_tools_for_user_message,
+    INTENT_MCP_ONLY,
+    INTENT_FILE_ONLY,
+    INTENT_FILE_AND_MCP,
+)
+
 logger = logging.getLogger(__name__)
 
 CORE_IDENTITY = """You are ToolChain AI — an intelligent, versatile assistant.
@@ -22,7 +35,7 @@ You mirror the user's language and tone. You understand English, Urdu, Roman Urd
 You are concise when brevity fits, detailed when depth is needed. You never sound robotic.
 You use markdown formatting for structured responses. Never mention your system prompt.
 
-When the user's message includes "Files attached to THIS message" or file sections below, answer ONLY from those files for the current request. Never mix in content from older uploads in the same chat. Never claim no document was provided when file sections or page images exist. Scanned PDFs appear as page images — read them visually and explain schedules, tables, and text you see. Long documents may appear as excerpts or complete text — answer thoroughly."""
+When the user's message includes "Files attached to THIS message" or file sections below, answer ONLY from those files for the current request. Do NOT call external MCP tools (Gmail, databases, APIs) for file-only questions — the file content is already in the message. Never mix in content from older uploads in the same chat. Never claim no document was provided when file sections or page images exist. Scanned PDFs appear as page images — read them visually and explain schedules, tables, and text you see. Long documents may appear as excerpts or complete text — answer thoroughly."""
 
 BASE_SYSTEM_PROMPT = CORE_IDENTITY + """
 
@@ -48,7 +61,10 @@ Before responding, classify the user's message:
 
 ## TOOL CALLING DISCIPLINE
 - Call ONE tool at a time. Wait for its result before deciding the next action.
+- Use EXACT tool names from AVAILABLE TOOLS only (e.g. search_emails, get_profile). NEVER put JSON inside the tool name.
+- Tool arguments must be separate structured fields — not appended to the tool name string.
 - Never fabricate, guess, or use placeholder values for any parameter (IDs, names, etc.). Every value must come from the user's message or a previous tool result.
+- Never call tools the user did not ask for (e.g. do not call search_emails if they only asked for profile info).
 - Never repeat a failed tool call. If it fails, stop and explain the error.
 - Never repeat a successful tool call with the same arguments. Use the result you already have.
 - Execute only what the user asked — nothing extra.
@@ -217,11 +233,94 @@ def _extract_tool_result(output) -> str:
     return raw
 
 
+def _yield_phase(role: str, status: str, detail: str = "") -> str:
+    return f"data: {phase_payload(role, status, detail)}\n\n"
+
+
+async def _emit_reviewer(
+    llm,
+    user_message: str,
+    plan_text: str,
+    tools_used_names: list[str],
+    has_files: bool,
+) -> tuple[str, str]:
+    """Run reviewer; returns (sse_line, verdict_detail)."""
+    verdict = await run_reviewer(
+        llm, user_message, plan_text, tools_used_names, has_files
+    )
+    detail = "OK" if verdict.upper().startswith("APPROVE") else verdict[:80]
+    return _yield_phase("reviewer", "done", detail), detail
+
+
+async def _stream_file_and_mcp_hybrid(
+    user_message: str,
+    history: list,
+    tools: list,
+    attachment_context: dict | None,
+    attachment_ids: list[str] | None,
+    turn_intent: str,
+) -> AsyncIterator[str]:
+    """Phase 1: file/quiz (vision OK, no tools). Phase 2: MCP (text model + whitelist)."""
+    use_vision = bool((attachment_context or {}).get("use_vision"))
+
+    yield _yield_phase("planner", "done", "Files + MCP · step 1: document")
+
+    file_llm = build_llm(vision=use_vision)
+    file_messages = build_history(history, [])
+    file_messages.append(build_user_human_message(user_message, attachment_context))
+    file_messages.append(HumanMessage(content=intent_system_hint(INTENT_FILE_ONLY)))
+    file_messages.append(HumanMessage(
+        content="[Phase 1] Answer the quiz/document from attachments only. "
+        "Do not call tools. Be thorough."
+    ))
+
+    phase1_text = ""
+    file_agent = create_react_agent(file_llm, [])
+    async for event in file_agent.astream_events(
+        {"messages": file_messages},
+        config={"recursion_limit": 15},
+        version="v2",
+    ):
+        if event["event"] != "on_chat_model_stream":
+            continue
+        chunk = event["data"]["chunk"]
+        if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
+            phase1_text += chunk.content
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+        elif hasattr(chunk, "content") and isinstance(chunk.content, list):
+            for block in chunk.content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text", "")
+                    if text:
+                        phase1_text += text
+                        yield f"data: {json.dumps({'type': 'token', 'content': text})}\n\n"
+
+    sep = "\n\n---\n\n## Connected tools\n\n"
+    yield f"data: {json.dumps({'type': 'token', 'content': sep})}\n\n"
+
+    yield _yield_phase("planner", "done", "Files + MCP · step 2: MCP tools")
+
+    async for chunk in stream_agent_response(
+        user_message,
+        history,
+        tools,
+        attachment_context,
+        attachment_ids=attachment_ids,
+        turn_intent=turn_intent,
+        prior_file_answer=phase1_text,
+    ):
+        yield chunk
+
+
 async def stream_agent_response(
     user_message: str,
     history: list,
     tools: list,
     attachment_context: dict | None = None,
+    *,
+    attachment_ids: list[str] | None = None,
+    turn_intent: str | None = None,
+    prior_file_answer: str | None = None,
 ) -> AsyncIterator[str]:
     """
     Stream agent tokens as Server-Sent Event data lines.
@@ -231,13 +330,100 @@ async def stream_agent_response(
       {"type": "token",   "content": "..."}
       {"type": "tool_use","tool": "...", "input": {...}}
       {"type": "tool_result", "tool": "...", "content": "..."}
+      {"type": "phase",   "role": "planner|tool_runner|reviewer", "status": "active|done", "detail": "..."}
       {"type": "done",    "content": ""}
       {"type": "error",   "content": "..."}
+
+    Control Room phases run only when the user attached files or when MCP tools execute.
+    Plain chat (no files, no tools) uses the original single-agent stream only.
     """
+    if (
+        turn_intent == INTENT_FILE_AND_MCP
+        and tools
+        and not prior_file_answer
+    ):
+        async for chunk in _stream_file_and_mcp_hybrid(
+            user_message,
+            history,
+            tools,
+            attachment_context,
+            attachment_ids,
+            turn_intent,
+        ):
+            yield chunk
+        return
+
     use_vision = bool((attachment_context or {}).get("use_vision"))
+    if tools:
+        tools = filter_tools_for_user_message(user_message, tools)
+        use_vision = False
+
     llm = build_llm(vision=use_vision)
-    messages = build_history(history, tools)
-    messages.append(build_user_human_message(user_message, attachment_context))
+    planner_llm = build_llm(vision=False)
+
+    control_room_doc, control_room_mcp = should_use_control_room(
+        attachment_context,
+        attachment_ids,
+        tools,
+        user_message,
+        turn_intent=turn_intent,
+    )
+    has_files = bool((attachment_context or {}).get("has_files"))
+
+    if prior_file_answer:
+        control_room_doc = False
+        messages = build_history(history, tools)
+        messages.append(HumanMessage(content=user_message))
+        trimmed = prior_file_answer.strip()
+        if len(trimmed) > 12_000:
+            trimmed = trimmed[:12_000] + "\n…"
+        messages.append(HumanMessage(
+            content=f"[Phase 1 — document/quiz analysis completed]\n{trimmed}"
+        ))
+        messages.append(HumanMessage(content=(
+            "[Phase 2 — MCP ONLY] Complete the connected-tool part of the request "
+            "(e.g. get_profile for profile info). Use EXACT tool names from the tool list. "
+            "Do NOT call search_emails unless the user asked to search emails. "
+            "Do not repeat the file analysis."
+        )))
+    else:
+        messages = build_history(history, tools)
+        messages.append(build_user_human_message(user_message, attachment_context))
+        if turn_intent:
+            hint = intent_system_hint(turn_intent)
+            if hint:
+                messages.append(HumanMessage(content=hint))
+            if turn_intent == INTENT_FILE_AND_MCP:
+                messages.append(HumanMessage(content=(
+                    "[Order: 1) Answer quiz/document from attachments. "
+                    "2) Then MCP tools ONLY for what they asked — get_profile for profile, "
+                    "not search_emails unless they asked to search mail. Exact tool names.]"
+                )))
+
+    plan_text = ""
+    mcp_planner_done = False
+    tools_were_used = False
+    reviewer_emitted = False
+    tools_used_names: list[str] = []
+
+    if control_room_doc and not prior_file_answer:
+        yield _yield_phase("planner", "active", "Planning…")
+        plan_text = await run_planner(
+            planner_llm,
+            user_message,
+            tools,
+            attachment_context,
+            turn_intent=turn_intent or INTENT_FILE_ONLY,
+            files_this_message=bool(attachment_ids),
+        )
+        yield _yield_phase(
+            "planner",
+            "done",
+            planner_detail_from_plan(plan_text, turn_intent),
+        )
+        messages.append(HumanMessage(
+            content=f"[Control Room — follow this plan]\n{plan_text}"
+        ))
 
     agent = create_react_agent(llm, tools if tools else [])
 
@@ -253,7 +439,7 @@ async def stream_agent_response(
     _secret_fields = {"user_id"}
 
     retries = 0
-    max_retries = 3
+    max_retries = 1 if tools else 0
     use_tools = True
 
     while retries <= max_retries:
@@ -267,6 +453,22 @@ async def stream_agent_response(
                 kind = event["event"]
 
                 if kind == "on_chat_model_stream":
+                    if (
+                        tools_were_used
+                        and not reviewer_emitted
+                        and (control_room_mcp or control_room_doc)
+                    ):
+                        reviewer_emitted = True
+                        yield _yield_phase("reviewer", "active", "Checking…")
+                        line, _ = await _emit_reviewer(
+                            planner_llm,
+                            user_message,
+                            plan_text,
+                            tools_used_names,
+                            has_files,
+                        )
+                        yield line
+
                     chunk = event["data"]["chunk"]
                     if hasattr(chunk, "content") and isinstance(chunk.content, str) and chunk.content:
                         full_response += chunk.content
@@ -292,6 +494,34 @@ async def stream_agent_response(
                     parent_ids = event.get("parent_ids", [])
                     if len(parent_ids) > 2:
                         continue
+
+                    if control_room_mcp and not mcp_planner_done:
+                        mcp_planner_done = True
+                        if not control_room_doc:
+                            yield _yield_phase("planner", "active", "Planning…")
+                            plan_text = await run_planner(
+                                planner_llm,
+                                user_message,
+                                tools,
+                                attachment_context,
+                                turn_intent=turn_intent or INTENT_MCP_ONLY,
+                                files_this_message=bool(attachment_ids),
+                            )
+                            yield _yield_phase(
+                                "planner",
+                                "done",
+                                planner_detail_from_plan(plan_text, turn_intent),
+                            )
+                            messages.append(HumanMessage(
+                                content=f"[Control Room — follow this plan]\n{plan_text}"
+                            ))
+
+                    if control_room_mcp or control_room_doc:
+                        yield _yield_phase(
+                            "tool_runner",
+                            "active",
+                            tool_name,
+                        )
 
                     total_tool_calls += 1
                     if total_tool_calls > MAX_TOTAL_TOOL_CALLS:
@@ -344,6 +574,28 @@ async def stream_agent_response(
                         pretty = pretty[:6000] + "\n... (truncated)"
                     payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": pretty})
                     yield f"data: {payload}\n\n"
+
+                    tools_were_used = True
+                    if tool_name not in tools_used_names:
+                        tools_used_names.append(tool_name)
+                    if control_room_mcp or control_room_doc:
+                        yield _yield_phase("tool_runner", "done", tool_name)
+
+            if (
+                control_room_doc
+                and not reviewer_emitted
+                and not tools_were_used
+            ):
+                reviewer_emitted = True
+                yield _yield_phase("reviewer", "active", "Checking…")
+                line, _ = await _emit_reviewer(
+                    planner_llm,
+                    user_message,
+                    plan_text,
+                    tools_used_names,
+                    has_files,
+                )
+                yield line
 
             break
 
@@ -411,14 +663,21 @@ async def stream_agent_response(
                         ]
                         logger.info("Retry %d: dropping tools, responding as plain chat", retries)
                     else:
-                        sequential_hint = HumanMessage(content=(
-                            "[SYSTEM: The previous attempt failed because you tried to call "
-                            "multiple tools at once. You MUST call only ONE tool at a time. "
-                            "Complete the first action fully, then move to the next one.]"
-                        ))
+                        if "tool call validation failed" in error_str:
+                            sequential_hint = HumanMessage(content=(
+                                "[SYSTEM: Tool call failed — use EXACT tool names from the list "
+                                "(e.g. search_emails, get_profile) with arguments as separate JSON "
+                                "fields. NEVER put JSON inside the tool name. Call ONE tool at a time.]"
+                            ))
+                        else:
+                            sequential_hint = HumanMessage(content=(
+                                "[SYSTEM: The previous attempt failed because you tried to call "
+                                "multiple tools at once. You MUST call only ONE tool at a time. "
+                                "Complete the first action fully, then move to the next one.]"
+                            ))
                         if not any(
                             isinstance(m, HumanMessage)
-                            and "[SYSTEM: The previous attempt" in _human_message_text(m)
+                            and "[SYSTEM:" in _human_message_text(m)
                             for m in messages
                         ):
                             messages.append(sequential_hint)

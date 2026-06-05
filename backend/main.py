@@ -48,6 +48,8 @@ from database import (
 )
 from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
+from control_room import classify_turn_intent, apply_turn_routing
+from agent import build_llm
 from chat_attachments import (
     verify_session_owner,
     save_attachment,
@@ -753,8 +755,27 @@ async def api_chat_stream(
         full_response_parts = []
 
         async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
+            router_llm = build_llm(vision=False)
+            turn_intent = await classify_turn_intent(
+                router_llm,
+                user_message,
+                attachment_ids=body.attachment_ids,
+                attachment_context=attachment_context,
+                tools=tools,
+            )
+            agent_tools, agent_attachment_context = apply_turn_routing(
+                turn_intent,
+                tools,
+                attachment_context,
+                body.attachment_ids,
+            )
             async for sse_chunk in stream_agent_response(
-                user_message, history, tools, attachment_context
+                user_message,
+                history,
+                agent_tools,
+                agent_attachment_context,
+                attachment_ids=body.attachment_ids,
+                turn_intent=turn_intent,
             ):
                 yield sse_chunk
 
@@ -773,6 +794,13 @@ async def api_chat_stream(
                             raw_content = data.get("content", "")
                             encoded = base64.b64encode(raw_content.encode("utf-8")).decode("ascii")
                             line = f'Result: {data["tool"]} -> @@JSON@@{encoded}@@END@@\n'
+                            full_response_parts.append(line)
+                        elif evt_type == "phase" and data.get("status") == "done":
+                            detail = (data.get("detail") or "").replace("\n", " ")
+                            line = (
+                                f'Phase: {data.get("role", "")}|'
+                                f'done|{detail}\n'
+                            )
                             full_response_parts.append(line)
                     except Exception:
                         pass

@@ -8,6 +8,7 @@ import { fetchAttachmentBlob } from '../api.js'
 import { parseUserMessageContent } from '../utils/chatAttachments.js'
 import { stabilizeStreamingMarkdown } from '../utils/streamingMarkdown.js'
 import { FileAttachmentCard } from './FileAttachmentCard.jsx'
+import { ControlRoomPhases, collectPhasesFromParts } from './ControlRoomPhases.jsx'
 import styles from './ChatMessage.module.css'
 
 function CodeBlock({ language, children }) {
@@ -147,8 +148,20 @@ function parseContent(content) {
   for (const line of lines) {
     const toolUseMatch = line.match(/^Tool: (.+?)\((.+)\)$/)
     const toolResultMatch = line.match(/^Result: (.+?) -> (.+)$/)
+    const phaseMatch = line.match(/^Phase: (\w+)\|(\w+)\|(.*)$/)
 
-    if (toolUseMatch) {
+    if (phaseMatch) {
+      if (markdownBuffer.length > 0) {
+        parts.push({ type: 'markdown', content: markdownBuffer.join('\n') })
+        markdownBuffer = []
+      }
+      parts.push({
+        type: 'phase',
+        role: phaseMatch[1],
+        status: phaseMatch[2],
+        detail: phaseMatch[3] || '',
+      })
+    } else if (toolUseMatch) {
       if (markdownBuffer.length > 0) {
         parts.push({ type: 'markdown', content: markdownBuffer.join('\n') })
         markdownBuffer = []
@@ -222,12 +235,19 @@ const markdownComponents = {
 
 function AssistantMessageContent({ content, isStreaming }) {
   const parts = useMemo(() => parseContent(content), [content])
+  const phaseParts = useMemo(() => collectPhasesFromParts(parts), [parts])
 
   if (!parts?.length && !content) return null
 
   return (
     <div className={isStreaming ? styles.streamingMarkdown : undefined}>
+      {phaseParts.length > 0 && (
+        <ControlRoomPhases phases={phaseParts} />
+      )}
       {parts.map((part, i) => {
+        if (part.type === 'phase') {
+          return null
+        }
         if (part.type === 'tool_use') {
           return <ToolCall key={`tool-${i}`} tool={part.tool} input={part.input} />
         }

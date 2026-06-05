@@ -1,0 +1,61 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  max-width: 100%;
+}
+
+.chipActive {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary));
+}
+
+.chipDone {
+  color: var(--text-primary);
+}
+
+.chipIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.chipLabel {
+  flex-shrink: 0;
+}
+
+.chipDetail {
+  opacity: 0.75;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.check {
+  color: #22c55e;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
