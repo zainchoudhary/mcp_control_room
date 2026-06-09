@@ -43,12 +43,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db_config import init_db, get_db, AsyncSessionLocal
 from database import (
     register_mcp, list_mcps, get_mcp,
-    set_mcp_connection, delete_mcp, get_connected_mcps,
+    set_mcp_connection, set_mcp_requires_reauth, disconnect_mcps, delete_mcp, get_connected_mcps,
     create_session, create_ghost_session, get_session, list_user_sessions, update_session_title,
     delete_session, save_message, get_session_messages,
     get_all_user_sessions_with_messages, delete_all_user_sessions,
 )
-from mcp_manager import get_mcp_tools, probe_mcp, execute_tool
+from mcp_manager import load_mcp_tools, probe_mcp, execute_tool
 from agent import stream_agent_response
 from control_room import classify_turn_intent, apply_turn_routing
 from agent import build_llm
@@ -210,6 +210,101 @@ def _mcp_base_url(mcp_url: str) -> str:
     return url
 
 
+async def _revoke_mcp_auth(base: str, user_id: str) -> None:
+    """Revoke OAuth credentials on the MCP server (best-effort)."""
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post(f"{base}/auth/revoke", params={"user_id": user_id})
+    except Exception:
+        logger.debug("Auth revoke skipped for user %s (server unreachable)", user_id[:8])
+
+
+async def _prune_unreachable_mcps(
+    db: AsyncSession,
+    user_id: str,
+    mcps: list,
+    *,
+    probe_timeout: float = 5.0,
+) -> tuple[list, list[dict]]:
+    """
+    Probe connected MCP backends; auto-disconnect any that are down.
+    Returns (updated_mcp_list, pruned_server_info).
+    """
+    connected = [m for m in mcps if m.get("connected")]
+    if not connected:
+        return mcps, []
+
+    probe_results = await asyncio.gather(
+        *[
+            probe_mcp(m["url"], m.get("transport", "sse"), timeout=probe_timeout)
+            for m in connected
+        ],
+        return_exceptions=True,
+    )
+
+    failed_ids: list[str] = []
+    pruned: list[dict] = []
+    for mcp, result in zip(connected, probe_results):
+        ok = isinstance(result, dict) and result.get("ok")
+        if ok:
+            continue
+        mcp_id = mcp.get("id")
+        if not mcp_id:
+            continue
+        failed_ids.append(mcp_id)
+        err = result.get("error") if isinstance(result, dict) else str(result)
+        pruned.append({"id": mcp_id, "name": mcp.get("name", mcp_id), "error": err or "unreachable"})
+        logger.info("Auto-disconnect MCP '%s' — backend unreachable", mcp.get("name", mcp_id))
+
+    if failed_ids:
+        await disconnect_mcps(db, user_id, failed_ids)
+        mcps = await list_mcps(db, user_id)
+
+    return mcps, pruned
+
+
+async def _attach_reachability(
+    mcps: list,
+    *,
+    probe_timeout: float = 5.0,
+) -> list:
+    """Probe each MCP and add reachable=True/False to the response."""
+    if not mcps:
+        return mcps
+
+    probe_results = await asyncio.gather(
+        *[
+            probe_mcp(m["url"], m.get("transport", "sse"), timeout=probe_timeout)
+            for m in mcps
+        ],
+        return_exceptions=True,
+    )
+
+    enriched = []
+    for mcp, result in zip(mcps, probe_results):
+        entry = dict(mcp)
+        entry["reachable"] = isinstance(result, dict) and result.get("ok", False)
+        enriched.append(entry)
+    return enriched
+
+
+async def _disconnect_mcp_failures(user_id: str, failures: list[dict]) -> list[dict]:
+    """Disconnect MCPs that failed tool load; return disconnected server summaries."""
+    ids = [f["id"] for f in failures if f.get("id")]
+    if not ids:
+        return []
+    async with AsyncSessionLocal() as db:
+        disconnected_ids = await disconnect_mcps(db, user_id, ids)
+    if not disconnected_ids:
+        return []
+    disconnected_set = set(disconnected_ids)
+    return [
+        {"id": f["id"], "name": f.get("name", f["id"])}
+        for f in failures
+        if f.get("id") in disconnected_set
+    ]
+
+
 # ─── Routes: MCP Registry ────────────────────────────────────────────────────
 
 @app.get("/api/mcps")
@@ -217,7 +312,10 @@ async def api_list_mcps(
     user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await list_mcps(db, user["id"])
+    mcps = await list_mcps(db, user["id"])
+    mcps, _pruned = await _prune_unreachable_mcps(db, user["id"], mcps)
+    mcps = await _attach_reachability(mcps)
+    return mcps
 
 
 @app.post("/api/mcps", status_code=201)
@@ -288,27 +386,52 @@ async def api_connect_mcp(
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
 
-    if not skip_auth:
-        base = _mcp_base_url(mcp["url"])
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                resp = await client.get(f"{base}/auth/status", params={"user_id": user["id"]})
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if not data.get("authenticated"):
-                        url_resp = await client.get(f"{base}/auth/url", params={"user_id": user["id"]})
-                        if url_resp.status_code == 200:
-                            auth_data = url_resp.json()
-                            return {
-                                "id": mcp_id,
-                                "connected": False,
-                                "needs_auth": True,
-                                "auth_url": auth_data.get("auth_url", ""),
-                            }
-        except (httpx.RequestError, httpx.HTTPStatusError):
-            pass
-        except Exception as e:
-            logging.warning("Auth check for MCP %s failed: %s", mcp_id, e)
+    probe_result = await probe_mcp(mcp["url"], mcp.get("transport", "sse"))
+    if not probe_result["ok"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Server unreachable. Please ensure the MCP server is running.",
+        )
+
+    base = _mcp_base_url(mcp["url"])
+
+    if mcp.get("requires_reauth"):
+        await _revoke_mcp_auth(base, user["id"])
+        await set_mcp_requires_reauth(db, mcp_id, user["id"], False)
+
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.get(f"{base}/auth/status", params={"user_id": user["id"]})
+            if resp.status_code == 200:
+                data = resp.json()
+                if not data.get("authenticated"):
+                    if skip_auth:
+                        raise HTTPException(
+                            status_code=422,
+                            detail="Authentication was not completed. Please try connecting again.",
+                        )
+                    url_resp = await client.get(f"{base}/auth/url", params={"user_id": user["id"]})
+                    if url_resp.status_code == 200:
+                        auth_data = url_resp.json()
+                        return {
+                            "id": mcp_id,
+                            "connected": False,
+                            "needs_auth": True,
+                            "auth_url": auth_data.get("auth_url", ""),
+                        }
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Could not start authentication. Please try again.",
+                    )
+    except HTTPException:
+        raise
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=422,
+            detail="Server unreachable. Please ensure the MCP server is running.",
+        )
+    except Exception as e:
+        logging.warning("Auth check for MCP %s failed: %s", mcp_id, e)
 
     await set_mcp_connection(db, mcp_id, user["id"], True)
     return {"id": mcp_id, "connected": True}
@@ -325,13 +448,10 @@ async def api_disconnect_mcp(
         raise HTTPException(status_code=404, detail="MCP not found.")
 
     base = _mcp_base_url(mcp["url"])
-    try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            await client.post(f"{base}/auth/revoke", params={"user_id": user["id"]})
-    except Exception:
-        logger.debug("Auth revoke skipped for %s (server unreachable)", mcp.get("name", mcp_id))
+    await _revoke_mcp_auth(base, user["id"])
 
     await set_mcp_connection(db, mcp_id, user["id"], False)
+    await set_mcp_requires_reauth(db, mcp_id, user["id"], True)
     return {"id": mcp_id, "connected": False}
 
 
@@ -346,9 +466,22 @@ async def api_toggle_mcp(
     if not mcp:
         raise HTTPException(status_code=404, detail="MCP not found.")
 
-    new_state = not mcp.get("connected", False)
-    await set_mcp_connection(db, mcp_id, user["id"], new_state)
-    return {"id": mcp_id, "connected": new_state}
+    if mcp.get("connected"):
+        base = _mcp_base_url(mcp["url"])
+        await _revoke_mcp_auth(base, user["id"])
+        await set_mcp_connection(db, mcp_id, user["id"], False)
+        await set_mcp_requires_reauth(db, mcp_id, user["id"], True)
+        return {"id": mcp_id, "connected": False}
+
+    probe_result = await probe_mcp(mcp["url"], mcp.get("transport", "sse"))
+    if not probe_result["ok"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Server unreachable. Please ensure the MCP server is running.",
+        )
+
+    await set_mcp_connection(db, mcp_id, user["id"], True)
+    return {"id": mcp_id, "connected": True}
 
 
 @app.post("/api/mcps/{mcp_id}/probe")
@@ -791,64 +924,68 @@ async def api_chat_stream(
         def _title_sse(title: str) -> str:
             return f'data: {json.dumps({"type": "session_title", "title": title})}\n\n'
 
-        async with get_mcp_tools(connected_mcps, user_id=current_user_id) as tools:
-            router_llm = build_llm(vision=False)
-            turn_intent = await classify_turn_intent(
-                router_llm,
-                user_message,
-                attachment_ids=body.attachment_ids,
-                attachment_context=attachment_context,
-                tools=tools,
-            )
-            agent_tools, agent_attachment_context = apply_turn_routing(
-                turn_intent,
-                tools,
-                attachment_context,
-                body.attachment_ids,
-            )
-            async for sse_chunk in stream_agent_response(
-                user_message,
-                history,
-                agent_tools,
-                agent_attachment_context,
-                attachment_ids=body.attachment_ids,
-                turn_intent=turn_intent,
-            ):
-                if title_task and not title_sent and title_task.done():
-                    try:
-                        generated_title = title_task.result()
-                        if generated_title:
-                            yield _title_sse(generated_title)
-                            title_sent = True
-                    except Exception:
-                        logger.exception("Session title task failed")
+        tools, load_failures = await load_mcp_tools(connected_mcps, user_id=current_user_id)
+        disconnected = await _disconnect_mcp_failures(current_user_id, load_failures)
+        if disconnected:
+            yield f'data: {json.dumps({"type": "mcp_disconnected", "servers": disconnected})}\n\n'
 
-                yield sse_chunk
+        router_llm = build_llm(vision=False)
+        turn_intent = await classify_turn_intent(
+            router_llm,
+            user_message,
+            attachment_ids=body.attachment_ids,
+            attachment_context=attachment_context,
+            tools=tools,
+        )
+        agent_tools, agent_attachment_context = apply_turn_routing(
+            turn_intent,
+            tools,
+            attachment_context,
+            body.attachment_ids,
+        )
+        async for sse_chunk in stream_agent_response(
+            user_message,
+            history,
+            agent_tools,
+            agent_attachment_context,
+            attachment_ids=body.attachment_ids,
+            turn_intent=turn_intent,
+        ):
+            if title_task and not title_sent and title_task.done():
+                try:
+                    generated_title = title_task.result()
+                    if generated_title:
+                        yield _title_sse(generated_title)
+                        title_sent = True
+                except Exception:
+                    logger.exception("Session title task failed")
 
-                if sse_chunk.startswith("data: "):
-                    try:
-                        data = json.loads(sse_chunk[6:])
-                        evt_type = data.get("type")
-                        if evt_type == "token":
-                            full_response_parts.append(data.get("content", ""))
-                        elif evt_type == "tool_use":
-                            line = f'Tool: {data["tool"]}({json.dumps(data.get("input", {}))})\n'
-                            full_response_parts.append(line)
-                        elif evt_type == "tool_result":
-                            import base64
-                            raw_content = data.get("content", "")
-                            encoded = base64.b64encode(raw_content.encode("utf-8")).decode("ascii")
-                            line = f'Result: {data["tool"]} -> @@JSON@@{encoded}@@END@@\n'
-                            full_response_parts.append(line)
-                        elif evt_type == "phase" and data.get("status") == "done":
-                            detail = (data.get("detail") or "").replace("\n", " ")
-                            line = (
-                                f'Phase: {data.get("role", "")}|'
-                                f'done|{detail}\n'
-                            )
-                            full_response_parts.append(line)
-                    except Exception:
-                        pass
+            yield sse_chunk
+
+            if sse_chunk.startswith("data: "):
+                try:
+                    data = json.loads(sse_chunk[6:])
+                    evt_type = data.get("type")
+                    if evt_type == "token":
+                        full_response_parts.append(data.get("content", ""))
+                    elif evt_type == "tool_use":
+                        line = f'Tool: {data["tool"]}({json.dumps(data.get("input", {}))})\n'
+                        full_response_parts.append(line)
+                    elif evt_type == "tool_result":
+                        import base64
+                        raw_content = data.get("content", "")
+                        encoded = base64.b64encode(raw_content.encode("utf-8")).decode("ascii")
+                        line = f'Result: {data["tool"]} -> @@JSON@@{encoded}@@END@@\n'
+                        full_response_parts.append(line)
+                    elif evt_type == "phase" and data.get("status") == "done":
+                        detail = (data.get("detail") or "").replace("\n", " ")
+                        line = (
+                            f'Phase: {data.get("role", "")}|'
+                            f'done|{detail}\n'
+                        )
+                        full_response_parts.append(line)
+                except Exception:
+                    pass
 
         if title_task and not title_sent:
             try:

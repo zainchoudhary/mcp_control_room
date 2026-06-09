@@ -100,6 +100,7 @@ class MCP(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     icon: Mapped[str | None] = mapped_column(String(500), nullable=True)
     connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    requires_reauth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     user: Mapped["User"] = relationship(backref="mcps")
@@ -114,6 +115,7 @@ class MCP(Base):
             "description": self.description,
             "icon": self.icon,
             "connected": self.connected,
+            "requires_reauth": self.requires_reauth,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

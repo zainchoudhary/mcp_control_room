@@ -400,7 +400,9 @@ export default function App() {
   useEffect(() => {
     if (!user || activePage !== 'mcp-servers') return
     refreshMCPs()
-  }, [user, activePage])
+    const interval = setInterval(refreshMCPs, 15000)
+    return () => clearInterval(interval)
+  }, [user, activePage, refreshMCPs])
 
   useEffect(() => {
     if (!user || activePage !== 'chat') return
@@ -889,15 +891,17 @@ export default function App() {
                     toast('Connected', 'success')
                   }
                 })
-                .catch(() => {})
+                .catch((err) => toast(err.message || 'Connection failed', 'error'))
                 .finally(() => setTogglingMcp(null))
             }
           }
         }, 500)
         return
       }
-      await refreshMCPs()
-      toast('Connected', 'success')
+      if (result?.connected) {
+        await refreshMCPs()
+        toast('Connected', 'success')
+      }
     } catch (err) {
       toast(err.message || 'Connection failed', 'error')
     } finally {

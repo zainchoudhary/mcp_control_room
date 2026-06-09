@@ -48,7 +48,45 @@ async def set_mcp_connection(db: AsyncSession, mcp_id: str, user_id: str, connec
     mcp = result.scalar_one_or_none()
     if mcp:
         mcp.connected = connected
+        if connected:
+            mcp.requires_reauth = False
         await db.commit()
+
+
+async def set_mcp_requires_reauth(
+    db: AsyncSession,
+    mcp_id: str,
+    user_id: str,
+    requires_reauth: bool,
+):
+    """Flag MCP as needing OAuth re-authentication after manual disconnect."""
+    result = await db.execute(select(MCP).where(MCP.id == mcp_id, MCP.user_id == user_id))
+    mcp = result.scalar_one_or_none()
+    if mcp:
+        mcp.requires_reauth = requires_reauth
+        await db.commit()
+
+
+async def disconnect_mcps(db: AsyncSession, user_id: str, mcp_ids: list[str]) -> list[str]:
+    """Mark MCPs as disconnected (e.g. unreachable backend). Does not force re-auth."""
+    if not mcp_ids:
+        return []
+    disconnected: list[str] = []
+    for mcp_id in mcp_ids:
+        result = await db.execute(
+            select(MCP).where(
+                MCP.id == mcp_id,
+                MCP.user_id == user_id,
+                MCP.connected == True,  # noqa: E712
+            )
+        )
+        mcp = result.scalar_one_or_none()
+        if mcp:
+            mcp.connected = False
+            disconnected.append(mcp_id)
+    if disconnected:
+        await db.commit()
+    return disconnected
 
 
 async def delete_mcp(db: AsyncSession, mcp_id: str, user_id: str):

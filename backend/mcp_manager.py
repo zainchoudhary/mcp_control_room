@@ -31,6 +31,138 @@ def build_server_config(mcps: list) -> dict:
     return config
 
 
+def _single_server_config(mcp: dict) -> dict:
+    return build_server_config([mcp])
+
+
+def _merge_tools(tool_batches: list[tuple[str, list]]) -> list:
+    merged: list = []
+    seen_names: set[str] = set()
+    for server_name, tools in tool_batches:
+        for tool in tools:
+            name = getattr(tool, "name", None)
+            if not name:
+                continue
+            if name in seen_names:
+                logger.warning(
+                    "Duplicate tool '%s' from MCP '%s' — skipping",
+                    name,
+                    server_name,
+                )
+                continue
+            seen_names.add(name)
+            merged.append(tool)
+    return merged
+
+
+async def _load_tools_from_server(
+    mcp: dict,
+    user_id: str,
+    *,
+    max_retries: int = 2,
+    timeout: float = 10.0,
+) -> tuple[list, str | None]:
+    server_name = mcp.get("name") or mcp.get("id") or "unknown"
+    config = _single_server_config(mcp)
+    last_err: Exception | None = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with asyncio.timeout(timeout):
+                client = MultiServerMCPClient(config)
+                tools = await client.get_tools()
+            tools = _sanitize_tools(tools)
+            tools = _inject_user_id(tools, user_id)
+            logger.info("Loaded %d tool(s) from MCP '%s'", len(tools), server_name)
+            return tools, None
+        except asyncio.TimeoutError:
+            last_err = TimeoutError(f"Connection timed out after {timeout}s")
+            logger.warning(
+                "MCP '%s' attempt %d/%d timed out",
+                server_name,
+                attempt,
+                max_retries,
+            )
+        except Exception as exc:
+            last_err = exc
+            logger.warning(
+                "MCP '%s' attempt %d/%d failed: %s",
+                server_name,
+                attempt,
+                max_retries,
+                exc,
+            )
+        if attempt < max_retries:
+            await asyncio.sleep(min(1.0 * attempt, 2))
+
+    err_msg = str(last_err) if last_err else "unknown error"
+    logger.error("MCP '%s' unavailable — skipping (%s)", server_name, err_msg)
+    return [], err_msg
+
+
+async def load_mcp_tools(
+    mcps: list,
+    user_id: str = "",
+    *,
+    max_retries: int = 2,
+    timeout: float = 10.0,
+) -> tuple[list, list[dict]]:
+    """
+    Load tools from each MCP independently (parallel).
+    Returns (tools, failures) where failures entries are
+    {"id", "name", "error"} for servers that could not load.
+    """
+    if not mcps:
+        return [], []
+
+    results = await asyncio.gather(
+        *[
+            _load_tools_from_server(
+                mcp,
+                user_id,
+                max_retries=max_retries,
+                timeout=timeout,
+            )
+            for mcp in mcps
+        ],
+        return_exceptions=True,
+    )
+
+    batches: list[tuple[str, list]] = []
+    failures: list[dict] = []
+
+    for mcp, result in zip(mcps, results):
+        server_name = mcp.get("name") or mcp.get("id") or "unknown"
+        mcp_id = mcp.get("id")
+        if isinstance(result, BaseException):
+            failures.append({
+                "id": mcp_id,
+                "name": server_name,
+                "error": str(result),
+            })
+            continue
+        tools, err = result
+        if err:
+            failures.append({
+                "id": mcp_id,
+                "name": server_name,
+                "error": err,
+            })
+        if tools:
+            batches.append((server_name, tools))
+
+    merged = _merge_tools(batches)
+    if failures:
+        logger.info(
+            "MCP load: %d tool(s) from %d/%d server(s); unreachable: %s",
+            len(merged),
+            len(batches),
+            len(mcps),
+            [f["name"] for f in failures],
+        )
+    return merged, failures
+
+
 def _sanitize_tool_name(name: str) -> str:
     """Ensure tool name contains only valid characters for Groq/OpenAI function calling."""
     sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
@@ -102,43 +234,14 @@ def _inject_user_id(tools: list, user_id: str) -> list:
 @asynccontextmanager
 async def get_mcp_tools(mcps: list, user_id: str = "", max_retries: int = 3):
     """
-    Async context manager that yields a list of LangChain-compatible tools
-    loaded from the given MCP servers.
-
-    If user_id is provided, it is injected transparently into all tool calls
-    that accept a user_id parameter (hidden from the LLM schema).
-
-    Retries on transient connection failures so MCP switching works reliably.
-
-    Usage:
-        async with get_mcp_tools(connected_mcps, user_id="abc") as tools:
-            # use tools in agent
+    Async context manager that yields tools loaded per MCP server.
+    Unreachable servers are skipped (see load_mcp_tools).
     """
-    if not mcps:
-        yield []
-        return
-
-    server_config = build_server_config(mcps)
-    logger.info("Connecting to MCP servers: %s (user_id=%s)", list(server_config.keys()), user_id[:8] if user_id else "EMPTY")
-
-    tools = []
-    for attempt in range(1, max_retries + 1):
-        try:
-            client = MultiServerMCPClient(server_config)
-            tools = await client.get_tools()
-            tools = _sanitize_tools(tools)
-            tools = _inject_user_id(tools, user_id)
-            logger.info("Loaded %d tools from %d MCP server(s)", len(tools), len(mcps))
-            for t in tools:
-                logger.info("  Tool: %s", t.name)
-            break
-        except Exception as exc:
-            logger.warning("MCP tool load attempt %d/%d failed: %s", attempt, max_retries, exc)
-            if attempt < max_retries:
-                await asyncio.sleep(min(1.5 * attempt, 4))
-            else:
-                logger.error("Failed to load MCP tools after %d attempts: %s", max_retries, exc)
-
+    tools, _failures = await load_mcp_tools(
+        mcps,
+        user_id,
+        max_retries=max_retries,
+    )
     yield tools
 
 

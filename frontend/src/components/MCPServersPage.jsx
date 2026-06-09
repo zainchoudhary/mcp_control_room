@@ -161,7 +161,9 @@ export function MCPServersPage({
 function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, onOpen, onOpenTools }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const serverOffline = mcp.reachable === false
   const disabled = busy || isToggling
+  const connectBlocked = !mcp.connected && serverOffline
 
   useEffect(() => {
     if (!menuOpen) return
@@ -174,7 +176,7 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
 
   const handleToggle = () => {
     setMenuOpen(false)
-    if (disabled) return
+    if (disabled || connectBlocked) return
     if (mcp.connected) onDisconnect(mcp.id)
     else onConnect(mcp.id)
   }
@@ -222,9 +224,9 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
                   <span>Disconnect</span>
                 </button>
               ) : (
-                <button className={styles.dotsMenuItem} onClick={handleToggle}>
+                <button className={styles.dotsMenuItem} onClick={handleToggle} disabled={connectBlocked}>
                   <Power size={14} />
-                  <span>Connect</span>
+                  <span>{connectBlocked ? 'Server offline' : 'Connect'}</span>
                 </button>
               )}
               <button className={`${styles.dotsMenuItem} ${styles.dotsMenuDanger}`} onClick={handleDelete}>
@@ -247,7 +249,13 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
         </div>
         <div className={styles.metaItem}>
           {mcp.connected ? <Wifi size={12} /> : <WifiOff size={12} />}
-          <span>{mcp.connected ? 'Connected' : 'Disconnected'}</span>
+          <span>
+            {serverOffline
+              ? 'Server offline'
+              : mcp.connected
+                ? 'Connected'
+                : 'Disconnected'}
+          </span>
         </div>
       </div>
 
@@ -271,7 +279,9 @@ function ServerCard({ mcp, onConnect, onDisconnect, onDelete, isToggling, busy, 
 function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, isToggling, busy }) {
   const [copiedField, setCopiedField] = useState(null)
   const overlayRef = useRef(null)
+  const serverOffline = mcp.reachable === false
   const disabled = busy || isToggling
+  const connectBlocked = !mcp.connected && serverOffline
 
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === 'Escape' && !disabled) onClose() }
@@ -284,7 +294,7 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, is
   }
 
   const handleToggle = () => {
-    if (disabled) return
+    if (disabled || connectBlocked) return
     if (mcp.connected) onDisconnect(mcp.id)
     else onConnect(mcp.id)
   }
@@ -318,7 +328,11 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, is
               <h2 className={styles.modalTitle}>{mcp.name}</h2>
               <span className={`${styles.modalStatus} ${mcp.connected ? styles.modalStatusOn : ''}`}>
                 <span className={styles.modalStatusDot} />
-                {mcp.connected ? 'Connected' : 'Disconnected'}
+                {serverOffline
+                  ? 'Server offline'
+                  : mcp.connected
+                    ? 'Connected'
+                    : 'Disconnected'}
               </span>
             </div>
           </div>
@@ -400,14 +414,15 @@ function ServerDetailModal({ mcp, onClose, onConnect, onDisconnect, onDelete, is
               <button
                 className={`${styles.footerBtn} ${styles.footerBtnConnect}`}
                 onClick={handleToggle}
-                disabled={disabled}
+                disabled={disabled || connectBlocked}
+                title={connectBlocked ? 'Start the MCP server before connecting' : undefined}
               >
                 {isToggling ? (
                   <Loader2 size={14} className={styles.toggleSpinner} />
                 ) : (
                   <>
                     <Wifi size={14} />
-                    <span>Connect</span>
+                    <span>{connectBlocked ? 'Server offline' : 'Connect'}</span>
                   </>
                 )}
               </button>
