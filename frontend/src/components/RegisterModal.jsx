@@ -8,7 +8,7 @@ const TRANSPORT_OPTIONS = [
 ]
 
 const DOMAIN_MAP = {
-  gmail:'gmail.com',mail:'gmail.com',email:'gmail.com',inbox:'gmail.com',
+  gmail:'gmail.com',
   github:'github.com',gh:'github.com',youtube:'youtube.com',yt:'youtube.com',
   google:'google.com',gcp:'cloud.google.com',slack:'slack.com',
   discord:'discord.com',notion:'notion.so',spotify:'spotify.com',
@@ -49,10 +49,6 @@ function detectIcon(name) {
   if (!name) return null
   const lower = name.toLowerCase().replace(/[\s_\-.]+/g, '').replace(/mcp|server|tools?|api/g, '')
   if (lower.length < 2) return null
-
-  if (lower.includes('gmail') || lower.includes('mail') || lower.includes('email') || lower.includes('inbox')) {
-    return 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico'
-  }
 
   for (const [key, domain] of Object.entries(DOMAIN_MAP)) {
     if (lower.includes(key)) {

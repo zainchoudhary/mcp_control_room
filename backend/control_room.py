@@ -21,14 +21,14 @@ Reply with ONLY valid JSON, no markdown:
 {"intent":"file_only"|"mcp_only"|"file_and_mcp"|"chat_only"}
 
 Meanings:
-- file_only: Answer from attached documents/images in this chat. No external MCP tools (Gmail, DB, APIs).
-- mcp_only: User wants connected MCP tools (email search, account info, list tools, database, etc.). NOT asking about an uploaded document — even if a file was uploaded earlier in the chat.
-- file_and_mcp: This message needs BOTH attached file content AND external MCP tools (e.g. summarize PDF and email results).
+- file_only: Answer from attached documents/images in this chat. No external MCP tools (databases, APIs, connected services).
+- mcp_only: User wants connected MCP tools (search, fetch, create, list tools, database queries, etc.). NOT asking about an uploaded document — even if a file was uploaded earlier in the chat.
+- file_and_mcp: This message needs BOTH attached file content AND external MCP tools (e.g. summarize PDF and fetch live data from a connected server).
 - chat_only: Greeting, thanks, general knowledge, or casual chat — no files and no MCP tools needed for this message.
 
 Rules:
-- New files attached THIS message + questions about them → file_only (unless they also clearly ask for Gmail/inbox/tools in the same message → file_and_mcp).
-- Email/inbox/Gmail/tool-list requests with MCP connected → mcp_only (ignore old files in chat history).
+- New files attached THIS message + questions about them → file_only (unless they also clearly ask for connected tools/services in the same message → file_and_mcp).
+- Tool/service/API requests with MCP connected → mcp_only (ignore old files in chat history).
 - Follow-up about "this PDF", "question 2", "the attached quiz" without new upload → file_only.
 - If MCP tools are not connected, never return mcp_only or file_and_mcp."""
 
@@ -42,15 +42,27 @@ APPROVE = plan and approach look sound.
 CHECK = brief reason if something is risky or missing (max 15 words)."""
 
 _EXTERNAL_TOOL_MARKERS = (
-    "gmail", "inbox", "my email", "e-mail", "emails", "email from",
-    "search email", "search my", "mail from", "received from",
-    "also check", "account info", "gmail account", "my gmail",
     "available tools", "list tools", "what tools", "which tools",
     "give me tools", "connected tools", "mcp tools", "show tools",
     "use mcp", "use the tool", "call the tool", "run the tool",
-    "from my database", "stripe", "notion", "slack",
-    "postgres", "mysql", "mcp server", "connected tool",
-    "get_profile", "search_emails", "tool se", "mcp se",
+    "execute tool", "run query", "fetch from", "pull from",
+    "from my database", "connected server", "mcp server", "connected tool",
+    "tool se", "mcp se",
+)
+
+_LIST_TOOLS_MARKERS = (
+    "available tools", "list tools", "what tools", "which tools",
+    "show tools", "connected tools", "give me tools",
+)
+
+_READ_INTENT_MARKERS = (
+    "profile", "account info", "account details", "who am i",
+    "my info", "my account", "my status", "get info", "get details",
+)
+
+_SEARCH_INTENT_MARKERS = (
+    "search", "find", "lookup", "look up", "query", "filter",
+    "list all", "fetch all", "show all", "get all",
 )
 
 _EMPTY_ATTACHMENT_CONTEXT: dict[str, Any] = {
@@ -102,10 +114,19 @@ def message_targets_mcp_tools(user_message: str, tools: list | None = None) -> b
     if user_requests_external_tools(user_message):
         return True
     lower = (user_message or "").lower()
-    if re.search(r"\b(search|find|list|get|fetch)\b.*\b(email|mail|inbox)\b", lower):
-        return True
-    if re.search(r"\b(email|mail|inbox)\b.*\b(search|find|from)\b", lower):
-        return True
+    if re.search(
+        r"\b(search|find|list|get|fetch|run|call|execute|create|update|delete)\b",
+        lower,
+    ):
+        for t in tools or []:
+            name = getattr(t, "name", str(t)).lower()
+            desc = (getattr(t, "description", "") or "").lower()
+            for token in re.findall(r"[a-z0-9_]+", name.replace("_", " ")):
+                if len(token) >= 4 and token in lower:
+                    return True
+            for token in re.findall(r"[a-z0-9_]+", desc):
+                if len(token) >= 5 and token in lower:
+                    return True
     for t in tools or []:
         name = getattr(t, "name", str(t)).lower()
         if name in lower:
@@ -229,9 +250,29 @@ async def classify_turn_intent(
     return intent
 
 
+def _tool_name_in_message(name: str, lower_message: str) -> bool:
+    normalized = name.lower()
+    if normalized in lower_message:
+        return True
+    spaced = normalized.replace("_", " ")
+    return spaced in lower_message
+
+
+def _tool_matches_intent(name: str, *, wants_read: bool, wants_search: bool) -> bool:
+    n = name.lower()
+    is_search_tool = any(k in n for k in ("search", "find", "query", "lookup"))
+    is_read_tool = any(k in n for k in ("profile", "info", "status", "get_", "fetch_"))
+    if wants_read and not wants_search and is_search_tool and not is_read_tool:
+        return False
+    if wants_search and not wants_read and is_read_tool and not is_search_tool:
+        return False
+    return True
+
+
 def filter_tools_for_user_message(user_message: str, tools: list) -> list:
     """
-    Reduce Groq tool-call errors: only expose tools the user actually asked for.
+    Reduce Groq tool-call errors by narrowing tools when the user clearly targets
+    specific ones. Works with any MCP — no hardcoded tool names.
     """
     if not tools:
         return tools
@@ -239,48 +280,33 @@ def filter_tools_for_user_message(user_message: str, tools: list) -> list:
     lower = (user_message or "").lower()
     by_name = {getattr(t, "name", str(t)): t for t in tools}
 
-    wants_profile = any(
-        p in lower
-        for p in (
-            "profile", "account info", "my email", "gmail account",
-            "account details", "who am i", "my address",
-        )
-    )
-    wants_search = any(
-        p in lower
-        for p in (
-            "search email", "search my", "find email", "emails from",
-            "mail from", "inbox", "received from", "unread",
-            "latest email", "recent email",
-        )
-    ) or bool(
-        re.search(r"\b(search|find|list|fetch)\b.*\b(email|mail|inbox)\b", lower)
-    )
-    wants_list_tools = any(
-        p in lower
-        for p in (
-            "available tools", "list tools", "what tools", "which tools",
-            "show tools", "connected tools",
-        )
-    )
+    explicit = [
+        t for name, t in by_name.items()
+        if _tool_name_in_message(name, lower)
+    ]
+    if explicit:
+        logger.info("Tool whitelist (name match): %s", [t.name for t in explicit])
+        return explicit
 
-    allowed: list[str] = []
-    if wants_profile and "get_profile" in by_name:
-        allowed.append("get_profile")
-    if wants_search and "search_emails" in by_name:
-        allowed.append("search_emails")
-    if wants_list_tools:
-        for name in by_name:
-            if "list" in name or "tool" in name:
-                allowed.append(name)
-
-    if wants_profile and not wants_search and "search_emails" in allowed:
-        allowed = [n for n in allowed if n != "search_emails"]
-
-    if allowed:
-        picked = [by_name[n] for n in allowed if n in by_name]
+    if any(marker in lower for marker in _LIST_TOOLS_MARKERS):
+        picked = [
+            t for name, t in by_name.items()
+            if "list" in name.lower() or "tool" in name.lower()
+        ]
         if picked:
-            logger.info("Tool whitelist: %s", [t.name for t in picked])
+            logger.info("Tool whitelist (list tools): %s", [t.name for t in picked])
+            return picked
+
+    wants_read = any(marker in lower for marker in _READ_INTENT_MARKERS)
+    wants_search = any(marker in lower for marker in _SEARCH_INTENT_MARKERS)
+
+    if wants_read or wants_search:
+        picked = [
+            t for name, t in by_name.items()
+            if _tool_matches_intent(name, wants_read=wants_read, wants_search=wants_search)
+        ]
+        if picked and len(picked) < len(tools):
+            logger.info("Tool whitelist (intent): %s", [t.name for t in picked])
             return picked
 
     return list(tools)
@@ -503,7 +529,7 @@ def planner_detail_from_plan(plan: str, turn_intent: str | None = None) -> str:
     combined = " ".join(lines).lower()
     if "attach" in combined or "file" in combined or "pdf" in combined:
         label = "Read attached files"
-    elif "tool" in combined or "mcp" in combined or "gmail" in combined:
+    elif "tool" in combined or "mcp" in combined:
         label = "Run MCP tools"
     else:
         first = re.sub(r"^\d+[\.\)]\s*", "", lines[0])

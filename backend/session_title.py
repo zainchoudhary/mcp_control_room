@@ -28,7 +28,7 @@ Return ONLY valid JSON with a single "title" field. No markdown, no explanation.
 Good examples:
 {"title": "Fix login button on mobile"}
 {"title": "Summarize Q3 sales report"}
-{"title": "Gmail profile and unread emails"}
+{"title": "Query connected database records"}
 {"title": "Quiz answers from attached PDF"}
 {"title": "Explain Python list comprehensions"}
 
