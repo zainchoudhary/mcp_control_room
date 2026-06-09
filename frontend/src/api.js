@@ -60,6 +60,7 @@ export const getWeeklyStats = () => request('/stats/weekly')
 // Sessions
 export const listSessions = () => request('/sessions')
 export const createSession = () => request('/sessions', { method: 'POST' })
+export const createGhostSession = () => request('/sessions/ghost', { method: 'POST' })
 export const updateSession = (id, body) => request(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 export const deleteSessionApi = (id) => request(`/sessions/${id}`, { method: 'DELETE' })
 export const getMessages = (id) => request(`/sessions/${id}/messages`)
@@ -196,7 +197,7 @@ export async function fetchAttachmentBlob(sessionId, attachmentId) {
 }
 
 // Chat Stream
-export async function* streamChat(sessionId, message, mcpIds = [], attachmentIds = []) {
+export async function* streamChat(sessionId, message, mcpIds = [], attachmentIds = [], { ghostMode = false, ghostHistory = null } = {}) {
   const res = await fetch(`${BASE}/chat/stream`, {
     method: 'POST',
     headers: authHeaders(),
@@ -205,6 +206,8 @@ export async function* streamChat(sessionId, message, mcpIds = [], attachmentIds
       message,
       mcp_ids: mcpIds,
       attachment_ids: attachmentIds.length ? attachmentIds : undefined,
+      ghost_mode: ghostMode || undefined,
+      ghost_history: ghostHistory?.length ? ghostHistory : undefined,
     }),
   })
 

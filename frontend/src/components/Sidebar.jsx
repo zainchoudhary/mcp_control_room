@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings, Wrench, Crown, Zap, Sparkles, Search, X,
+  Settings, Wrench, Crown, Zap, Sparkles, Search, X, Ghost,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -41,6 +41,7 @@ export function Sidebar({
   mcpCount,
   connectedCount,
   searchFocusToken = 0,
+  ghostMode = false,
   t,
 }) {
   const [hoveredSession, setHoveredSession] = useState(null)
@@ -65,8 +66,9 @@ export function Sidebar({
   }, [])
 
   const openSearchPopup = useCallback(() => {
+    if (ghostMode) return
     setSearchPopupOpen(true)
-  }, [])
+  }, [ghostMode])
 
   const handlePopupSelectSession = useCallback((id) => {
     onNavigate('chat')
@@ -111,9 +113,9 @@ export function Sidebar({
   }, [collapsed])
 
   useEffect(() => {
-    if (!searchFocusToken) return
+    if (!searchFocusToken || ghostMode) return
     setSearchPopupOpen(true)
-  }, [searchFocusToken])
+  }, [searchFocusToken, ghostMode])
 
   const tr = t || ((k) => k)
 
@@ -184,9 +186,10 @@ export function Sidebar({
             </div>
             <button
               type="button"
-              className={styles.topSearchBtn}
+              className={`${styles.topSearchBtn} ${ghostMode ? styles.topSearchBtnDisabled : ''}`}
               onClick={openSearchPopup}
-              title={tr('searchChats') || 'Search chats'}
+              disabled={ghostMode}
+              title={ghostMode ? (tr('ghostSearchBlocked') || 'Chats hidden in ghost mode') : (tr('searchChats') || 'Search chats')}
               aria-label={tr('searchChats') || 'Search chats'}
             >
               <Search size={17} />
@@ -214,9 +217,10 @@ export function Sidebar({
           <div className={styles.collapsedSpacer} />
 
           <button
-            className={styles.collapsedBtn}
+            className={`${styles.collapsedBtn} ${ghostMode ? styles.collapsedBtnDisabled : ''}`}
             onClick={openSearchPopup}
-            title={tr('searchChats') || 'Search chats'}
+            disabled={ghostMode}
+            title={ghostMode ? (tr('ghostSearchBlocked') || 'Chats hidden in ghost mode') : (tr('searchChats') || 'Search chats')}
           >
             <Search size={18} />
           </button>
@@ -310,7 +314,12 @@ export function Sidebar({
                       </button>
 
                       <div className={styles.sessions}>
-                        {sessionsLoading ? (
+                        {ghostMode ? (
+                          <div className={styles.ghostSidebarNotice}>
+                            <Ghost size={15} />
+                            <span>{tr('ghostSidebarHidden') || 'Chats hidden — ghost mode active'}</span>
+                          </div>
+                        ) : sessionsLoading ? (
                           <div className={styles.sessionsSkeleton}>
                             <div className={styles.skelGroup} />
                             {[1, 2, 3, 4].map(i => (

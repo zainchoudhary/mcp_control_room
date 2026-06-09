@@ -4,16 +4,12 @@
   z-index: 300;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  animation: overlayIn 0.2s ease-out forwards;
-}
-
-/* Blur + 3D = lag — page flip pe sirf dark overlay */
-.overlayFlip {
-  backdrop-filter: none;
   background: rgba(0, 0, 0, 0.58);
   animation: overlayIn 0.25s ease-out forwards;
+}
+
+.overlayFlip {
+  backdrop-filter: none;
 }
 
 @keyframes overlayIn {
@@ -25,8 +21,9 @@
   width: 92%;
   max-width: 360px;
   background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
   backface-visibility: hidden;
 }
@@ -109,14 +106,14 @@
   margin-bottom: 18px;
 }
 .badge_danger {
-  background: #fef2f2;
-  color: #dc2626;
-  box-shadow: 0 0 0 6px rgba(239,68,68,0.06), 0 0 0 12px rgba(239,68,68,0.03);
+  background: var(--red-light);
+  color: var(--red);
+  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.06), 0 0 0 12px rgba(239, 68, 68, 0.03);
 }
 .badge_warning {
-  background: #fffbeb;
-  color: #d97706;
-  box-shadow: 0 0 0 6px rgba(245,158,11,0.06), 0 0 0 12px rgba(245,158,11,0.03);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--amber);
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.06), 0 0 0 12px rgba(245, 158, 11, 0.03);
 }
 
 .text { margin-bottom: 24px; }
@@ -153,8 +150,8 @@
 .btn:active:not(:disabled) { transform: scale(0.98); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.btn_danger { background: #ef4444; }
-.btn_warning { background: #f59e0b; }
+.btn_danger { background: var(--red); }
+.btn_warning { background: var(--amber); }
 
 .btnGhost {
   width: 100%; padding: 12px;

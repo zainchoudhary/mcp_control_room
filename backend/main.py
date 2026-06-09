@@ -44,7 +44,7 @@ from db_config import init_db, get_db, AsyncSessionLocal
 from database import (
     register_mcp, list_mcps, get_mcp,
     set_mcp_connection, delete_mcp, get_connected_mcps,
-    create_session, list_user_sessions, update_session_title,
+    create_session, create_ghost_session, get_session, list_user_sessions, update_session_title,
     delete_session, save_message, get_session_messages,
     get_all_user_sessions_with_messages, delete_all_user_sessions,
 )
@@ -65,6 +65,7 @@ from chat_attachments import (
 from auth_routes import router as auth_router
 from stripe_routes import router as stripe_router, get_user_limits
 from auth_utils import get_current_user, send_contact_email
+from ghost_mode import is_ghost_session_title
 from plan_guard import (
     require_active_subscription,
     check_daily_message_limit,
@@ -144,6 +145,8 @@ class ChatRequest(BaseModel):
     message: str
     mcp_ids: Optional[list[str]] = None
     attachment_ids: Optional[list[str]] = None
+    ghost_mode: bool = False
+    ghost_history: Optional[list[dict]] = None
 
 
 class ContactRequest(BaseModel):
@@ -541,6 +544,16 @@ async def api_create_session(
     return session
 
 
+@app.post("/api/sessions/ghost", status_code=201)
+async def api_create_ghost_session(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ephemeral ghost chat session — not listed in sidebar, deleted when ghost mode ends."""
+    session = await create_ghost_session(db, user["id"])
+    return {**session, "ghost": True}
+
+
 @app.delete("/api/sessions", status_code=200)
 async def api_delete_all_sessions(
     user: dict = Depends(get_current_user),
@@ -723,7 +736,14 @@ async def api_chat_stream(
     and streams tokens back to the client. Enforces daily message limit.
     """
     await verify_session_owner(db, body.session_id, user["id"])
-    history = await get_session_messages(db, body.session_id)
+    session_row = await get_session(db, body.session_id, user["id"])
+    is_ghost = body.ghost_mode or is_ghost_session_title(
+        (session_row or {}).get("title")
+    )
+    if is_ghost:
+        history = body.ghost_history or []
+    else:
+        history = await get_session_messages(db, body.session_id)
     current_user_id = str(user["id"])
 
     manifest = list_attachments(current_user_id, body.session_id)
@@ -733,9 +753,10 @@ async def api_chat_stream(
         att_meta = [a for a in manifest if a["id"] in allowed_ids]
 
     stored_user = format_stored_user_message(body.message, att_meta)
-    await save_message(db, body.session_id, "user", stored_user)
+    if not is_ghost:
+        await save_message(db, body.session_id, "user", stored_user)
 
-    is_first_message = not history
+    is_first_message = not history and not is_ghost
     attachment_names = [a.get("name", "") for a in att_meta if a.get("name")]
 
     logging.info("Chat stream: user_id=%s type=%s", current_user_id, type(current_user_id).__name__)
@@ -758,7 +779,7 @@ async def api_chat_stream(
         title_sent = False
         title_task = None
 
-        if is_first_message:
+        if is_first_message and not is_ghost:
             async def _save_title():
                 title = await generate_session_title(user_message, attachment_names)
                 async with AsyncSessionLocal() as title_db:
@@ -838,7 +859,7 @@ async def api_chat_stream(
                 logger.exception("Session title task failed")
 
         full_text = "".join(full_response_parts)
-        if full_text.strip():
+        if full_text.strip() and not is_ghost:
             async with AsyncSessionLocal() as new_db:
                 await save_message(new_db, session_id, "assistant", full_text)
 

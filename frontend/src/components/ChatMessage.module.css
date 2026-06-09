@@ -43,6 +43,16 @@
   border: 1px solid var(--border-default);
 }
 
+.avatarGhost {
+  background: var(--accent-light) !important;
+  color: var(--accent) !important;
+  border: 1px solid var(--accent-border) !important;
+}
+
+.ghostMessage.userMessage {
+  background: var(--accent-light);
+}
+
 .assistantMessage .avatar {
   background: var(--accent);
   color: white;

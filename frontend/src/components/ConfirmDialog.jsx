@@ -9,7 +9,7 @@ const ICONS = {
   disconnect: Unplug,
 }
 
-/** 'pageFlip' = book page turn; 'default' = simple drop */
+/** 'pageFlip' = book page turn (default); 'default' = simple drop */
 export function ConfirmDialog({
   open,
   title,
@@ -18,7 +18,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   variant = 'danger',
   icon = 'warning',
-  animation = 'default',
+  animation = 'pageFlip',
   onConfirm,
   onCancel,
   loading = false,

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from db_models import MCP, ChatSession, Message
+from ghost_mode import GHOST_SESSION_TITLE
 
 
 async def register_mcp(
@@ -76,11 +77,30 @@ async def create_session(db: AsyncSession, user_id: str, title: Optional[str] = 
     return session.to_dict()
 
 
+async def get_session(db: AsyncSession, session_id: str, user_id: str) -> Optional[dict]:
+    """Get a chat session by ID, scoped to user."""
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id)
+    )
+    session = result.scalar_one_or_none()
+    return session.to_dict() if session else None
+
+
+async def create_ghost_session(db: AsyncSession, user_id: str) -> dict:
+    """Ephemeral session — hidden from sidebar, wiped when ghost mode ends."""
+    session = ChatSession(user_id=user_id, title=GHOST_SESSION_TITLE)
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session.to_dict()
+
+
 async def list_user_sessions(db: AsyncSession, user_id: str) -> list:
-    """List all chat sessions for a user, newest first."""
+    """List all chat sessions for a user, newest first (excludes ghost sessions)."""
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.user_id == user_id)
+        .where(ChatSession.title != GHOST_SESSION_TITLE)
         .order_by(ChatSession.created_at.desc())
     )
     return [row.to_dict() for row in result.scalars().all()]
@@ -134,6 +154,7 @@ async def get_all_user_sessions_with_messages(db: AsyncSession, user_id: str) ->
         select(ChatSession)
         .options(selectinload(ChatSession.messages))
         .where(ChatSession.user_id == user_id)
+        .where(ChatSession.title != GHOST_SESSION_TITLE)
         .order_by(ChatSession.created_at.desc())
     )
     sessions = result.scalars().all()

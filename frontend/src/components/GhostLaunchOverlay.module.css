@@ -1,0 +1,229 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  overflow: hidden;
+  animation: overlayIn 0.35s ease;
+}
+
+.warp {
+  animation: overlayOut 0.5s ease 0.1s forwards;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlayOut {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.stars,
+.stars2 {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 80px 120px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 160px 60px, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 240px 180px, rgba(255, 255, 255, 0.25), transparent);
+  background-size: 280px 280px;
+  animation: starDrift 8s linear infinite;
+  opacity: 0.45;
+}
+
+:global([data-theme="light"]) .stars,
+:global([data-theme="light"]) .stars2 {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(0, 0, 0, 0.12), transparent),
+    radial-gradient(1px 1px at 80px 120px, rgba(0, 0, 0, 0.08), transparent),
+    radial-gradient(1.5px 1.5px at 160px 60px, rgba(0, 0, 0, 0.1), transparent),
+    radial-gradient(1px 1px at 240px 180px, rgba(0, 0, 0, 0.06), transparent);
+  opacity: 0.7;
+}
+
+.stars2 {
+  background-size: 420px 420px;
+  animation-duration: 14s;
+  animation-direction: reverse;
+  opacity: 0.28;
+}
+
+:global([data-theme="light"]) .stars2 {
+  opacity: 0.45;
+}
+
+@keyframes starDrift {
+  from { transform: translateY(0); }
+  to { transform: translateY(-280px); }
+}
+
+.shipWrap {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: shipLaunch 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes shipLaunch {
+  0% {
+    transform: translateX(-50%) translateY(120px) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateX(-50%) translateY(-80px) scale(1);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-320px) scale(0.35);
+    opacity: 0;
+  }
+}
+
+.ship {
+  color: var(--accent);
+  filter: drop-shadow(0 0 20px var(--accent-border));
+  transform: rotate(-45deg);
+  animation: shipWobble 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes shipWobble {
+  from { transform: rotate(-42deg); }
+  to { transform: rotate(-48deg); }
+}
+
+.engineGlow {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  width: 24px;
+  height: 48px;
+  transform: translateX(-50%);
+  background: linear-gradient(to top, var(--accent), var(--violet), transparent);
+  border-radius: 50%;
+  filter: blur(8px);
+  animation: enginePulse 0.15s ease-in-out infinite alternate;
+  opacity: 0.85;
+}
+
+@keyframes enginePulse {
+  from { opacity: 0.65; height: 40px; }
+  to { opacity: 1; height: 56px; }
+}
+
+.trail,
+.trail2 {
+  position: absolute;
+  bottom: -60px;
+  left: 50%;
+  width: 4px;
+  height: 80px;
+  transform: translateX(-50%);
+  background: linear-gradient(to bottom, var(--accent-border), transparent);
+  border-radius: 4px;
+  filter: blur(2px);
+}
+
+.trail2 {
+  width: 12px;
+  opacity: 0.45;
+  filter: blur(6px);
+  animation: trailFlicker 0.2s infinite;
+}
+
+@keyframes trailFlicker {
+  50% { opacity: 0.2; }
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 32px;
+  animation: contentFade 0.6s ease 0.3s both;
+}
+
+@keyframes contentFade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ghostBadge {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  box-shadow: var(--shadow-md);
+  animation: badgePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: var(--shadow-md); }
+  50% { box-shadow: 0 0 32px var(--accent-light); }
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  margin: 0 0 28px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.progress {
+  width: 220px;
+  height: 4px;
+  margin: 0 auto;
+  background: var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--violet));
+  border-radius: 4px;
+  animation: progressFill 2.2s ease forwards;
+}
+
+@keyframes progressFill {
+  to { width: 100%; }
+}
+
+.warp .stars,
+.warp .stars2 {
+  animation-duration: 0.4s;
+}
+
+.warp .content {
+  animation: contentWarp 0.45s ease forwards;
+}
+
+@keyframes contentWarp {
+  to {
+    opacity: 0;
+    transform: scale(1.08);
+    filter: blur(6px);
+  }
+}

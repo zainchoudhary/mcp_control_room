@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   createSession,
+  createGhostSession,
   listSessions,
   deleteSessionApi,
   getMessages,
@@ -16,7 +17,7 @@ import {
   deleteChatAttachment,
   fetchAttachmentBlob,
 } from './api.js'
-import { formatUserMessageForDisplay } from './utils/chatAttachments.js'
+import { formatUserMessageForDisplay, parseUserMessageContent } from './utils/chatAttachments.js'
 import { getSavedUser, fetchMe, logout } from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
 import { DashboardPage } from './components/DashboardPage.jsx'
@@ -40,7 +41,8 @@ import { applyCustomBg } from './utils/customBackground.js'
 import { registerCurrentDevice } from './utils/registerDevice.js'
 import { WebsiteLockOverlay } from './components/WebsiteLockOverlay.jsx'
 import { shouldShowLock, clearUnlockSession } from './utils/websiteLock.js'
-import { Bot, Menu } from 'lucide-react'
+import { GhostLaunchOverlay } from './components/GhostLaunchOverlay.jsx'
+import { Bot, Menu, Ghost } from 'lucide-react'
 import styles from './App.module.css'
 
 const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'pricing', 'settings']
@@ -97,6 +99,10 @@ export default function App() {
   const [weeklyStats, setWeeklyStats] = useState(null)
   const [toolExecState, setToolExecState] = useState({ mcpId: null, toolName: null, tools: null, formCache: {} })
   const [appLocked, setAppLocked] = useState(false)
+  const [ghostMode, setGhostMode] = useState(false)
+  const [ghostLaunching, setGhostLaunching] = useState(false)
+  const ghostSessionIdRef = useRef(null)
+  const preGhostSessionRef = useRef(null)
   const userId = user?.id || 'anon'
   const disabledKeyRef = useRef(`toolchain_disabled_mcps_${userId}`)
   const loadDisabled = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() } }
@@ -302,7 +308,6 @@ export default function App() {
       message: 'Are you sure you want to sign out? You will need to log in again.',
       confirmLabel: 'Sign Out',
       icon: 'logout',
-      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: () => {
         setLogoutLoading(true)
@@ -410,12 +415,29 @@ export default function App() {
 
 
   const ensureSession = async () => {
+    if (ghostMode) {
+      if (ghostSessionIdRef.current) return ghostSessionIdRef.current
+      const data = await createGhostSession()
+      ghostSessionIdRef.current = data.id
+      setSessionId(data.id)
+      return data.id
+    }
     if (sessionId) return sessionId
     const data = await createSession()
     setSessions((prev) => [data, ...prev])
     setSessionId(data.id)
     return data.id
   }
+
+  const buildGhostHistory = useCallback((msgs) => {
+    return msgs.map((m) => ({
+      role: m.role,
+      content:
+        m.role === 'user'
+          ? (m.rawContent ?? parseUserMessageContent(m.content).text)
+          : m.content,
+    }))
+  }, [])
 
   const clearComposerAttachments = useCallback(() => {
     attachmentUrlsRef.current.forEach((url) => {
@@ -429,6 +451,82 @@ export default function App() {
       })
       return []
     })
+  }, [])
+
+  const wipeGhostSession = useCallback(async () => {
+    const gid = ghostSessionIdRef.current
+    ghostSessionIdRef.current = null
+    if (gid) {
+      try {
+        await deleteSessionApi(gid)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
+
+  const exitGhostMode = useCallback(async ({ silent = false } = {}) => {
+    if (sending) return
+    await wipeGhostSession()
+    setGhostMode(false)
+    setGhostLaunching(false)
+    clearComposerAttachments()
+    setMessages([])
+    setStreamingId(null)
+    setInput('')
+    const restore = preGhostSessionRef.current
+    preGhostSessionRef.current = null
+    if (restore?.sessionId) {
+      setSessionId(restore.sessionId)
+      setMessages(restore.messages || [])
+    } else {
+      setSessionId(null)
+    }
+    if (!silent) toast(t('ghostModeOff') || 'Ghost mode ended — no traces saved.', 'success')
+  }, [sending, wipeGhostSession, clearComposerAttachments, toast, t])
+
+  const finishGhostLaunch = useCallback(() => {
+    setGhostLaunching(false)
+    setGhostMode(true)
+    toast(t('ghostModeOn') || 'Ghost mode active — anonymous & ephemeral.', 'success')
+  }, [toast, t])
+
+  const handleToggleGhostMode = () => {
+    if (ghostMode) {
+      setConfirmDialog({
+        title: t('ghostExitTitle') || 'Exit Ghost Mode?',
+        message: t('ghostExitMessage') || 'All messages in this ghost session will vanish immediately. Nothing is saved.',
+        confirmLabel: t('ghostExitConfirm') || 'Exit & Erase',
+        icon: 'delete',
+        variant: 'danger',
+        onConfirm: async () => {
+          setConfirmDialog(null)
+          await exitGhostMode()
+        },
+      })
+      return
+    }
+    if (sending) return
+    preGhostSessionRef.current = {
+      sessionId,
+      messages: [...messages],
+    }
+    setSessionId(null)
+    ghostSessionIdRef.current = null
+    setMessages([])
+    setStreamingId(null)
+    setInput('')
+    clearComposerAttachments()
+    setGhostLaunching(true)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (ghostSessionIdRef.current) {
+        deleteSessionApi(ghostSessionIdRef.current).catch(() => {})
+        ghostSessionIdRef.current = null
+      }
+    }
   }, [])
 
   const handleAddFiles = async (files) => {
@@ -525,6 +623,7 @@ export default function App() {
       id: crypto.randomUUID(),
       role: 'user',
       content: formatUserMessageForDisplay(messageText, sentAttachments),
+      rawContent: messageText,
     }
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: 'assistant', content: '' }])
@@ -532,10 +631,14 @@ export default function App() {
 
     try {
       const sid = await ensureSession()
+      const ghostHistory = ghostMode ? buildGhostHistory(messages) : null
 
       streamPendingRef.current = ''
-      for await (const event of streamChat(sid, messageText, [...enabledMcpIds], attachmentIds)) {
-        if (event.type === 'session_title' && event.title) {
+      for await (const event of streamChat(sid, messageText, [...enabledMcpIds], attachmentIds, {
+        ghostMode,
+        ghostHistory,
+      })) {
+        if (event.type === 'session_title' && event.title && !ghostMode) {
           setSessions((prev) =>
             prev.map((s) => (s.id === sid ? { ...s, title: event.title } : s))
           )
@@ -588,7 +691,7 @@ export default function App() {
     if (idx === -1) return
 
     const kept = messages.slice(0, idx)
-    const editedMsg = { ...messages[idx], content: newText }
+    const editedMsg = { ...messages[idx], content: newText, rawContent: newText }
     const assistantId = crypto.randomUUID()
 
     setMessages([...kept, editedMsg, { id: assistantId, role: 'assistant', content: '' }])
@@ -599,8 +702,12 @@ export default function App() {
     try {
       const sid = await ensureSession()
       const attachmentIds = chatAttachments.map((a) => a.id)
+      const ghostHistory = ghostMode ? buildGhostHistory(kept) : null
       streamPendingRef.current = ''
-      for await (const event of streamChat(sid, newText, [...enabledMcpIds], attachmentIds)) {
+      for await (const event of streamChat(sid, newText, [...enabledMcpIds], attachmentIds, {
+        ghostMode,
+        ghostHistory,
+      })) {
         if (event.type === 'token') {
           appendStreamContent(assistantId, event.content || '')
         }
@@ -639,6 +746,18 @@ export default function App() {
   }
 
   const handleNewChat = () => {
+    if (ghostMode) {
+      wipeGhostSession().then(() => {
+        setSessionId(null)
+        setMessages([])
+        setStreamingId(null)
+        setInput('')
+        clearComposerAttachments()
+        setActivePage('chat')
+        window.history.pushState(null, '', '/chat')
+      })
+      return
+    }
     clearComposerAttachments()
     setSessionId(null)
     setMessages([])
@@ -661,6 +780,10 @@ export default function App() {
   }, [activePage, messages])
 
   const handleSelectSession = async (id) => {
+    if (ghostMode) {
+      toast(t('ghostSelectBlocked') || 'Exit ghost mode to open saved chats.', 'error')
+      return
+    }
     if (id === sessionId && activePage === 'chat') return
     setSessionId(id)
     setMessages([])
@@ -790,7 +913,6 @@ export default function App() {
       message: `Disconnect "${name}"? You will need to re-authenticate to use it again.`,
       confirmLabel: 'Disconnect',
       icon: 'disconnect',
-      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: async () => {
         setConfirmDialog(null)
@@ -829,7 +951,6 @@ export default function App() {
       message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
       confirmLabel: 'Delete',
       icon: 'delete',
-      animation: 'pageFlip',
       variant: 'danger',
       onConfirm: async () => {
         setDeleteLoading(true)
@@ -1059,6 +1180,7 @@ export default function App() {
         mcpCount={mcps.length}
         connectedCount={connectedCount}
         searchFocusToken={searchFocusToken}
+        ghostMode={ghostMode}
         t={t}
       />
 
@@ -1137,7 +1259,28 @@ export default function App() {
         )}
 
         {activePage === 'chat' && (
-          <div className={styles.chatPage}>
+          <div className={`${styles.chatPage} ${ghostMode ? styles.chatPageGhost : ''}`}>
+            <div className={styles.chatTopBar}>
+              <div className={styles.chatTopBarLeft}>
+                {ghostMode && (
+                  <span className={styles.ghostLiveBadge}>
+                    <span className={styles.ghostLiveDot} />
+                    {t('ghostModeActive') || 'Ghost Mode — Anonymous'}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className={`${styles.ghostModeBtn} ${ghostMode ? styles.ghostModeBtnOn : ''}`}
+                onClick={handleToggleGhostMode}
+                disabled={sending || ghostLaunching}
+                title={ghostMode ? (t('ghostModeExit') || 'Exit Ghost Mode') : (t('ghostModeEnter') || 'Enter Ghost Mode')}
+              >
+                <Ghost size={16} />
+                <span>{ghostMode ? (t('ghostModeExit') || 'Exit Ghost') : (t('ghostMode') || 'Ghost Mode')}</span>
+              </button>
+            </div>
+
             <div className={`${styles.chatArea} ${messages.length > 0 || loadingMessages ? styles.chatAreaScrollable : styles.chatAreaFixed}`} ref={chatAreaRef}>
               {loadingMessages ? (
                 <div className={styles.skeletonWrap}>
@@ -1153,13 +1296,18 @@ export default function App() {
                 </div>
               ) : messages.length === 0 ? (
                 <div className={styles.welcome}>
-                  <div className={styles.welcomeIcon}>
-                    <Bot size={40} />
+                  <div className={`${styles.welcomeIcon} ${ghostMode ? styles.welcomeIconGhost : ''}`}>
+                    {ghostMode ? <Ghost size={40} /> : <Bot size={40} />}
                   </div>
-                  <h1 className={styles.welcomeTitle}>{t('toolchainAI')}</h1>
+                  <h1 className={styles.welcomeTitle}>
+                    {ghostMode ? (t('ghostWelcomeTitle') || 'Anonymous Channel') : t('toolchainAI')}
+                  </h1>
                   <p className={styles.welcomeSubtitle}>
-                    {t('welcomeSubtitle')}
+                    {ghostMode
+                      ? (t('ghostWelcomeSubtitle') || 'No history. No identity. Messages vanish when you leave.')
+                      : t('welcomeSubtitle')}
                   </p>
+                  {!ghostMode && (
                   <div className={styles.suggestions}>
                     {suggestions.map((s, i) => (
                       <button
@@ -1171,6 +1319,12 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  )}
+                  {ghostMode && (
+                    <p className={styles.ghostHint}>
+                      {t('ghostHint') || 'Your account is hidden. Nothing from this chat is saved or appears in history.'}
+                    </p>
+                  )}
                   {connectedCount > 0 && (
                     <p className={styles.connectedInfo}>
                       {t('connectedInfo').replace('{count}', connectedCount).replace('{s}', connectedCount !== 1 ? 's' : '')}
@@ -1185,7 +1339,8 @@ export default function App() {
                       message={m}
                       sessionId={sessionId}
                       isStreaming={m.id === streamingId}
-                      onEdit={m.role === 'user' && !sending ? handleEditMessage : undefined}
+                      onEdit={m.role === 'user' && !sending && !ghostMode ? handleEditMessage : undefined}
+                      ghostMode={ghostMode}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -1234,6 +1389,7 @@ export default function App() {
       )}
 
       <ToastContainer toasts={toasts} dismiss={dismiss} />
+      <GhostLaunchOverlay active={ghostLaunching} onComplete={finishGhostLaunch} />
       {user && appLocked && user.security?.lock_pin_set && (
         <WebsiteLockOverlay
           user={user}

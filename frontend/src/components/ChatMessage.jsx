@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Copy, Check, User, Bot, Wrench, ChevronDown, ChevronUp, Pencil, X, Send } from 'lucide-react'
+import { Copy, Check, User, Bot, Wrench, ChevronDown, ChevronUp, Pencil, X, Send, Ghost } from 'lucide-react'
 import { fetchAttachmentBlob } from '../api.js'
 import { parseUserMessageContent } from '../utils/chatAttachments.js'
 import { stabilizeStreamingMarkdown } from '../utils/streamingMarkdown.js'
@@ -318,7 +318,7 @@ function UserAttachments({ attachments, sessionId }) {
   )
 }
 
-export function ChatMessage({ message, sessionId, isStreaming, onEdit }) {
+export function ChatMessage({ message, sessionId, isStreaming, onEdit, ghostMode = false }) {
   const isUser = message.role === 'user'
   const userParsed = useMemo(
     () => (isUser ? parseUserMessageContent(message.content) : null),
@@ -375,15 +375,15 @@ export function ChatMessage({ message, sessionId, isStreaming, onEdit }) {
   }
 
   return (
-    <div className={`${styles.message} ${isUser ? styles.userMessage : styles.assistantMessage}`}>
+    <div className={`${styles.message} ${isUser ? styles.userMessage : styles.assistantMessage} ${ghostMode ? styles.ghostMessage : ''}`}>
       <div className={styles.messageInner}>
-        <div className={styles.avatar}>
-          {isUser ? <User size={18} /> : <Bot size={18} />}
+        <div className={`${styles.avatar} ${ghostMode && isUser ? styles.avatarGhost : ''}`}>
+          {isUser ? (ghostMode ? <Ghost size={18} /> : <User size={18} />) : <Bot size={18} />}
         </div>
 
         <div className={styles.messageBody}>
           <div className={styles.roleLine}>
-            <span className={styles.roleName}>{isUser ? 'You' : 'ToolChain AI'}</span>
+            <span className={styles.roleName}>{isUser ? (ghostMode ? 'Anonymous' : 'You') : 'ToolChain AI'}</span>
           </div>
 
           <div className={styles.messageContent}>
