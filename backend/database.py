@@ -59,7 +59,7 @@ async def set_mcp_requires_reauth(
     user_id: str,
     requires_reauth: bool,
 ):
-    """Flag MCP as needing OAuth re-authentication after manual disconnect."""
+    """Flag MCP as needing OAuth re-authentication (manual disconnect or server went offline)."""
     result = await db.execute(select(MCP).where(MCP.id == mcp_id, MCP.user_id == user_id))
     mcp = result.scalar_one_or_none()
     if mcp:
@@ -68,7 +68,7 @@ async def set_mcp_requires_reauth(
 
 
 async def disconnect_mcps(db: AsyncSession, user_id: str, mcp_ids: list[str]) -> list[str]:
-    """Mark MCPs as disconnected (e.g. unreachable backend). Does not force re-auth."""
+    """Mark MCPs as disconnected (e.g. unreachable backend) and require re-auth on reconnect."""
     if not mcp_ids:
         return []
     disconnected: list[str] = []
@@ -83,6 +83,7 @@ async def disconnect_mcps(db: AsyncSession, user_id: str, mcp_ids: list[str]) ->
         mcp = result.scalar_one_or_none()
         if mcp:
             mcp.connected = False
+            mcp.requires_reauth = True
             disconnected.append(mcp_id)
     if disconnected:
         await db.commit()

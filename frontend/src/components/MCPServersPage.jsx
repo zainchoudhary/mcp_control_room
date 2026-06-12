@@ -62,18 +62,25 @@ export function MCPServersPage({
       {!mcpsLoading && mcps.length > 0 && (
         <div className={styles.searchBar}>
           <Search size={15} className={styles.searchIcon} />
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Search MCP Servers"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className={styles.searchClear} onClick={() => setSearchQuery('')} type="button">
-              <X size={13} />
-            </button>
-          )}
+          <div className={styles.searchInputWrap}>
+            <input
+              className={styles.searchInput}
+              type="text"
+              placeholder="Search MCP Servers"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                className={styles.searchClear}
+                onClick={() => setSearchQuery('')}
+                type="button"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

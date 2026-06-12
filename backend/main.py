@@ -394,13 +394,30 @@ async def api_connect_mcp(
         )
 
     base = _mcp_base_url(mcp["url"])
+    force_fresh_auth = bool(mcp.get("requires_reauth"))
 
-    if mcp.get("requires_reauth"):
+    if force_fresh_auth:
         await _revoke_mcp_auth(base, user["id"])
         await set_mcp_requires_reauth(db, mcp_id, user["id"], False)
 
     try:
         async with httpx.AsyncClient(timeout=8) as client:
+            if force_fresh_auth and not skip_auth:
+                url_resp = await client.get(f"{base}/auth/url", params={"user_id": user["id"]})
+                if url_resp.status_code == 200:
+                    auth_data = url_resp.json()
+                    return {
+                        "id": mcp_id,
+                        "connected": False,
+                        "needs_auth": True,
+                        "auth_url": auth_data.get("auth_url", ""),
+                    }
+                if url_resp.status_code not in (404, 405):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Could not start authentication. Please try again.",
+                    )
+
             resp = await client.get(f"{base}/auth/status", params={"user_id": user["id"]})
             if resp.status_code == 200:
                 data = resp.json()
@@ -478,6 +495,12 @@ async def api_toggle_mcp(
         raise HTTPException(
             status_code=422,
             detail="Server unreachable. Please ensure the MCP server is running.",
+        )
+
+    if mcp.get("requires_reauth"):
+        raise HTTPException(
+            status_code=422,
+            detail="Server was offline. Reconnect from MCP Servers to sign in again.",
         )
 
     await set_mcp_connection(db, mcp_id, user["id"], True)
