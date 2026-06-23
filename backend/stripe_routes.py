@@ -172,6 +172,37 @@ async def create_checkout_session(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/invoices")
+async def list_invoices(
+    user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return recent Stripe invoices for the authenticated user."""
+    row = await _get_user_row(db, user["id"])
+    if not row.stripe_customer_id:
+        return {"invoices": []}
+
+    try:
+        invoices = stripe.Invoice.list(customer=row.stripe_customer_id, limit=12)
+        items = []
+        for inv in invoices.data:
+            inv_dict = inv.to_dict() if hasattr(inv, "to_dict") else dict(inv)
+            created = inv_dict.get("created")
+            items.append({
+                "id": inv_dict.get("id", ""),
+                "amount": (inv_dict.get("amount_paid") or 0) / 100,
+                "currency": (inv_dict.get("currency") or "usd").upper(),
+                "status": inv_dict.get("status", "unknown"),
+                "date": datetime.fromtimestamp(created, tz=timezone.utc).isoformat() if created else None,
+                "pdf_url": inv_dict.get("invoice_pdf"),
+                "hosted_url": inv_dict.get("hosted_invoice_url"),
+            })
+        return {"invoices": items}
+    except stripe.StripeError as e:
+        logger.error("Stripe invoice list error: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/portal")
 async def create_portal_session(
     user: dict = Depends(get_current_user),

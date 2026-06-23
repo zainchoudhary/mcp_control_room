@@ -2,11 +2,21 @@
 
 .settingsLayout {
   display: flex;
+  flex: 1;
   width: 100%;
   height: 100%;
   min-height: 0;
   background: transparent;
   overflow: hidden;
+  position: relative;
+}
+
+.settingsMobileOverlay {
+  display: none;
+}
+
+.settingsMobileHeader {
+  display: none;
 }
 
 .settingsAside {
@@ -195,6 +205,7 @@
 .asideNav .sidebarItem span {
   flex: 1;
   text-align: left;
+  white-space: nowrap;
 }
 
 .asideHint {
@@ -321,50 +332,128 @@
 }
 
 @media (max-width: 768px) {
-  .settingsLayout {
-    flex-direction: column;
+  .settingsMobileOverlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 199;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    animation: overlayIn 0.2s ease;
   }
 
-  .settingsAside,
-  .asideCollapsed {
-    width: 100%;
-    height: auto;
-    max-height: 42vh;
-    border-right: none;
+  .settingsMobileHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 10px 14px;
+    background: var(--bg-sidebar);
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  .asideCollapsed .asideTop {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .settingsMobileMenuBtn {
+    display: flex;
+    align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+  }
+
+  .settingsMobileMenuBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .settingsMobileHeaderBrand {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--text-primary);
+  }
+
+  .settingsMobileHeaderBrand span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settingsAside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 200;
+    width: 280px;
+    max-width: 88vw;
+    height: 100%;
+    max-height: none;
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: none;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(0);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .settingsAsideMobileClosed {
+    transform: translateX(-100%);
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .settingsAsideMobileOpen {
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .settingsAside.asideCollapsed {
+    width: 280px;
   }
 
   .asideCollapsedNav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 8px;
-  }
-
-  .asideNav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 8px;
-  }
-
-  .asideNav .sidebarItem {
-    flex: 1;
-    min-width: calc(50% - 4px);
-    justify-content: center;
-  }
-
-  .asideHint {
     display: none;
   }
 
+  .asideTop {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .asideNav {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    padding: 10px 8px;
+  }
+
+  .asideNav .sidebarItem {
+    flex: none;
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settingsMainMobile {
+    width: 100%;
+    padding-top: 56px;
+  }
+
   .settingsMainHeader {
-    padding: 20px 20px 16px;
+    display: none;
   }
 
   .settingsMain .content {
@@ -547,6 +636,7 @@
   transition: var(--transition-fast);
   text-align: left;
   width: 100%;
+  white-space: nowrap;
 }
 
 .sidebarItem:hover {
@@ -947,12 +1037,12 @@
 
 .optionRow {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   width: 100%;
   min-height: 52px;
-  padding: 0 18px;
+  padding: 10px 18px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -991,22 +1081,31 @@
   color: var(--accent);
 }
 
+.optionText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
 .optionLabel {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .optionValue {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-tertiary);
-  text-align: right;
-  white-space: nowrap;
+  text-align: left;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
-  justify-self: end;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .optionValueDanger {
@@ -2096,6 +2195,8 @@
   font-size: 13.5px;
   font-weight: 500;
   color: #ef4444;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .deleteRowActive {
   background: rgba(239, 68, 68, 0.04) !important;
@@ -2518,4 +2619,313 @@
 .billingWarning svg {
   flex-shrink: 0;
   margin-top: 1px;
+}
+
+.billingToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.billingToolbarHint {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.billingRefreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.billingRefreshBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-subtle);
+}
+
+.billingRefreshBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.billingPlanPrice {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.billingUpgradeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.billingUpgradeCard {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.billingUpgradeTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.billingUpgradeIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.billingUpgradeName {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.billingUpgradePrice {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.billingUpgradeCardBtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--plan-clr, var(--accent));
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.billingUpgradeCardBtn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.billingUpgradeCardBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.billingFeatureList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.billingFeatureItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.billingFeatureOn {
+  background: rgba(var(--accent-rgb), 0.04);
+}
+
+.billingFeatureOff {
+  background: var(--bg-secondary);
+  opacity: 0.72;
+}
+
+.billingFeatureIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.billingFeatureItem span {
+  flex: 1;
+}
+
+.billingFeatureCheck {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.billingFeatureX {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.billingCompareWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+}
+
+.billingCompareTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.billingCompareTable th,
+.billingCompareTable td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.billingCompareTable th:first-child,
+.billingCompareTable td:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.billingCompareTable thead th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.billingCompareActive {
+  background: rgba(var(--accent-rgb), 0.06);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.billingCompareYes {
+  color: #10b981;
+}
+
+.billingCompareNo {
+  color: var(--text-tertiary);
+}
+
+.billingInvoiceEmpty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-primary);
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.billingInvoiceEmpty svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.billingInvoiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.billingInvoiceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.billingInvoiceMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.billingInvoiceAmount {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.billingInvoiceDate {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.billingInvoiceMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.billingInvoiceStatus {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.billingInvoiceStatus_paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.billingInvoiceStatus_open,
+.billingInvoiceStatus_draft {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.billingInvoiceStatus_void,
+.billingInvoiceStatus_uncollectible {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.billingInvoiceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.billingInvoiceLink:hover {
+  text-decoration: underline;
 }

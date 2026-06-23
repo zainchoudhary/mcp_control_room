@@ -1,0 +1,363 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.top {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 28px 32px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.selectBtn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.selectBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.selectBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selectBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.newChatBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.newChatBtn:hover {
+  background: var(--accent-hover);
+}
+
+.deleteBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.deleteBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.searchBar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
+}
+
+.searchIcon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.searchClear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.searchClear:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.selectBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 14px;
+}
+
+.selectAllBtn {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.selectAllBtn:hover {
+  text-decoration: underline;
+}
+
+.selectCount {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.listScroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.15) transparent;
+}
+
+.listScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.listScroll::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-radius: 10px;
+}
+
+.listScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: min-content;
+}
+
+.chatRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 32px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.chatRow:hover {
+  background: var(--bg-tertiary);
+}
+
+.chatRowActive {
+  background: var(--accent-light);
+}
+
+.chatRowActive:hover {
+  background: var(--accent-light);
+}
+
+.chatRowSelected {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-primary));
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-default);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: white;
+  transition: all 0.12s ease;
+}
+
+.checkboxChecked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.chatTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatDate {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.empty {
+  padding: 64px 32px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.skelRow {
+  height: 52px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (max-width: 768px) {
+  .top {
+    padding: 20px 16px 0;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .selectBtn,
+  .newChatBtn,
+  .deleteBtn {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+
+  .chatRow {
+    padding: 14px 16px;
+  }
+
+  .empty {
+    padding: 48px 16px;
+  }
+}

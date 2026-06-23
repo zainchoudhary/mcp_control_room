@@ -245,6 +245,7 @@ export const getSubscription = () => request('/billing/subscription')
 export const getUsage = () => request('/billing/usage')
 export const createCheckout = (plan) => request('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) })
 export const createPortalSession = () => request('/billing/portal', { method: 'POST' })
+export const getInvoices = () => request('/billing/invoices')
 
 // Contact form (public, no auth)
 export const submitContact = (data) =>

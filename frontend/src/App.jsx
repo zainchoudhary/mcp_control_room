@@ -32,6 +32,7 @@ import { PricingPage } from './components/PricingPage.jsx'
 import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { SettingsPage } from './components/SettingsModal.jsx'
+import { AllChatsPage } from './components/AllChatsPage.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
 import { useLanguage } from './hooks/useLanguage.js'
@@ -45,7 +46,7 @@ import { GhostLaunchOverlay } from './components/GhostLaunchOverlay.jsx'
 import { Bot, Menu, Ghost } from 'lucide-react'
 import styles from './App.module.css'
 
-const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'pricing', 'settings']
+const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'all-chats', 'pricing', 'settings']
 const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
@@ -405,9 +406,9 @@ export default function App() {
   }, [user, activePage, refreshMCPs])
 
   useEffect(() => {
-    if (!user || activePage !== 'chat') return
+    if (!user || (activePage !== 'chat' && activePage !== 'all-chats')) return
     refreshSessions()
-    refreshMCPs()
+    if (activePage === 'chat') refreshMCPs()
   }, [user, activePage])
 
   useEffect(() => {
@@ -825,6 +826,40 @@ export default function App() {
     })
   }
 
+  const handleDeleteSessions = (ids) => {
+    if (ids.length === 0) return Promise.resolve(false)
+    const count = ids.length
+    return new Promise((resolve) => {
+      setConfirmDialog({
+        title: count === 1 ? 'Delete Conversation' : `Delete ${count} Conversations`,
+        message: count === 1
+          ? 'Delete this conversation? All messages will be lost.'
+          : `Delete ${count} conversations? All messages will be lost. This cannot be undone.`,
+        confirmLabel: 'Delete',
+        icon: 'delete',
+        variant: 'danger',
+        onDismiss: () => resolve(false),
+        onConfirm: async () => {
+          setConfirmDialog(null)
+          const results = await Promise.allSettled(ids.map((id) => deleteSessionApi(id)))
+          const deleted = ids.filter((_, i) => results[i].status === 'fulfilled')
+          if (deleted.length > 0) {
+            setSessions((prev) => prev.filter((s) => !deleted.includes(s.id)))
+            if (deleted.includes(sessionId)) {
+              handleNewChat()
+            }
+          }
+          if (deleted.length < ids.length) {
+            toast('Some conversations could not be deleted.', 'error')
+          } else if (deleted.length > 1) {
+            toast(`${deleted.length} conversations deleted`, 'success')
+          }
+          resolve(deleted.length > 0)
+        },
+      })
+    })
+  }
+
   const onRegister = async (payload) => {
     await registerMCP(payload)
     await refreshMCPs()
@@ -1148,7 +1183,11 @@ export default function App() {
             animation={confirmDialog.animation}
             variant={confirmDialog.variant}
             onConfirm={confirmDialog.onConfirm}
-            onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}
+            onCancel={() => {
+              if (logoutLoading || deleteLoading) return
+              confirmDialog.onDismiss?.()
+              setConfirmDialog(null)
+            }}
             loading={logoutLoading || deleteLoading}
           />
         )}
@@ -1259,6 +1298,18 @@ export default function App() {
             persistedState={toolExecState}
             onStateChange={setToolExecState}
             user={user}
+          />
+        )}
+
+        {activePage === 'all-chats' && (
+          <AllChatsPage
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            currentSessionId={sessionId}
+            onSelectSession={handleSelectSession}
+            onNewChat={handleNewChat}
+            onDeleteSessions={handleDeleteSessions}
+            t={t}
           />
         )}
 
@@ -1387,7 +1438,11 @@ export default function App() {
           animation={confirmDialog.animation}
           variant={confirmDialog.variant}
           onConfirm={confirmDialog.onConfirm}
-          onCancel={() => { if (!logoutLoading && !deleteLoading) setConfirmDialog(null) }}
+          onCancel={() => {
+            if (logoutLoading || deleteLoading) return
+            confirmDialog.onDismiss?.()
+            setConfirmDialog(null)
+          }}
           loading={logoutLoading || deleteLoading}
         />
       )}

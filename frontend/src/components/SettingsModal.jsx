@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard, Monitor, SearchCheck, XCircle } from 'lucide-react'
-import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, checkUsernameAvailability, listAccountDevices, removeAccountDevice, getSecuritySettings } from '../api.js'
+import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard, Monitor, SearchCheck, XCircle, RefreshCw, Code, Headphones, TrendingUp, Sparkles, Receipt, FileText, X as XMark, Plug, Menu } from 'lucide-react'
+import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, getPlans, getInvoices, createCheckout, checkUsernameAvailability, listAccountDevices, removeAccountDevice, getSecuritySettings } from '../api.js'
 import { SecurityFeatures } from './SecurityFeatures.jsx'
 import { logout } from '../auth.js'
 import { getClientDeviceId, clearClientDeviceId } from '../utils/deviceId.js'
@@ -42,10 +42,12 @@ function CollapsibleSection({ panelId, openPanel, onToggle, icon: Icon, label, h
         ) : (
           <div className={styles.optionIcon}><Icon size={16} strokeWidth={2} /></div>
         )}
-        <span className={danger ? styles.deleteLabel : styles.optionLabel}>{label}</span>
-        {hint != null && hint !== '' && (
-          <span className={`${styles.optionValue} ${danger ? styles.optionValueDanger : ''}`}>{hint}</span>
-        )}
+        <div className={styles.optionText}>
+          <span className={danger ? styles.deleteLabel : styles.optionLabel}>{label}</span>
+          {hint != null && hint !== '' && (
+            <span className={`${styles.optionValue} ${danger ? styles.optionValueDanger : ''}`}>{hint}</span>
+          )}
+        </div>
         <ChevronRight size={18} strokeWidth={2} className={`${styles.optionChevron} ${isOpen ? styles.optionChevronOpen : ''}`} />
       </button>
       {isOpen && <div className={styles.optionPanel}>{children}</div>}
@@ -1088,6 +1090,47 @@ function ChatSessionsTab({ onSessionsDeleted, busy, onBusyChange }) {
 
 const PLAN_ICONS = { free: Zap, pro: Crown, enterprise: Building2 }
 const PLAN_COLORS = { free: '#6366f1', pro: 'var(--accent, #00c896)', enterprise: '#f59e0b' }
+const PLAN_RANK = { free: 0, pro: 1, enterprise: 2 }
+
+const PLAN_FEATURE_ACCESS = {
+  free: [
+    { icon: Server, label: 'Up to 2 MCP servers', included: true },
+    { icon: MessageSquare, label: '25 messages / day', included: true },
+    { icon: Layers, label: '5 sessions / month', included: true },
+    { icon: Bot, label: 'Basic AI agent', included: true },
+    { icon: Code, label: 'Tool execution', included: false },
+    { icon: TrendingUp, label: 'Execution history', included: false },
+    { icon: Headphones, label: 'Priority support', included: false },
+  ],
+  pro: [
+    { icon: Server, label: 'Up to 10 MCP servers', included: true },
+    { icon: MessageSquare, label: '500 messages / day', included: true },
+    { icon: Layers, label: '50 sessions / month', included: true },
+    { icon: Bot, label: 'Advanced AI agent', included: true },
+    { icon: Code, label: 'Tool execution', included: true },
+    { icon: TrendingUp, label: 'Execution history', included: true },
+    { icon: Headphones, label: 'Priority support', included: true },
+  ],
+  enterprise: [
+    { icon: Server, label: 'Unlimited MCP servers', included: true },
+    { icon: MessageSquare, label: 'Unlimited messages', included: true },
+    { icon: Layers, label: 'Unlimited sessions', included: true },
+    { icon: Bot, label: 'Premium AI agent', included: true },
+    { icon: Code, label: 'Tool execution', included: true },
+    { icon: TrendingUp, label: 'Execution history', included: true },
+    { icon: Headphones, label: 'Dedicated support', included: true },
+    { icon: Sparkles, label: 'API access & custom integrations', included: true },
+  ],
+}
+
+const COMPARE_ROWS = [
+  { label: 'MCP servers', free: '2', pro: '10', enterprise: 'Unlimited' },
+  { label: 'Messages / day', free: '25', pro: '500', enterprise: 'Unlimited' },
+  { label: 'Sessions / month', free: '5', pro: '50', enterprise: 'Unlimited' },
+  { label: 'Tool execution', free: false, pro: true, enterprise: true },
+  { label: 'Priority support', free: false, pro: true, enterprise: true },
+  { label: 'API access', free: false, pro: false, enterprise: true },
+]
 
 function UsageBar({ used, limit, color }) {
   if (limit === -1) return <span className={styles.billingUsageUnlimited}>Unlimited</span>
@@ -1111,26 +1154,63 @@ function UsageBar({ used, limit, color }) {
 function BillingTab({ user, onNavigate, busy }) {
   const [openPanel, setOpenPanel] = useState('plan')
   const [sub, setSub] = useState(null)
+  const [plans, setPlans] = useState([])
+  const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(null)
+  const [billingError, setBillingError] = useState('')
 
   const togglePanel = useCallback((panel) => {
     setOpenPanel((prev) => (prev === panel ? null : panel))
   }, [])
 
-  useEffect(() => {
-    getSubscription().then(setSub).catch(() => {}).finally(() => setLoading(false))
+  const loadBilling = useCallback(async () => {
+    setLoading(true)
+    setBillingError('')
+    try {
+      const [subData, plansData, invoiceData] = await Promise.all([
+        getSubscription(),
+        getPlans().catch(() => ({ plans: [] })),
+        getInvoices().catch(() => ({ invoices: [] })),
+      ])
+      setSub(subData)
+      setPlans(plansData?.plans || [])
+      setInvoices(invoiceData?.invoices || [])
+    } catch {
+      setBillingError('Could not load billing information. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    loadBilling()
+  }, [loadBilling])
 
   const handleManage = useCallback(async () => {
     setPortalLoading(true)
+    setBillingError('')
     try {
       const { url } = await createPortalSession()
       if (url) window.location.href = url
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setBillingError(e.message || 'Could not open billing portal.')
     } finally {
       setPortalLoading(false)
+    }
+  }, [])
+
+  const handleCheckout = useCallback(async (planId) => {
+    setCheckoutLoading(planId)
+    setBillingError('')
+    try {
+      const { url } = await createCheckout(planId)
+      if (url) window.location.href = url
+    } catch (e) {
+      setBillingError(e.message || 'Checkout failed. Please try again.')
+    } finally {
+      setCheckoutLoading(null)
     }
   }, [])
 
@@ -1142,11 +1222,39 @@ function BillingTab({ user, onNavigate, busy }) {
   const isActive = sub?.status === 'active' || sub?.status === 'trialing'
   const isPastDue = sub?.status === 'past_due'
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1)
+  const currentRank = PLAN_RANK[plan] ?? 0
+  const featureList = PLAN_FEATURE_ACCESS[plan] || PLAN_FEATURE_ACCESS.free
+  const currentPlanMeta = plans.find((p) => p.id === plan)
+  const upgradeOptions = [
+    { id: 'pro', name: 'Pro', price: 10, color: PLAN_COLORS.pro, icon: Crown },
+    { id: 'enterprise', name: 'Enterprise', price: 30, color: PLAN_COLORS.enterprise, icon: Building2 },
+  ].filter((p) => (PLAN_RANK[p.id] ?? 0) > currentRank)
 
   const planHint = plan === 'free' ? 'Free tier' : `${planLabel} · ${isActive ? 'Active' : isPastDue ? 'Past due' : sub?.status || 'Inactive'}`
 
   return (
     <div className={styles.section}>
+      <div className={styles.billingToolbar}>
+        <span className={styles.billingToolbarHint}>Manage your plan, usage, and payments</span>
+        <button
+          type="button"
+          className={styles.billingRefreshBtn}
+          onClick={loadBilling}
+          disabled={loading || busy}
+          title="Refresh billing"
+        >
+          <RefreshCw size={14} className={loading ? styles.spinner : ''} />
+          Refresh
+        </button>
+      </div>
+
+      {billingError && (
+        <div className={styles.billingWarning}>
+          <AlertTriangle size={14} />
+          <span>{billingError}</span>
+        </div>
+      )}
+
       {loading ? (
         <div className={styles.billingLoading}>
           <Loader2 size={20} className={styles.spinner} />
@@ -1197,6 +1305,11 @@ function BillingTab({ user, onNavigate, busy }) {
                   Renews {new Date(sub.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
               )}
+              {currentPlanMeta?.price != null && (
+                <div className={styles.billingPlanPrice}>
+                  {currentPlanMeta.price === 0 ? 'Free forever' : `$${currentPlanMeta.price} / month`}
+                </div>
+              )}
             </div>
             <div className={styles.billingActions} style={{ marginTop: 16 }}>
               {plan !== 'free' && (
@@ -1207,8 +1320,76 @@ function BillingTab({ user, onNavigate, busy }) {
               )}
               <button className={styles.billingUpgradeBtn} onClick={() => onNavigate?.('pricing')}>
                 <Rocket size={14} />
-                {plan === 'free' ? 'Upgrade Plan' : 'View Plans'}
+                {plan === 'free' ? 'View All Plans' : 'Compare Plans'}
               </button>
+            </div>
+          </CollapsibleSection>
+
+          {upgradeOptions.length > 0 && (
+            <CollapsibleSection
+              panelId="upgrade"
+              openPanel={openPanel}
+              onToggle={togglePanel}
+              icon={Rocket}
+              label="Upgrade"
+              hint={upgradeOptions.map((p) => p.name).join(' · ')}
+              disabled={busy}
+            >
+              <div className={styles.billingUpgradeGrid}>
+                {upgradeOptions.map((opt) => {
+                  const OptIcon = opt.icon
+                  return (
+                    <div key={opt.id} className={styles.billingUpgradeCard} style={{ '--plan-clr': opt.color }}>
+                      <div className={styles.billingUpgradeTop}>
+                        <div className={styles.billingUpgradeIcon} style={{ background: opt.color }}>
+                          <OptIcon size={16} />
+                        </div>
+                        <div>
+                          <div className={styles.billingUpgradeName}>{opt.name}</div>
+                          <div className={styles.billingUpgradePrice}>${opt.price}/mo</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.billingUpgradeCardBtn}
+                        onClick={() => handleCheckout(opt.id)}
+                        disabled={checkoutLoading === opt.id || busy}
+                      >
+                        {checkoutLoading === opt.id ? <Loader2 size={14} className={styles.spinner} /> : <Sparkles size={14} />}
+                        Upgrade to {opt.name}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          <CollapsibleSection
+            panelId="features"
+            openPanel={openPanel}
+            onToggle={togglePanel}
+            icon={Sparkles}
+            label="Plan Features"
+            hint={`${featureList.filter((f) => f.included).length} included`}
+            disabled={busy}
+          >
+            <div className={styles.billingFeatureList}>
+              {featureList.map((feat, i) => {
+                const FeatIcon = feat.icon
+                return (
+                  <div
+                    key={i}
+                    className={`${styles.billingFeatureItem} ${feat.included ? styles.billingFeatureOn : styles.billingFeatureOff}`}
+                  >
+                    <div className={styles.billingFeatureIcon}>
+                      <FeatIcon size={14} />
+                    </div>
+                    <span>{feat.label}</span>
+                    {feat.included ? <Check size={14} className={styles.billingFeatureCheck} /> : <XMark size={14} className={styles.billingFeatureX} />}
+                  </div>
+                )
+              })}
             </div>
           </CollapsibleSection>
 
@@ -1225,7 +1406,8 @@ function BillingTab({ user, onNavigate, busy }) {
               {[
                 { icon: MessageSquare, label: 'Messages Today', used: usage.messages?.used ?? 0, limit: limits.messages_per_day, reset: 'Resets daily' },
                 { icon: Layers, label: 'Sessions This Month', used: usage.sessions?.used ?? 0, limit: limits.sessions_per_month, reset: usage.sessions?.days_until_reset ? `Resets in ${usage.sessions.days_until_reset}d` : 'Resets monthly' },
-                { icon: Server, label: 'MCP Servers', used: usage.mcps?.used ?? 0, limit: limits.mcps, reset: null },
+                { icon: Server, label: 'MCP Servers Registered', used: usage.mcps?.used ?? 0, limit: limits.mcps, reset: null },
+                { icon: Plug, label: 'MCP Servers Connected', used: usage.mcps?.connected ?? 0, limit: limits.mcps, reset: 'Active connections' },
               ].map(({ icon: LIcon, label, used, limit, reset }, i) => (
                 <div key={i} className={styles.billingLimitItem}>
                   <div className={styles.billingLimitIcon}><LIcon size={14} /></div>
@@ -1239,6 +1421,89 @@ function BillingTab({ user, onNavigate, busy }) {
                 </div>
               ))}
             </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            panelId="compare"
+            openPanel={openPanel}
+            onToggle={togglePanel}
+            icon={LayoutDashboard}
+            label="Compare Plans"
+            hint="Free · Pro · Enterprise"
+            disabled={busy}
+          >
+            <div className={styles.billingCompareWrap}>
+              <table className={styles.billingCompareTable}>
+                <thead>
+                  <tr>
+                    <th>Feature</th>
+                    <th className={plan === 'free' ? styles.billingCompareActive : ''}>Free</th>
+                    <th className={plan === 'pro' ? styles.billingCompareActive : ''}>Pro</th>
+                    <th className={plan === 'enterprise' ? styles.billingCompareActive : ''}>Enterprise</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARE_ROWS.map((row) => (
+                    <tr key={row.label}>
+                      <td>{row.label}</td>
+                      {['free', 'pro', 'enterprise'].map((tier) => {
+                        const val = row[tier]
+                        return (
+                          <td key={tier} className={plan === tier ? styles.billingCompareActive : ''}>
+                            {typeof val === 'boolean'
+                              ? (val ? <Check size={14} className={styles.billingCompareYes} /> : <XMark size={14} className={styles.billingCompareNo} />)
+                              : val}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            panelId="invoices"
+            openPanel={openPanel}
+            onToggle={togglePanel}
+            icon={Receipt}
+            label="Billing History"
+            hint={invoices.length ? `${invoices.length} invoice(s)` : 'No invoices yet'}
+            disabled={busy}
+          >
+            {invoices.length === 0 ? (
+              <div className={styles.billingInvoiceEmpty}>
+                <FileText size={18} />
+                <span>No billing history yet. Invoices appear here after your first paid subscription.</span>
+              </div>
+            ) : (
+              <div className={styles.billingInvoiceList}>
+                {invoices.map((inv) => (
+                  <div key={inv.id} className={styles.billingInvoiceRow}>
+                    <div className={styles.billingInvoiceMain}>
+                      <span className={styles.billingInvoiceAmount}>
+                        {inv.currency} {inv.amount?.toFixed(2)}
+                      </span>
+                      <span className={styles.billingInvoiceDate}>
+                        {inv.date ? new Date(inv.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </span>
+                    </div>
+                    <div className={styles.billingInvoiceMeta}>
+                      <span className={`${styles.billingInvoiceStatus} ${styles[`billingInvoiceStatus_${inv.status}`] || ''}`}>
+                        {inv.status}
+                      </span>
+                      {inv.hosted_url && (
+                        <a href={inv.hosted_url} target="_blank" rel="noopener noreferrer" className={styles.billingInvoiceLink}>
+                          <ExternalLink size={12} />
+                          View
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CollapsibleSection>
           </SettingsGroup>
         </>
@@ -1270,13 +1535,40 @@ function SettingsPanel({
   const [activeTab, setActiveTab] = useState('general')
   const [busy, setBusy] = useState(false)
   const [localAsideCollapsed, setLocalAsideCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  )
   const { t } = useLanguage()
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const onChange = (e) => {
+      setIsMobile(e.matches)
+      if (!e.matches) setMobileNavOpen(false)
+    }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const isAsideControlled = onToggleSidebarCollapse != null
   const asideCollapsed = isAsideControlled ? sidebarCollapsed : localAsideCollapsed
   const toggleAsideCollapse = isAsideControlled
     ? onToggleSidebarCollapse
     : () => setLocalAsideCollapsed((c) => !c)
+
+  const handleAsideToggle = useCallback(() => {
+    if (isMobile) {
+      setMobileNavOpen((open) => !open)
+      return
+    }
+    toggleAsideCollapse()
+  }, [isMobile, toggleAsideCollapse])
+
+  const selectTab = useCallback((tabId) => {
+    setActiveTab(tabId)
+    if (isMobile) setMobileNavOpen(false)
+  }, [isMobile])
 
   const TABS = useMemo(() => [
     { id: 'general', label: t('general'), icon: Sun, description: t('customize') },
@@ -1323,19 +1615,53 @@ function SettingsPanel({
   )
 
   if (variant === 'page') {
+    const showCollapsedNav = asideCollapsed && !isMobile
+    const asideClassName = [
+      styles.settingsAside,
+      showCollapsedNav ? styles.asideCollapsed : '',
+      isMobile ? (mobileNavOpen ? styles.settingsAsideMobileOpen : styles.settingsAsideMobileClosed) : '',
+    ].filter(Boolean).join(' ')
+
     return (
       <div className={styles.settingsLayout}>
-        <aside className={`${styles.settingsAside} ${asideCollapsed ? styles.asideCollapsed : ''}`}>
+        {isMobile && mobileNavOpen && (
+          <div
+            className={styles.settingsMobileOverlay}
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {isMobile && (
+          <div className={styles.settingsMobileHeader}>
+            <button
+              type="button"
+              className={styles.settingsMobileMenuBtn}
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open settings menu"
+            >
+              <Menu size={20} />
+            </button>
+            <div className={styles.settingsMobileHeaderBrand}>
+              <div className={styles.asideBrandIcon}><Bot size={14} /></div>
+              <span>{activeTabMeta?.label || t('settings')}</span>
+            </div>
+          </div>
+        )}
+
+        <aside className={asideClassName}>
           <div className={styles.asideTop}>
             <button
               type="button"
               className={styles.asideToggleBtn}
-              onClick={toggleAsideCollapse}
-              title={asideCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              onClick={handleAsideToggle}
+              title={isMobile ? 'Close menu' : (asideCollapsed ? 'Expand sidebar' : 'Collapse sidebar')}
             >
-              {asideCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+              {isMobile
+                ? (mobileNavOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />)
+                : (asideCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />)}
             </button>
-            {!asideCollapsed && (
+            {!showCollapsedNav && (
               <>
                 <button type="button" className={styles.backBtn} onClick={onBack} title="Back to app">
                   <ArrowLeft size={18} />
@@ -1349,14 +1675,14 @@ function SettingsPanel({
                 </div>
               </>
             )}
-            {asideCollapsed && (
+            {showCollapsedNav && (
               <button type="button" className={styles.asideCollapsedBack} onClick={onBack} title="Back to app">
                 <ArrowLeft size={18} />
               </button>
             )}
           </div>
 
-          {asideCollapsed ? (
+          {showCollapsedNav ? (
             <nav className={styles.asideCollapsedNav}>
               {TABS.map((tab) => {
                 const Icon = tab.icon
@@ -1365,7 +1691,7 @@ function SettingsPanel({
                     key={tab.id}
                     type="button"
                     className={`${styles.asideCollapsedBtn} ${activeTab === tab.id ? styles.asideCollapsedBtnActive : ''}`}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => selectTab(tab.id)}
                     disabled={busy}
                     title={tab.label}
                   >
@@ -1384,7 +1710,7 @@ function SettingsPanel({
                       key={tab.id}
                       type="button"
                       className={`${styles.sidebarItem} ${activeTab === tab.id ? styles.sidebarItemActive : ''}`}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => selectTab(tab.id)}
                       disabled={busy}
                     >
                       <Icon size={17} />
@@ -1398,7 +1724,7 @@ function SettingsPanel({
           )}
         </aside>
 
-        <main className={styles.settingsMain}>
+        <main className={`${styles.settingsMain} ${isMobile ? styles.settingsMainMobile : ''}`}>
           <div className={styles.settingsMainHeader}>
             <h1 className={styles.mainTitle}>{activeTabMeta?.label || t('settings')}</h1>
             {activeTabMeta?.description && (

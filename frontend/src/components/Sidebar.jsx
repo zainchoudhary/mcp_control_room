@@ -54,6 +54,10 @@ export function Sidebar({
   const searchInputRef = useRef(null)
   const searchPopupRef = useRef(null)
 
+  useEffect(() => {
+    if (activePage === 'all-chats') setChatExpanded(true)
+  }, [activePage])
+
   const popupSessions = useMemo(() => {
     if (!sessionSearch.trim()) return sessions
     const q = sessionSearch.toLowerCase()
@@ -261,8 +265,10 @@ export function Sidebar({
           <nav className={styles.nav}>
             {navItems.map((item) => {
               const Icon = item.icon
-              const isActive = activePage === item.id
               const isChat = item.id === 'chat'
+              const isActive = isChat
+                ? activePage === 'chat' || activePage === 'all-chats'
+                : activePage === item.id
 
               return (
                 <div key={item.id} className={isChat && isActive && chatExpanded ? styles.chatNavBlock : undefined}>
@@ -270,7 +276,7 @@ export function Sidebar({
                     <button
                       className={`${styles.navItem} ${styles.navItemCollapsible} ${isActive ? styles.navItemActive : ''}`}
                       onClick={() => {
-                        if (activePage !== 'chat') {
+                        if (activePage !== 'chat' && activePage !== 'all-chats') {
                           onNavigate('chat')
                           setChatExpanded(true)
                         } else {
@@ -334,6 +340,15 @@ export function Sidebar({
                           <div className={styles.empty}>{tr('noConversations')}</div>
                         ) : (
                           renderSessionGroups(sessions)
+                        )}
+                        {!ghostMode && !sessionsLoading && (
+                          <button
+                            type="button"
+                            className={`${styles.allChatsBtn} ${activePage === 'all-chats' ? styles.allChatsBtnActive : ''}`}
+                            onClick={() => onNavigate('all-chats')}
+                          >
+                            <span>{tr('allChats') || 'All chats'}</span>
+                          </button>
                         )}
                       </div>
                     </div>
