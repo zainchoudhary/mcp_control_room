@@ -268,6 +268,30 @@
   border-top: 1px solid var(--border-subtle);
   overflow: hidden;
 }
+
+.toolBodyScroll {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.toolTruncatedBadge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.toolSizeHint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
 .toolBodyBar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 12px;

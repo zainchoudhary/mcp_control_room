@@ -65,7 +65,7 @@ function prettify(raw) {
   return cleaned
 }
 
-function ToolJson({ text, variant }) {
+function ToolJson({ text, variant, truncated }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text)
@@ -75,27 +75,32 @@ function ToolJson({ text, variant }) {
   return (
     <div className={styles.toolBody}>
       <div className={styles.toolBodyBar}>
-        <span className={styles.toolBodyLang}>{variant === 'input' ? 'arguments' : 'response'}</span>
+        <span className={styles.toolBodyLang}>
+          {variant === 'input' ? 'arguments' : 'response'}
+          {truncated && <span className={styles.toolTruncatedBadge}>shortened</span>}
+        </span>
         <button className={styles.toolCopyBtn} onClick={handleCopy}>
           {copied ? <Check size={12} /> : <Copy size={12} />}
           <span>{copied ? 'Copied!' : 'Copy'}</span>
         </button>
       </div>
-      <SyntaxHighlighter
-        language="json"
-        style={vscDarkPlus}
-        customStyle={{
-          margin: 0,
-          padding: '14px 16px',
-          background: '#1a1a1a',
-          borderRadius: '0 0 8px 8px',
-          fontSize: '12.5px',
-          lineHeight: 1.55,
-        }}
-        wrapLongLines
-      >
-        {text}
-      </SyntaxHighlighter>
+      <div className={styles.toolBodyScroll}>
+        <SyntaxHighlighter
+          language="json"
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            padding: '14px 16px',
+            background: '#1a1a1a',
+            borderRadius: '0 0 8px 8px',
+            fontSize: '12.5px',
+            lineHeight: 1.55,
+          }}
+          wrapLongLines
+        >
+          {text}
+        </SyntaxHighlighter>
+      </div>
     </div>
   )
 }
@@ -117,17 +122,26 @@ function ToolCall({ tool, input }) {
 }
 
 function ToolResult({ tool, content }) {
-  const [expanded, setExpanded] = useState(true)
   const contentStr = prettify(content)
+  const isTruncated = /\.\.\. \(truncated\)\s*$/.test(contentStr)
+  const isLong = contentStr.length > 2000
+  const [expanded, setExpanded] = useState(!isLong)
 
   return (
     <div className={styles.toolResult}>
-      <button className={styles.toolResultHeader} onClick={() => setExpanded(e => !e)}>
+      <button className={styles.toolResultHeader} onClick={() => setExpanded((e) => !e)}>
         <Check size={14} />
-        <span>{tool} returned</span>
+        <span>
+          {tool} returned
+          {isLong && !expanded && (
+            <span className={styles.toolSizeHint}>
+              {' '}({Math.round(contentStr.length / 1000)}k chars)
+            </span>
+          )}
+        </span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      {expanded && <ToolJson text={contentStr} variant="result" />}
+      {expanded && <ToolJson text={contentStr} variant="result" truncated={isTruncated} />}
     </div>
   )
 }

@@ -49,15 +49,19 @@ TOOLS_SYSTEM_PROMPT = CORE_IDENTITY + """
 
 ## THINKING PROCESS — BEFORE EVERY RESPONSE
 Before responding, classify the user's message:
-1. **Is this a tool request?** — Does the user want me to DO something that requires a tool?
-   - If NO → respond normally as a helpful assistant. NO tool calls.
-   - If YES → continue to step 2.
-2. **Do I have all required information?** — Do I have real IDs, real data, real parameters?
-   - If NO → call a READ tool first to get the data I need. WAIT for the result. Then proceed.
-   - If YES → continue to step 3.
-3. **Is this a write/destructive action?** (send, create, delete, modify, trash, update, post)
-   - If YES → show the user what I plan to do and ASK for confirmation. Do NOT execute yet.
-   - If NO (read-only) → execute the tool immediately.
+1. **Are tools available for this turn?** — If no tools are listed below, answer from knowledge only.
+2. **Is this a tool request?** — Does the user want live data or an action that connected tools handle?
+   - If YES → use tools. Never answer with manual steps in another app when a tool can do it.
+   - If NO → respond normally. NO tool calls.
+3. **Do I have all required information?** — Real IDs and parameters from the user or a prior tool result?
+   - If NO → call a READ tool first, wait for the result, then continue.
+4. **Is this a write/destructive action?** (send, create, delete, modify, update, post)
+   - If YES → ask for confirmation before executing.
+
+## CONNECTED TOOLS — WHEN TOOLS ARE AVAILABLE
+- Use tools only when the user needs live data or actions from connected services.
+- Do NOT call tools for general knowledge, explanations, or greetings — even if tools exist in the app.
+- Never reply with "open the app and search manually" when a tool can do the task.
 
 ## TOOL CALLING DISCIPLINE
 - Call ONE tool at a time. Wait for its result before deciding the next action.
@@ -78,7 +82,9 @@ When a request requires multiple steps (e.g., "find X and then do Y to them"):
 5. Summarize what was done.
 
 ## WHAT NOT TO DO
-- Never call tools for greetings, thanks, general knowledge questions, or casual chat.
+- Never call tools when none are available for this turn.
+- Never call tools for greetings, thanks, or general knowledge questions.
+- Never call tools just because MCP servers are enabled in the app — only when this message needs them.
 - Never call multiple tools simultaneously.
 - Never execute a write action without user confirmation.
 - Never retry a tool call that already failed or succeeded with the same arguments."""
@@ -435,6 +441,7 @@ async def stream_agent_response(
     MAX_SAME_TOOL_CALLS = 5
     MAX_TOTAL_TOOL_CALLS = 20
     MAX_DUPLICATE_CALLS = 2
+    TOOL_RESULT_DISPLAY_MAX = 50_000
 
     _secret_fields = {"user_id"}
 
@@ -570,8 +577,8 @@ async def stream_agent_response(
                         pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
                     except (json.JSONDecodeError, TypeError):
                         pretty = content
-                    if len(pretty) > 6000:
-                        pretty = pretty[:6000] + "\n... (truncated)"
+                    if len(pretty) > TOOL_RESULT_DISPLAY_MAX:
+                        pretty = pretty[:TOOL_RESULT_DISPLAY_MAX] + "\n... (truncated)"
                     payload = json.dumps({"type": "tool_result", "tool": tool_name, "content": pretty})
                     yield f"data: {payload}\n\n"
 

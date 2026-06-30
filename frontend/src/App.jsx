@@ -1418,6 +1418,7 @@ export default function App() {
               onAddFiles={handleAddFiles}
               onRemoveAttachment={handleRemoveAttachment}
               uploadingFiles={uploadingFiles}
+              language={language}
               t={t}
             />
           </div>

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Plus, Server, Plug, ChevronRight, Paperclip, ImageIcon, FileText } from 'lucide-react'
+import { ArrowUp, Loader2, Plus, Server, Plug, ChevronRight, Paperclip, ImageIcon, FileText, Mic } from 'lucide-react'
 import { FileAttachmentCard } from './FileAttachmentCard.jsx'
+import { useSpeechRecognition, speechLangFromAppLanguage } from '../hooks/useSpeechRecognition.js'
 import styles from './ChatInput.module.css'
 
 export function ChatInput({
@@ -18,6 +19,7 @@ export function ChatInput({
   onAddFiles,
   onRemoveAttachment,
   uploadingFiles = false,
+  language = 'en',
   t: _t,
 }) {
   const t = _t || ((k) => k)
@@ -26,9 +28,12 @@ export function ChatInput({
   const attachRef = useRef(null)
   const fileInputRef = useRef(null)
   const imageInputRef = useRef(null)
+  const voiceBaseRef = useRef('')
+  const voiceFinalRef = useRef('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
   const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const [voiceError, setVoiceError] = useState('')
 
   const FILE_ACCEPT =
     '.pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.html,.py,.js,.ts,.jsx,.tsx,.css,.yaml,.yml,.java,.c,.cpp,.go,.rs,.sql,.log'
@@ -49,6 +54,46 @@ export function ChatInput({
   useEffect(() => { autoResize() }, [value, autoResize])
   useEffect(() => { textareaRef.current?.focus() }, [])
 
+  const handleVoiceTranscript = useCallback(({ final, interim }) => {
+    if (final) voiceFinalRef.current += final
+    const prefix = voiceBaseRef.current
+    const spoken = `${voiceFinalRef.current}${interim}`.trim()
+    const next = [prefix, spoken].filter(Boolean).join(prefix && spoken ? ' ' : '')
+    onChange(next)
+  }, [onChange])
+
+  const handleVoiceError = useCallback((error) => {
+    if (error === 'not-allowed' || error === 'service-not-allowed') {
+      setVoiceError(t('voicePermissionDenied'))
+    } else if (error !== 'aborted' && error !== 'no-speech') {
+      setVoiceError(t('voiceError'))
+    }
+  }, [t])
+
+  const { listening, supported: voiceSupported, toggle: toggleVoice, stop: stopVoice } = useSpeechRecognition({
+    lang: speechLangFromAppLanguage(language),
+    onTranscript: handleVoiceTranscript,
+    onError: handleVoiceError,
+    onEnd: () => setVoiceError(''),
+  })
+
+  useEffect(() => {
+    if (sending && listening) stopVoice()
+  }, [sending, listening, stopVoice])
+
+  const handleVoiceToggle = () => {
+    setVoiceError('')
+    if (!voiceSupported) {
+      setVoiceError(t('voiceUnsupported'))
+      return
+    }
+    if (!listening) {
+      voiceBaseRef.current = value.trim()
+      voiceFinalRef.current = ''
+    }
+    toggleVoice()
+  }
+
   useEffect(() => {
     if (!menuOpen && !attachMenuOpen) return
     const handleClick = (e) => {
@@ -67,6 +112,7 @@ export function ChatInput({
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
+      if (listening) stopVoice()
       onSend()
     }
   }
@@ -111,16 +157,22 @@ export function ChatInput({
     <div className={styles.wrapper}>
       <div className={`${styles.container} ${hasComposerFiles ? styles.containerWithFiles : ''}`}>
         <div className={styles.inputArea}>
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t('typeMessage')}
-            className={styles.textarea}
-            rows={1}
-            disabled={sending}
-          />
+          <div className={listening ? styles.textareaWrapListening : undefined}>
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={listening ? t('voiceListening') : t('typeMessage')}
+              className={styles.textarea}
+              rows={1}
+              disabled={sending}
+            />
+          </div>
+
+          {voiceError && (
+            <p className={styles.voiceError} role="alert">{voiceError}</p>
+          )}
 
           {hasComposerFiles && (
             <div className={styles.attachmentsRow}>
@@ -282,14 +334,33 @@ export function ChatInput({
             )}
           </div>
 
-          <button
-            className={`${styles.sendBtn} ${canSend ? styles.sendActive : ''}`}
-            onClick={onSend}
-            disabled={!canSend}
-            aria-label="Send message"
-          >
-            {sending ? <Loader2 size={18} className={styles.spinner} /> : <ArrowUp size={18} />}
-          </button>
+          <div className={styles.toolbarRight}>
+            {voiceSupported && (
+              <button
+                type="button"
+                className={`${styles.voiceBtn} ${listening ? styles.voiceBtnActive : ''}`}
+                onClick={handleVoiceToggle}
+                disabled={sending}
+                title={listening ? t('voiceStop') : t('voiceInput')}
+                aria-label={listening ? t('voiceStop') : t('voiceInput')}
+                aria-pressed={listening}
+              >
+                <Mic size={17} />
+                {listening && <span className={styles.voicePulse} aria-hidden="true" />}
+              </button>
+            )}
+            <button
+              className={`${styles.sendBtn} ${canSend ? styles.sendActive : ''}`}
+              onClick={() => {
+                if (listening) stopVoice()
+                onSend()
+              }}
+              disabled={!canSend}
+              aria-label="Send message"
+            >
+              {sending ? <Loader2 size={18} className={styles.spinner} /> : <ArrowUp size={18} />}
+            </button>
+          </div>
         </div>
       </div>
       <p className={styles.disclaimer}>

@@ -21,16 +21,17 @@ Reply with ONLY valid JSON, no markdown:
 {"intent":"file_only"|"mcp_only"|"file_and_mcp"|"chat_only"}
 
 Meanings:
-- file_only: Answer from attached documents/images in this chat. No external MCP tools (databases, APIs, connected services).
-- mcp_only: User wants connected MCP tools (search, fetch, create, list tools, database queries, etc.). NOT asking about an uploaded document — even if a file was uploaded earlier in the chat.
-- file_and_mcp: This message needs BOTH attached file content AND external MCP tools (e.g. summarize PDF and fetch live data from a connected server).
-- chat_only: Greeting, thanks, general knowledge, or casual chat — no files and no MCP tools needed for this message.
+- file_only: User is asking about attached/uploaded documents or images in this chat. Answer from file content. No MCP tools.
+- mcp_only: User wants live data or actions from connected MCP services (fetch, list, search, create, update their real data). NOT general knowledge.
+- file_and_mcp: This message needs BOTH attached file content AND connected MCP tools in the same turn.
+- chat_only: Greetings, thanks, general knowledge, coding help, explanations — answer from the model. No MCP tools even if connected. No file analysis unless files are clearly not the subject.
 
-Rules:
-- New files attached THIS message + questions about them → file_only (unless they also clearly ask for connected tools/services in the same message → file_and_mcp).
-- Tool/service/API requests with MCP connected → mcp_only (ignore old files in chat history).
-- Follow-up about "this PDF", "question 2", "the attached quiz" without new upload → file_only.
-- If MCP tools are not connected, never return mcp_only or file_and_mcp."""
+Rules (priority order):
+1. New files on THIS message + question about them → file_only (or file_and_mcp if they also need live MCP data in the same message).
+2. Follow-up about "this PDF", "attached file", "question 2 in the doc" → file_only.
+3. MCP connected + user wants THEIR live data or a connected-service action → mcp_only.
+4. MCP connected but question is generic (what is X, explain Y, how does Z work) → chat_only. Do NOT use mcp_only for textbook questions.
+5. MCP not connected → never return mcp_only or file_and_mcp."""
 
 PLANNER_SYSTEM = """You are the Planner agent in ToolChain Control Room.
 Output ONLY a short numbered plan (2-5 steps). No greetings, no final answer.
@@ -62,7 +63,45 @@ _READ_INTENT_MARKERS = (
 
 _SEARCH_INTENT_MARKERS = (
     "search", "find", "lookup", "look up", "query", "filter",
-    "list all", "fetch all", "show all", "get all",
+    "list all", "fetch all", "show all", "get all", "give me all",
+    "give me", "show me", "tell me",
+)
+
+_CASUAL_CHAT_RE = re.compile(
+    r"^(?:"
+    r"hi|hello|hey|thanks|thank you|thx|ok|okay|bye|goodbye|"
+    r"good morning|good night|good afternoon|"
+    r"salam|assalam|assalamu|shukriya|theek|"
+    r"yo|sup|what'?s up|how are you|how r u"
+    r")[\s!.,?]*$",
+    re.IGNORECASE,
+)
+
+_GENERIC_KNOWLEDGE_RE = re.compile(
+    r"\b(?:"
+    r"what is|what are|who is|who was|who are|"
+    r"explain|define|definition of|describe what|"
+    r"how does .{0,40} work|how do .{0,40} work|"
+    r"tell me about(?! my )|difference between|"
+    r"meaning of|why is|why are|why do|"
+    r"can you explain|help me understand(?! my )"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_LIVE_DATA_RE = re.compile(
+    r"\b(?:"
+    r"i received|i got|from my |in my |my (?:emails?|messages?|inbox|account|data|records?)|"
+    r"give me(?: all)?|show me(?: all)?|list(?: all)?|fetch |get(?: all)? |search (?:my )?|"
+    r"find (?:my )?|pull (?:my )?|retrieve |query (?:my )?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_FILE_REFERENCE_RE = re.compile(
+    r"\b(?:this|attached|uploaded|the) (?:pdf|document|file|doc|image|photo|scan|quiz|paper)\b|"
+    r"\b(?:in the (?:pdf|document|file)|question \d+|this (?:doc|file|pdf))\b",
+    re.IGNORECASE,
 )
 
 _EMPTY_ATTACHMENT_CONTEXT: dict[str, Any] = {
@@ -80,14 +119,17 @@ INTENT_HINTS = {
         "Do NOT call any MCP/external tools.]"
     ),
     INTENT_MCP_ONLY: (
-        "[Routing: MCP ONLY — Use connected MCP tools for this request. "
-        "Do NOT use old uploaded files from earlier in the chat unless the user explicitly mentions them.]"
+        "[Routing: MCP ONLY — The user enabled connected MCP tools for this chat. "
+        "You MUST use the appropriate tool(s) to fulfill this request. "
+        "Do NOT tell the user to do it manually in another app or UI. "
+        "Do NOT use old uploaded files unless they explicitly mention them.]"
     ),
     INTENT_FILE_AND_MCP: (
         "[Routing: FILE + MCP — Use attached files AND call MCP tools as needed in your plan.]"
     ),
     INTENT_CHAT_ONLY: (
-        "[Routing: CHAT — Normal assistant reply. Call tools only if the user clearly needs them.]"
+        "[Routing: CHAT — Answer from your knowledge. "
+        "Do NOT call MCP tools. Do NOT analyze uploaded files.]"
     ),
 }
 
@@ -105,19 +147,66 @@ def has_active_attachments(
     return bool((attachment_context or {}).get("has_files"))
 
 
+def is_casual_chat_message(user_message: str) -> bool:
+    """True only for short greetings/thanks — not real tasks."""
+    text = (user_message or "").strip()
+    if not text:
+        return True
+    return bool(_CASUAL_CHAT_RE.match(text))
+
+
+def message_is_generic_knowledge(user_message: str) -> bool:
+    """General questions answerable without MCP or files."""
+    text = (user_message or "").strip()
+    if not text or is_casual_chat_message(text):
+        return True
+    if message_requests_live_data(text):
+        return False
+    if user_requests_external_tools(text):
+        return False
+    return bool(_GENERIC_KNOWLEDGE_RE.search(text))
+
+
+def message_requests_live_data(user_message: str) -> bool:
+    """User wants their real data from a connected service."""
+    lower = (user_message or "").lower()
+    if _LIVE_DATA_RE.search(lower):
+        return True
+    if re.search(r"\b(give me|show me|list all|get all|fetch all|search my|find my)\b", lower):
+        return True
+    return False
+
+
+def message_references_uploaded_files(user_message: str) -> bool:
+    return bool(_FILE_REFERENCE_RE.search(user_message or ""))
+
+
 def user_requests_external_tools(user_message: str) -> bool:
     lower = (user_message or "").lower()
     return any(marker in lower for marker in _EXTERNAL_TOOL_MARKERS)
 
 
+def message_needs_mcp_tools(user_message: str, tools: list | None = None) -> bool:
+    """True when the message needs connected MCP tools — not generic chat."""
+    if is_casual_chat_message(user_message):
+        return False
+    if message_is_generic_knowledge(user_message):
+        return False
+    return message_targets_mcp_tools(user_message, tools)
+
+
 def message_targets_mcp_tools(user_message: str, tools: list | None = None) -> bool:
     if user_requests_external_tools(user_message):
         return True
+    if message_requests_live_data(user_message):
+        return True
     lower = (user_message or "").lower()
     if re.search(
-        r"\b(search|find|list|get|fetch|run|call|execute|create|update|delete)\b",
+        r"\b(search|find|list|get|fetch|retrieve|pull|run|call|execute|create|update|delete)\b",
         lower,
     ):
+        if re.search(r"\bmy\b", lower):
+            return True
         for t in tools or []:
             name = getattr(t, "name", str(t)).lower()
             desc = (getattr(t, "description", "") or "").lower()
@@ -129,12 +218,53 @@ def message_targets_mcp_tools(user_message: str, tools: list | None = None) -> b
                     return True
     for t in tools or []:
         name = getattr(t, "name", str(t)).lower()
+        desc = (getattr(t, "description", "") or "").lower()
+        for token in re.findall(r"[a-z0-9_]+", name.replace("_", " ")):
+            if len(token) >= 4 and token in lower:
+                return True
+        for token in re.findall(r"[a-z0-9_]+", desc):
+            if len(token) >= 5 and token in lower:
+                return True
         if name in lower:
             return True
         spaced = name.replace("_", " ")
         if spaced in lower:
             return True
     return False
+
+
+def _classify_intent_rules(
+    user_message: str,
+    *,
+    new_attachments: bool,
+    session_has_files: bool,
+    tools_connected: bool,
+    tools: list | None = None,
+) -> str | None:
+    """Deterministic routing before / after LLM. None = use LLM."""
+    if is_casual_chat_message(user_message):
+        return INTENT_CHAT_ONLY
+
+    if new_attachments:
+        if tools_connected and message_needs_mcp_tools(user_message, tools):
+            return INTENT_FILE_AND_MCP
+        return INTENT_FILE_ONLY
+
+    if session_has_files and message_references_uploaded_files(user_message):
+        return INTENT_FILE_ONLY
+
+    if tools_connected and message_needs_mcp_tools(user_message, tools):
+        return INTENT_MCP_ONLY
+
+    if message_is_generic_knowledge(user_message):
+        return INTENT_CHAT_ONLY
+
+    if not tools_connected:
+        if session_has_files:
+            return INTENT_FILE_ONLY
+        return INTENT_CHAT_ONLY
+
+    return None
 
 
 def _fallback_classify_intent(
@@ -145,25 +275,20 @@ def _fallback_classify_intent(
     tools_connected: bool,
     tools: list | None = None,
 ) -> str:
-    lower = (user_message or "").lower().strip()
-    if not tools_connected:
-        if new_attachments or session_has_files:
-            return INTENT_FILE_ONLY
-        return INTENT_CHAT_ONLY
+    ruled = _classify_intent_rules(
+        user_message,
+        new_attachments=new_attachments,
+        session_has_files=session_has_files,
+        tools_connected=tools_connected,
+        tools=tools,
+    )
+    if ruled:
+        return ruled
 
-    wants_mcp = message_targets_mcp_tools(user_message, tools)
-    if new_attachments and wants_mcp:
-        return INTENT_FILE_AND_MCP
-    if new_attachments or (session_has_files and not wants_mcp):
-        if wants_mcp:
-            return INTENT_FILE_AND_MCP
-        return INTENT_FILE_ONLY
-    if wants_mcp:
-        return INTENT_MCP_ONLY
-    if session_has_files and re.search(
-        r"\b(this|attached|uploaded|pdf|document|file|quiz|paper)\b", lower
-    ):
-        return INTENT_FILE_ONLY
+    if not tools_connected:
+        return INTENT_FILE_ONLY if session_has_files else INTENT_CHAT_ONLY
+
+    # MCP on but message not clearly MCP-related → plain chat, no tools
     return INTENT_CHAT_ONLY
 
 
@@ -211,10 +336,16 @@ async def classify_turn_intent(
     if not tools_connected:
         return INTENT_FILE_ONLY
 
-    if not new_attachments and not session_has_files:
-        if message_targets_mcp_tools(user_message, tools):
-            return INTENT_MCP_ONLY
-        return INTENT_CHAT_ONLY
+    ruled = _classify_intent_rules(
+        user_message,
+        new_attachments=new_attachments,
+        session_has_files=session_has_files,
+        tools_connected=tools_connected,
+        tools=tools,
+    )
+    if ruled:
+        logger.info("Turn intent (rules): %s", ruled)
+        return ruled
 
     prompt = (
         f"New files attached on THIS message: {'yes' if new_attachments else 'no'}\n"
@@ -234,6 +365,13 @@ async def classify_turn_intent(
         if intent:
             if not tools_connected and intent in (INTENT_MCP_ONLY, INTENT_FILE_AND_MCP):
                 intent = INTENT_FILE_ONLY if session_has_files or new_attachments else INTENT_CHAT_ONLY
+            elif intent == INTENT_MCP_ONLY and not message_needs_mcp_tools(user_message, tools):
+                intent = INTENT_CHAT_ONLY
+            elif intent == INTENT_CHAT_ONLY and message_needs_mcp_tools(user_message, tools):
+                if new_attachments:
+                    intent = INTENT_FILE_AND_MCP
+                else:
+                    intent = INTENT_MCP_ONLY
             logger.info("Turn intent (LLM): %s", intent)
             return intent
     except Exception as exc:
@@ -330,10 +468,8 @@ def apply_turn_routing(
     if intent == INTENT_FILE_AND_MCP:
         return list(tools), ctx
 
-    # chat_only
-    if attachment_ids:
-        return list(tools), ctx
-    return list(tools), _empty_context()
+    # chat_only — no MCP tools; no file context for generic chat
+    return [], _empty_context()
 
 
 def intent_system_hint(intent: str) -> str:
@@ -355,7 +491,7 @@ def should_use_control_room_from_intent(
     if intent == INTENT_FILE_AND_MCP:
         return True, bool(tools)
     if intent == INTENT_CHAT_ONLY:
-        return bool(attachment_ids) or has_ctx_files, bool(tools)
+        return bool(attachment_ids) or has_ctx_files, False
     return False, bool(tools)
 
 
