@@ -22,7 +22,7 @@ DATABASE_URL = os.getenv(
 )
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-from db_models import Base  # noqa: E402
+from app.db.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
