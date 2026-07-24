@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
-  Settings, Wrench, Crown, Zap, Sparkles, Search, X, Ghost,
+  Settings, Wrench, Crown, Zap, Sparkles, Search, X, Ghost, Shield,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -243,6 +243,13 @@ export function Sidebar({
                 <div className={styles.collapsedInlineMenu} ref={collapsedMenuRef}>
                   <button
                     className={styles.collapsedInlineBtn}
+                    onClick={() => { setUserMenuOpen(false); onNavigate('privacy-policy') }}
+                    title={tr('privacyPolicy') || 'Privacy Policy'}
+                  >
+                    <Shield size={16} />
+                  </button>
+                  <button
+                    className={styles.collapsedInlineBtn}
                     onClick={() => { setUserMenuOpen(false); onLogout() }}
                     title="Sign Out"
                   >
@@ -392,6 +399,14 @@ export function Sidebar({
                 </button>
                 {userMenuOpen && (
                   <div className={styles.userMenu}>
+                    <button
+                      className={styles.userMenuItemNeutral}
+                      onClick={() => { setUserMenuOpen(false); onNavigate('privacy-policy') }}
+                    >
+                      <Shield size={14} />
+                      <span>{tr('Privacy Policy') || 'Privacy Policy'}</span>
+                    </button>
+                    <div className={styles.userMenuDivider} />
                     <button
                       className={styles.userMenuItem}
                       onClick={() => { setUserMenuOpen(false); onLogout() }}

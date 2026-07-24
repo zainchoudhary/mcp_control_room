@@ -33,6 +33,7 @@ import { ToastContainer } from './components/Toast.jsx'
 import { ConfirmDialog } from './components/ConfirmDialog.jsx'
 import { SettingsPage } from './components/SettingsModal.jsx'
 import { AllChatsPage } from './components/AllChatsPage.jsx'
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage.jsx'
 import { useToast } from './hooks/useToast.js'
 import { useTheme } from './hooks/useTheme.js'
 import { useLanguage } from './hooks/useLanguage.js'
@@ -46,7 +47,7 @@ import { GhostLaunchOverlay } from './components/GhostLaunchOverlay.jsx'
 import { Bot, Menu, Ghost } from 'lucide-react'
 import styles from './App.module.css'
 
-const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'all-chats', 'pricing', 'settings']
+const APP_PAGES = ['dashboard', 'mcp-servers', 'tool-execution', 'chat', 'all-chats', 'pricing', 'settings', 'privacy-policy']
 const AUTH_PAGES = ['login', 'signup', 'forgot-password', 'reset-password']
 
 function getPageFromUrl() {
@@ -1298,6 +1299,13 @@ export default function App() {
             persistedState={toolExecState}
             onStateChange={setToolExecState}
             user={user}
+          />
+        )}
+
+        {activePage === 'privacy-policy' && (
+          <PrivacyPolicyPage
+            onBack={() => handleNavigate('dashboard')}
+            language={language}
           />
         )}
 

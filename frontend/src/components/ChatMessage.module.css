@@ -38,9 +38,17 @@
 }
 
 .userMessage .avatar {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-default);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 82%, #fff),
+    var(--accent)
+  );
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--accent-light),
+    0 6px 16px -5px var(--accent);
 }
 
 .avatarGhost {
@@ -62,6 +70,62 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+/* ── User messages aligned to the right (chat bubble) ── */
+.userMessage .messageInner {
+  flex-direction: row-reverse;
+}
+
+.userMessage .messageBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.userMessage .roleLine {
+  display: none;
+}
+
+.userMessage .messageContent {
+  position: relative;
+  align-self: flex-end;
+  width: fit-content;
+  max-width: 72%;
+  margin-left: auto;
+  padding: 12px 18px;
+  color: var(--text-primary);
+  border-radius: 20px 20px 6px 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.userMessage .messageContent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.userMessage .actions {
+  justify-content: flex-end;
+}
+
+.userMessage .editWrap {
+  width: 100%;
+}
+
+.userMessage .userAttachments {
+  justify-content: flex-end;
+}
+
+.userMessage.ghostMessage {
+  background: transparent;
+}
+
+.userMessage.ghostMessage .messageContent {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
 }
 
 .roleLine {
@@ -105,6 +169,50 @@
   background: var(--accent);
   border-radius: 1px;
   animation: cursorBlink 1s step-end infinite;
+}
+
+/* ── "Thinking" indicator — Claude-style shimmering text ── */
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.thinkingLabel {
+  font-size: 15px;
+  font-weight: 450;
+  letter-spacing: 0.01em;
+  background: linear-gradient(
+    100deg,
+    var(--text-tertiary) 0%,
+    var(--text-tertiary) 35%,
+    var(--text-primary) 50%,
+    var(--text-tertiary) 65%,
+    var(--text-tertiary) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: thinkingShimmer 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes thinkingShimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -150% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinkingLabel {
+    animation: none;
+    color: var(--text-tertiary);
+    -webkit-text-fill-color: currentColor;
+  }
 }
 
 @keyframes cursorBlink {

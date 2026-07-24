@@ -247,9 +247,30 @@ const markdownComponents = {
   hr() { return <hr className={styles.hr} /> },
 }
 
+function ThinkingIndicator() {
+  return (
+    <div className={styles.thinking} aria-live="polite" aria-label="Assistant is thinking">
+      <span className={styles.thinkingLabel}>Thinking</span>
+    </div>
+  )
+}
+
 function AssistantMessageContent({ content, isStreaming }) {
   const parts = useMemo(() => parseContent(content), [content])
   const phaseParts = useMemo(() => collectPhasesFromParts(parts), [parts])
+
+  const hasRenderable = useMemo(
+    () =>
+      phaseParts.length > 0 ||
+      parts.some((p) =>
+        p.type === 'markdown' ? p.content.trim().length > 0 : p.type === 'tool_use' || p.type === 'tool_result'
+      ),
+    [parts, phaseParts]
+  )
+
+  if (isStreaming && !hasRenderable) {
+    return <ThinkingIndicator />
+  }
 
   if (!parts?.length && !content) return null
 

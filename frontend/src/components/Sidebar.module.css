@@ -814,6 +814,33 @@
   color: var(--red);
 }
 
+.userMenuItemNeutral {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.userMenuItemNeutral:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.userMenuDivider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-subtle);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
