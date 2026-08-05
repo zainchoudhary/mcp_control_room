@@ -24,13 +24,15 @@ function validateUsername(username) {
 
 const MODE_TO_PATH = { login: '/login', signup: '/signup', forgot: '/forgot-password', reset: '/reset-password' }
 
-export function AuthPage({ onAuth, initialMode }) {
+export function AuthPage({ onAuth, initialMode, addAccountMode = false, onCancelAdd, asModal = false }) {
   const [mode, setMode] = useState(() => {
+    if (asModal) return initialMode || 'login'
     const params = new URLSearchParams(window.location.search)
     if (params.get('reset_token')) return 'reset'
     return initialMode || 'login'
   })
   const [resetToken] = useState(() => {
+    if (asModal) return ''
     const params = new URLSearchParams(window.location.search)
     return params.get('reset_token') || ''
   })
@@ -50,6 +52,7 @@ export function AuthPage({ onAuth, initialMode }) {
   const usernameRef = useRef(null)
 
   useEffect(() => {
+    if (asModal) return
     const current = window.location.pathname
     const expected = MODE_TO_PATH[mode]
     if (expected && current !== expected && mode !== 'reset') {
@@ -63,6 +66,7 @@ export function AuthPage({ onAuth, initialMode }) {
   }, [mode])
 
   useEffect(() => {
+    if (asModal) return
     const pathToMode = { '/login': 'login', '/signup': 'signup', '/forgot-password': 'forgot', '/reset-password': 'reset' }
     const onPop = () => {
       const m = pathToMode[window.location.pathname] || 'login'
@@ -70,7 +74,25 @@ export function AuthPage({ onAuth, initialMode }) {
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [])
+  }, [asModal])
+
+  useEffect(() => {
+    if (!asModal) return
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !loading) onCancelAdd?.()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [asModal, loading, onCancelAdd])
+
+  const requestClose = () => {
+    if (loading) return
+    onCancelAdd?.()
+  }
 
   const update = (key, value) => {
     setForm((p) => ({ ...p, [key]: value }))
@@ -94,6 +116,7 @@ export function AuthPage({ onAuth, initialMode }) {
   const isLoginValid = () => (pending2fa ? totpCode.length === 6 : form.email && form.password)
 
   const switchMode = (m) => {
+    if (loading) return
     setMode(m)
     setPending2fa(null)
     setTotpCode('')
@@ -102,6 +125,7 @@ export function AuthPage({ onAuth, initialMode }) {
     setServerError('')
     setSuccessMessage('')
     setTouched({})
+    if (asModal) return
     const targetPath = MODE_TO_PATH[m] || '/login'
     if (m === 'reset') {
       const params = new URLSearchParams(window.location.search)
@@ -135,19 +159,38 @@ export function AuthPage({ onAuth, initialMode }) {
         setForm({ username: '', email: '', password: '', confirm_password: '', full_name: '' })
         setTimeout(() => switchMode('login'), 2000)
       } else if (pending2fa) {
-        const { verifyLogin2fa } = await import('../auth.js')
-        const data = await verifyLogin2fa({ pending_token: pending2fa.token, code: totpCode })
+        const { verifyLogin2fa, acceptAuth, isAccountAlreadySaved } = await import('../auth.js')
+        const data = await verifyLogin2fa({
+          pending_token: pending2fa.token,
+          code: totpCode,
+          persist: !addAccountMode,
+        })
+        if (addAccountMode && isAccountAlreadySaved(data.user?.id)) {
+          setPending2fa(null)
+          setTotpCode('')
+          setServerError('This account is already connected on this device.')
+          setSuccessMessage('')
+          return
+        }
+        if (addAccountMode) acceptAuth(data.access_token, data.user)
         setPending2fa(null)
         setTotpCode('')
         onAuth(data.user)
       } else {
-        const { login } = await import('../auth.js')
-        const data = await login({ email: form.email.trim(), password: form.password })
+        const { login, acceptAuth, isAccountAlreadySaved } = await import('../auth.js')
+        const data = await login({
+          email: form.email.trim(),
+          password: form.password,
+          persist: !addAccountMode,
+        })
         if (data.requires_2fa) {
           setPending2fa({ token: data.pending_token, user: data.user })
           setTotpCode('')
           setSuccessMessage('Enter the 6-digit code from your authenticator app.')
+        } else if (addAccountMode && isAccountAlreadySaved(data.user?.id)) {
+          setServerError('This account is already connected on this device.')
         } else {
+          if (addAccountMode) acceptAuth(data.access_token, data.user)
           onAuth(data.user)
         }
       }
@@ -164,7 +207,15 @@ export function AuthPage({ onAuth, initialMode }) {
   })()
 
   return (
-    <div className={styles.page}>
+    <div
+      className={asModal ? styles.modalOverlay : styles.page}
+      onClick={asModal ? ((e) => { if (e.target === e.currentTarget) requestClose() }) : undefined}
+      role={asModal ? 'dialog' : undefined}
+      aria-modal={asModal ? true : undefined}
+      aria-label={asModal ? 'Add account' : undefined}
+      aria-busy={asModal && loading ? true : undefined}
+    >
+      {!asModal && (
       <div className={styles.heroSide}>
         <div className={styles.heroGlow} />
         <div className={styles.heroContent}>
@@ -206,15 +257,36 @@ export function AuthPage({ onAuth, initialMode }) {
           <div className={styles.orb3} />
         </div>
       </div>
+      )}
 
-      <div className={styles.formSide}>
-        <div className={styles.formScroll}>
-          <div className={styles.card}>
+      <div className={asModal ? styles.modalPanel : styles.formSide}>
+        <div className={asModal ? styles.modalScroll : styles.formScroll}>
+          <div className={`${styles.card} ${asModal ? styles.modalCard : ''}`}>
             <div className={styles.cardHeader}>
-              <div className={styles.logoMobile}>
-                <div className={styles.logoIcon}><Bot size={20} /></div>
-                <span>ToolChain AI</span>
-              </div>
+              {asModal ? (
+                <div className={styles.modalTopBar}>
+                  <div className={styles.modalBrand}>
+                    <div className={styles.logoIcon}><Bot size={18} /></div>
+                    <span>ToolChain AI</span>
+                  </div>
+                  {onCancelAdd && (
+                    <button
+                      type="button"
+                      className={styles.modalClose}
+                      onClick={requestClose}
+                      disabled={loading}
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.logoMobile}>
+                  <div className={styles.logoIcon}><Bot size={20} /></div>
+                  <span>ToolChain AI</span>
+                </div>
+              )}
               {mode === 'forgot' && (
                 <>
                   <button type="button" className={styles.backBtn} onClick={() => switchMode('login')}>
@@ -234,11 +306,22 @@ export function AuthPage({ onAuth, initialMode }) {
               )}
               {(mode === 'login' || mode === 'signup') && (
                 <>
+                  {!asModal && addAccountMode && onCancelAdd && (
+                    <button type="button" className={styles.backBtn} onClick={onCancelAdd}>
+                      <ArrowLeft size={16} /> Back to app
+                    </button>
+                  )}
                   <h2 className={styles.cardTitle}>
-                    {mode === 'login' ? 'Welcome back' : 'Create account'}
+                    {addAccountMode
+                      ? (mode === 'login' ? 'Add another account' : 'Create another account')
+                      : (mode === 'login' ? 'Welcome back' : 'Create account')}
                   </h2>
                   <p className={styles.cardSubtitle}>
-                    {mode === 'login' ? 'Enter your credentials to continue' : 'Get started for free'}
+                    {addAccountMode
+                      ? (mode === 'login'
+                        ? 'Sign in to switch between accounts on this device'
+                        : 'Create a new account to use alongside your current one')
+                      : (mode === 'login' ? 'Enter your credentials to continue' : 'Get started for free')}
                   </p>
                 </>
               )}
@@ -246,8 +329,8 @@ export function AuthPage({ onAuth, initialMode }) {
 
             {(mode === 'login' || mode === 'signup') && (
               <div className={styles.tabs}>
-                <button className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`} onClick={() => switchMode('login')} type="button">Sign In</button>
-                <button className={`${styles.tab} ${mode === 'signup' ? styles.tabActive : ''}`} onClick={() => switchMode('signup')} type="button">Sign Up</button>
+                <button className={`${styles.tab} ${mode === 'login' ? styles.tabActive : ''}`} onClick={() => switchMode('login')} type="button" disabled={loading}>Sign In</button>
+                <button className={`${styles.tab} ${mode === 'signup' ? styles.tabActive : ''}`} onClick={() => switchMode('signup')} type="button" disabled={loading}>Sign Up</button>
                 <div className={styles.tabIndicator} style={{ transform: mode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }} />
               </div>
             )}
@@ -334,7 +417,7 @@ export function AuthPage({ onAuth, initialMode }) {
                 <div className={styles.field}>
                   <div className={styles.labelRow}>
                     <label className={styles.label}>{mode === 'reset' ? 'New password' : 'Password'}</label>
-                    {mode === 'login' && (
+                    {mode === 'login' && !asModal && (
                       <button type="button" className={styles.forgotLink} onClick={() => switchMode('forgot')}>
                         Forgot password?
                       </button>

@@ -18,7 +18,18 @@ import {
   fetchAttachmentBlob,
 } from './api.js'
 import { formatUserMessageForDisplay, parseUserMessageContent } from './utils/chatAttachments.js'
-import { getSavedUser, fetchMe, logout } from './auth.js'
+import {
+  getSavedUser,
+  getSavedAccounts,
+  getToken,
+  fetchMe,
+  logoutCurrent,
+  switchAccount,
+  beginAddingAccount,
+  clearAddingAccount,
+  isAddingAccount,
+  updateSavedUser,
+} from './auth.js'
 import { Sidebar } from './components/Sidebar.jsx'
 import { DashboardPage } from './components/DashboardPage.jsx'
 import { MCPServersPage } from './components/MCPServersPage.jsx'
@@ -79,6 +90,8 @@ export default function App() {
   const { prefs, setPref, togglePref } = usePreferences(user?.id)
   const [authChecked, setAuthChecked] = useState(!!savedUser)
   const [activePage, setActivePage] = useState(getPageFromUrl)
+  const [accounts, setAccounts] = useState(() => getSavedAccounts())
+  const [addingAccount, setAddingAccount] = useState(() => isAddingAccount())
   const [mcps, setMcps] = useState([])
   const [mcpsLoading, setMcpsLoading] = useState(true)
   const [sessions, setSessions] = useState([])
@@ -187,8 +200,8 @@ export default function App() {
         toast('Subscription activated! Welcome to your new plan.', 'success')
         window.history.replaceState(null, '', '/dashboard')
         setActivePage('dashboard')
-        fetchMe().then(u => { if (u) { setUser(u); localStorage.setItem('toolchain_user', JSON.stringify(u)) } })
-      } else if (AUTH_PAGES.includes(path) && !hasResetToken) {
+        fetchMe().then(u => { if (u) { setUser(u); updateSavedUser(u); setAccounts(getSavedAccounts()) } })
+      } else if (AUTH_PAGES.includes(path) && !hasResetToken && !isAddingAccount()) {
         const startPage = getStartupPage(user.id)
         setActivePage(startPage)
         window.history.replaceState(null, '', `/${startPage}`)
@@ -289,26 +302,77 @@ export default function App() {
   }, [user?.id, user?.security])
 
   const handleAuth = async (userData) => {
+    const softEnter = addingAccount || !!user
+    clearAddingAccount()
+    setAddingAccount(false)
+    setAccounts(getSavedAccounts())
     setUser(userData)
     setAppLocked(shouldShowLock(userData.id, userData.security))
     setDataLoading(false)
+
+    // Clear previous account's in-memory UI (sessions/chat/mcps) without a full reload
+    setSessionId(null)
+    setMessages([])
+    setSessions([])
+    setSessionsLoading(true)
+    setMcps([])
+    setMcpsLoading(true)
+    setChatAttachments([])
+    setPendingUploads([])
+    setInput('')
+    setStreamingId(null)
+    setGhostMode(false)
+    setGhostLaunching(false)
+    setShowRegister(false)
+    setInitialSelectedMcp(null)
+
     await registerCurrentDevice(userData.id)
+
     const urlPage = getPageFromUrl()
     const onAuthRoute = AUTH_PAGES.includes(urlPage)
-    const startPage = onAuthRoute ? getStartupPage(userData.id) : (
-      APP_PAGES.includes(urlPage) ? urlPage : getStartupPage(userData.id)
-    )
+    const startPage = softEnter
+      ? (APP_PAGES.includes(activePage) ? activePage : getStartupPage(userData.id))
+      : (onAuthRoute ? getStartupPage(userData.id) : (
+        APP_PAGES.includes(urlPage) ? urlPage : getStartupPage(userData.id)
+      ))
     setActivePage(startPage)
     window.history.replaceState(null, '', `/${startPage}`)
   }
 
   const [logoutLoading, setLogoutLoading] = useState(false)
 
+  const refreshAccounts = useCallback(() => {
+    setAccounts(getSavedAccounts())
+  }, [])
+
+  const handleSwitchAccount = useCallback((userId) => {
+    if (!userId || userId === user?.id) return
+    if (!switchAccount(userId)) return
+    window.location.assign('/dashboard')
+  }, [user?.id])
+
+  const handleAddAccount = useCallback(() => {
+    beginAddingAccount(APP_PAGES.includes(activePage) ? activePage : 'dashboard')
+    setAddingAccount(true)
+  }, [activePage])
+
+  const handleCancelAddAccount = useCallback(() => {
+    clearAddingAccount()
+    setAddingAccount(false)
+    const saved = getSavedUser()
+    if (saved) {
+      setUser(saved)
+      setAccounts(getSavedAccounts())
+    }
+  }, [])
+
   const requestLogout = () => {
     setConfirmDialog({
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out? You will need to log in again.',
-      confirmLabel: 'Sign Out',
+      title: 'Sign out',
+      message: accounts.length > 1
+        ? 'Sign out of this account? Other accounts on this device will stay signed in.'
+        : 'Are you sure you want to sign out? You will need to log in again.',
+      confirmLabel: 'Sign out',
       icon: 'logout',
       variant: 'danger',
       onConfirm: () => {
@@ -317,7 +381,12 @@ export default function App() {
           setLogoutLoading(false)
           setConfirmDialog(null)
           clearUnlockSession(user?.id)
-          logout()
+          const { next } = logoutCurrent()
+          refreshAccounts()
+          if (next) {
+            window.location.assign('/dashboard')
+            return
+          }
           setUser(null)
           setAppLocked(false)
           setMcps([])
@@ -328,7 +397,7 @@ export default function App() {
           setMessages([])
           setActivePage('login')
           window.history.replaceState(null, '', '/login')
-        }, 1000)
+        }, 600)
       },
     })
   }
@@ -1028,6 +1097,34 @@ export default function App() {
     t('suggestion4'),
   ]
 
+  // If this tab entered "add account" but lost React user state, rehydrate from storage
+  useEffect(() => {
+    if (!addingAccount) return
+    if (user) return
+    const saved = getSavedUser()
+    if (saved) {
+      setUser(saved)
+      setAccounts(getSavedAccounts())
+    } else {
+      // No session to return to — exit add-account mode
+      clearAddingAccount()
+      setAddingAccount(false)
+    }
+  }, [addingAccount, user])
+
+  // Recover tab if token/user still in localStorage but React state was cleared
+  useEffect(() => {
+    if (!authChecked) return
+    if (user) return
+    if (addingAccount) return
+    const saved = getSavedUser()
+    const token = getToken()
+    if (saved && token) {
+      setUser(saved)
+      setAccounts(getSavedAccounts())
+    }
+  }, [authChecked, user, addingAccount])
+
   if (!authChecked) {
     const path = window.location.pathname.replace(/^\/+/, '').toLowerCase()
 
@@ -1154,14 +1251,20 @@ export default function App() {
           user={user}
           onUserUpdated={(updatedUser) => {
             setUser(updatedUser)
-            localStorage.setItem('toolchain_user', JSON.stringify(updatedUser))
+            updateSavedUser(updatedUser)
+            setAccounts(getSavedAccounts())
           }}
           onSessionsDeleted={() => {
             setSessions([])
             setSessionId(null)
             setMessages([])
           }}
-          onLogout={() => { logout(); window.location.reload() }}
+          onLogout={() => {
+            clearUnlockSession(user?.id)
+            const { next } = logoutCurrent()
+            if (next) window.location.assign('/dashboard')
+            else window.location.assign('/login')
+          }}
           language={language}
           onLanguageChange={setLanguage}
           accentId={accentId}
@@ -1219,6 +1322,9 @@ export default function App() {
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         onOpenSettings={() => handleNavigate('settings')}
         user={user}
+        accounts={accounts}
+        onSwitchAccount={handleSwitchAccount}
+        onAddAccount={handleAddAccount}
         onLogout={requestLogout}
         onBrandClick={() => { window.history.pushState(null, '', '/'); setActivePage('landing') }}
         mcpCount={mcps.length}
@@ -1435,6 +1541,16 @@ export default function App() {
 
       {showRegister && (
         <RegisterModal onClose={() => setShowRegister(false)} onRegister={onRegister} />
+      )}
+
+      {addingAccount && (
+        <AuthPage
+          onAuth={handleAuth}
+          initialMode="login"
+          addAccountMode
+          asModal
+          onCancelAdd={handleCancelAddAccount}
+        />
       )}
 
       {confirmDialog && (

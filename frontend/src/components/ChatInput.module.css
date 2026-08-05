@@ -653,6 +653,33 @@
     padding: 0 10px 12px;
   }
 
+  .attachMenuFloat {
+    position: fixed;
+    left: 50%;
+    right: auto;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    width: min(420px, calc(100vw - 24px));
+    transform: translateX(-50%);
+    z-index: 100;
+  }
+
+  .attachMenuFloat .plusMenu {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 6px;
+  }
+
+  .attachMenuFloat .plusMenuItem {
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+
+  .attachMenuFloat .plusMenuTitle,
+  .attachMenuFloat .plusMenuHint {
+    overflow-wrap: anywhere;
+  }
+
   .textarea {
     font-size: 16px;
   }

@@ -1,18 +1,76 @@
 const BASE = '/api/auth'
 const TOKEN_KEY = 'toolchain_token'
 const USER_KEY = 'toolchain_user'
+const ACCOUNTS_KEY = 'toolchain_accounts'
+const ADD_ACCOUNT_KEY = 'toolchain_adding_account'
+const ADD_ACCOUNT_RETURN_KEY = 'toolchain_add_account_return'
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+function readAccounts() {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+function writeAccounts(list) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list))
+}
+
+function slimUser(user) {
+  if (!user) return null
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    full_name: user.full_name,
+    plan: user.plan || 'free',
+  }
+}
+
+function upsertAccount(token, user) {
+  if (!token || !user?.id) return
+  const others = readAccounts().filter((a) => a.userId !== user.id)
+  writeAccounts([
+    {
+      userId: user.id,
+      token,
+      user: slimUser(user),
+      lastUsed: Date.now(),
+    },
+    ...others,
+  ])
+}
+
+function migrateAccountsIfNeeded() {
+  if (readAccounts().length > 0) return
+  const token = getToken()
+  const user = getSavedUser()
+  if (token && user?.id) upsertAccount(token, user)
+}
+
+function getSavedAccounts() {
+  migrateAccountsIfNeeded()
+  return readAccounts().slice().sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
+}
+
 function setAuth(token, user) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(USER_KEY, JSON.stringify(user))
+  upsertAccount(token, user)
 }
 
 function updateToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token)
+  if (!token) return
+  localStorage.setItem(TOKEN_KEY, token)
+  const user = getSavedUser()
+  if (user?.id) upsertAccount(token, user)
 }
 
 function clearAuth() {
@@ -26,6 +84,91 @@ function getSavedUser() {
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
+  }
+}
+
+function updateSavedUser(user) {
+  if (!user) return
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  const token = getToken()
+  if (token) upsertAccount(token, user)
+}
+
+function switchAccount(userId) {
+  const list = readAccounts()
+  const target = list.find((a) => a.userId === userId)
+  if (!target?.token) return false
+  writeAccounts([
+    { ...target, lastUsed: Date.now() },
+    ...list.filter((a) => a.userId !== userId),
+  ])
+  localStorage.setItem(TOKEN_KEY, target.token)
+  localStorage.setItem(USER_KEY, JSON.stringify(target.user))
+  return true
+}
+
+/** Remove only the active account. If others remain, activates the most recent. */
+function logoutCurrent() {
+  const current = getSavedUser()
+  clearAuth()
+  if (!current?.id) {
+    return { next: null }
+  }
+  const remaining = readAccounts()
+    .filter((a) => a.userId !== current.id)
+    .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
+  writeAccounts(remaining)
+  if (remaining.length === 0) {
+    return { next: null }
+  }
+  const pick = remaining[0]
+  localStorage.setItem(TOKEN_KEY, pick.token)
+  localStorage.setItem(USER_KEY, JSON.stringify(pick.user))
+  return { next: pick.user }
+}
+
+function logoutAll() {
+  clearAuth()
+  localStorage.removeItem(ACCOUNTS_KEY)
+  clearAddingAccount()
+}
+
+/** Backward-compatible: sign out of the current account only. */
+function logout() {
+  return logoutCurrent()
+}
+
+function isAddingAccount() {
+  try {
+    return sessionStorage.getItem(ADD_ACCOUNT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function beginAddingAccount(returnPage = 'dashboard') {
+  try {
+    sessionStorage.setItem(ADD_ACCOUNT_KEY, '1')
+    sessionStorage.setItem(ADD_ACCOUNT_RETURN_KEY, returnPage || 'dashboard')
+  } catch {
+    /* ignore */
+  }
+}
+
+function getAddAccountReturnPage() {
+  try {
+    return sessionStorage.getItem(ADD_ACCOUNT_RETURN_KEY) || 'dashboard'
+  } catch {
+    return 'dashboard'
+  }
+}
+
+function clearAddingAccount() {
+  try {
+    sessionStorage.removeItem(ADD_ACCOUNT_KEY)
+    sessionStorage.removeItem(ADD_ACCOUNT_RETURN_KEY)
+  } catch {
+    /* ignore */
   }
 }
 
@@ -52,23 +195,35 @@ async function signup({ username, email, password, confirm_password, full_name }
   return data
 }
 
-async function login({ email, password }) {
+async function login({ email, password, persist = true }) {
   const data = await authRequest('/login', { email, password })
   if (data.requires_2fa) {
     return data
   }
-  setAuth(data.access_token, data.user)
+  if (persist) {
+    setAuth(data.access_token, data.user)
+    clearAddingAccount()
+  }
   return data
 }
 
-async function verifyLogin2fa({ pending_token, code }) {
+async function verifyLogin2fa({ pending_token, code, persist = true }) {
   const data = await authRequest('/login/verify-2fa', { pending_token, code })
-  setAuth(data.access_token, data.user)
+  if (persist) {
+    setAuth(data.access_token, data.user)
+    clearAddingAccount()
+  }
   return data
 }
 
-function logout() {
-  clearAuth()
+function acceptAuth(token, user) {
+  setAuth(token, user)
+  clearAddingAccount()
+}
+
+function isAccountAlreadySaved(userId) {
+  if (!userId) return false
+  return getSavedAccounts().some((a) => a.userId === userId)
 }
 
 async function forgotPassword(email) {
@@ -111,19 +266,42 @@ async function fetchMe() {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     const detail = err.detail
-    if (res.status === 401 && typeof detail === 'string' && detail.toLowerCase().includes('device was removed')) {
-      logout()
-      if (!window.location.pathname.includes('login')) {
+    // Only drop the session on real auth failures — not network/5xx blips
+    if (res.status === 401) {
+      const { next } = logoutCurrent()
+      if (next) {
+        window.location.replace('/dashboard')
+      } else if (!window.location.pathname.includes('login')) {
         window.location.replace('/login')
       }
-    } else {
-      clearAuth()
     }
     return null
   }
   const user = await res.json()
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  updateSavedUser(user)
   return user
 }
 
-export { getToken, getSavedUser, signup, login, verifyLogin2fa, logout, fetchMe, forgotPassword, resetPassword, updateToken }
+export {
+  getToken,
+  getSavedUser,
+  getSavedAccounts,
+  switchAccount,
+  logoutCurrent,
+  logoutAll,
+  signup,
+  login,
+  verifyLogin2fa,
+  acceptAuth,
+  isAccountAlreadySaved,
+  logout,
+  fetchMe,
+  forgotPassword,
+  resetPassword,
+  updateToken,
+  updateSavedUser,
+  isAddingAccount,
+  beginAddingAccount,
+  clearAddingAccount,
+  getAddAccountReturnPage,
+}

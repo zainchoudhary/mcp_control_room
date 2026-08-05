@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Settings, Sun, Moon, Check, User, Eye, EyeOff, ChevronRight, KeyRound, AtSign, Palette, UserCircle, Mail, Calendar, Loader2, Shield, MessageSquare, Download, Trash2, AlertTriangle, Globe, Droplets, CreditCard, Crown, Zap, Building2, ExternalLink, Rocket, Server, Layers, ArrowLeft, Bot, X as XIcon, PanelLeft, PanelLeftClose, LayoutDashboard, Monitor, SearchCheck, XCircle, RefreshCw, Code, Headphones, TrendingUp, Sparkles, Receipt, FileText, X as XMark, Plug, Menu } from 'lucide-react'
 import { changePassword as apiChangePassword, changeUsername as apiChangeUsername, deleteAllSessions, exportAllChats, deleteAccount as apiDeleteAccount, getSubscription, createPortalSession, getUsage, getPlans, getInvoices, createCheckout, checkUsernameAvailability, listAccountDevices, removeAccountDevice, getSecuritySettings } from '../api.js'
 import { SecurityFeatures } from './SecurityFeatures.jsx'
-import { logout } from '../auth.js'
 import { getClientDeviceId, clearClientDeviceId } from '../utils/deviceId.js'
 import { LANGUAGES, useLanguage } from '../hooks/useLanguage.js'
 import { ACCENT_COLORS } from '../hooks/useAccentColor.js'
@@ -403,7 +402,6 @@ function AccountTab({ user, onLogout, busy, onBusyChange }) {
       await removeAccountDevice(device.id)
       if (isCurrent) {
         clearClientDeviceId(user.id)
-        logout()
         onLogout?.()
         return
       }

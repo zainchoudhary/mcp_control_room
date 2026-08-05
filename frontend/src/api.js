@@ -1,4 +1,4 @@
-import { getToken, logout } from './auth.js'
+import { getToken, logoutCurrent } from './auth.js'
 
 const BASE = '/api'
 
@@ -12,10 +12,8 @@ function authHeaders() {
 function handleSessionRevoked(detail) {
   const msg = typeof detail === 'string' ? detail : ''
   if (!msg.toLowerCase().includes('device was removed')) return false
-  logout()
-  if (!window.location.pathname.includes('login')) {
-    window.location.replace('/login')
-  }
+  const { next } = logoutCurrent()
+  window.location.replace(next ? '/dashboard' : '/login')
   return true
 }
 

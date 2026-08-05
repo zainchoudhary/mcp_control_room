@@ -3,6 +3,7 @@ import {
   PanelLeftClose, PanelLeft, LayoutDashboard, Server, MessageSquare,
   Plus, Trash2, Bot, LogOut, MoreVertical, ChevronDown, ChevronRight,
   Settings, Wrench, Crown, Zap, Sparkles, Search, X, Ghost, Shield,
+  UserPlus, Check,
 } from 'lucide-react'
 import styles from './Sidebar.module.css'
 
@@ -36,6 +37,9 @@ export function Sidebar({
   onToggleCollapse,
   onOpenSettings,
   user,
+  accounts = [],
+  onSwitchAccount,
+  onAddAccount,
   onLogout,
   onBrandClick,
   mcpCount,
@@ -51,6 +55,7 @@ export function Sidebar({
   const [searchPopupOpen, setSearchPopupOpen] = useState(false)
   const menuRef = useRef(null)
   const collapsedMenuRef = useRef(null)
+  const collapsedUserWrapRef = useRef(null)
   const searchInputRef = useRef(null)
   const searchPopupRef = useRef(null)
 
@@ -105,6 +110,7 @@ export function Sidebar({
     if (!userMenuOpen) return
     const handleClickOutside = (e) => {
       const inMenu = (menuRef.current && menuRef.current.contains(e.target)) ||
+        (collapsedUserWrapRef.current && collapsedUserWrapRef.current.contains(e.target)) ||
         (collapsedMenuRef.current && collapsedMenuRef.current.contains(e.target))
       if (!inMenu) setUserMenuOpen(false)
     }
@@ -122,6 +128,64 @@ export function Sidebar({
   }, [searchFocusToken, ghostMode])
 
   const tr = t || ((k) => k)
+
+  const renderAccountMenu = (variant = 'expanded') => {
+    const isCollapsed = variant === 'collapsed'
+    return (
+      <div
+        className={isCollapsed ? styles.accountMenuCollapsed : styles.userMenu}
+        ref={isCollapsed ? collapsedMenuRef : undefined}
+      >
+        <div className={styles.accountMenuSection}>
+          <div className={styles.accountMenuLabel}>{tr('accounts')}</div>
+          {(accounts || []).map((acc) => {
+            const u = acc.user || {}
+            const isActive = acc.userId === user?.id
+            const initial = (u.full_name || u.username || u.email || '?')[0].toUpperCase()
+            return (
+              <button
+                key={acc.userId}
+                type="button"
+                className={`${styles.accountItem} ${isActive ? styles.accountItemActive : ''}`}
+                onClick={() => {
+                  if (isActive) return
+                  setUserMenuOpen(false)
+                  onSwitchAccount?.(acc.userId)
+                }}
+                title={u.email || u.username}
+              >
+                <span className={styles.accountAvatar}>{initial}</span>
+                <span className={styles.accountMeta}>
+                  <span className={styles.accountName}>{u.full_name || u.username || 'Account'}</span>
+                  <span className={styles.accountEmail}>{u.email}</span>
+                </span>
+                {isActive && <Check size={14} className={styles.accountCheck} />}
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            className={styles.userMenuItemNeutral}
+            onClick={() => { setUserMenuOpen(false); onAddAccount?.() }}
+          >
+            <UserPlus size={14} />
+            <span>{tr('addAccount')}</span>
+          </button>
+        </div>
+
+        <div className={styles.userMenuDivider} />
+
+        <button
+          type="button"
+          className={styles.userMenuItem}
+          onClick={() => { setUserMenuOpen(false); onLogout?.() }}
+        >
+          <LogOut size={14} />
+          <span>{tr('signOut')}</span>
+        </button>
+      </div>
+    )
+  }
 
   const renderSessionGroups = (list, { inPopup = false, onSelect } = {}) => {
     const groups = groupSessionsByDate(list)
@@ -177,7 +241,7 @@ export function Sidebar({
   return (
     <>
     {!collapsed && <div className={styles.mobileOverlay} onClick={onToggleCollapse} />}
-    <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
+    <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${collapsed && userMenuOpen ? styles.collapsedMenuOpen : ''}`}>
       <div className={styles.top}>
         <button className={styles.toggleBtn} onClick={onToggleCollapse} title={collapsed ? 'Open sidebar' : 'Close sidebar'}>
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
@@ -230,6 +294,14 @@ export function Sidebar({
           </button>
 
           <button
+            className={`${styles.collapsedBtn} ${activePage === 'privacy-policy' ? styles.collapsedBtnActive : ''}`}
+            onClick={() => onNavigate('privacy-policy')}
+            title={tr('privacyPolicy')}
+          >
+            <Shield size={18} />
+          </button>
+
+          <button
             className={`${styles.collapsedBtn} ${activePage === 'settings' ? styles.collapsedBtnActive : ''}`}
             onClick={onOpenSettings}
             title="Settings"
@@ -238,25 +310,8 @@ export function Sidebar({
           </button>
 
           {user && (
-            <>
-              {userMenuOpen && (
-                <div className={styles.collapsedInlineMenu} ref={collapsedMenuRef}>
-                  <button
-                    className={styles.collapsedInlineBtn}
-                    onClick={() => { setUserMenuOpen(false); onNavigate('privacy-policy') }}
-                    title={tr('privacyPolicy') || 'Privacy Policy'}
-                  >
-                    <Shield size={16} />
-                  </button>
-                  <button
-                    className={styles.collapsedInlineBtn}
-                    onClick={() => { setUserMenuOpen(false); onLogout() }}
-                    title="Sign Out"
-                  >
-                    <LogOut size={16} />
-                  </button>
-                </div>
-              )}
+            <div className={styles.collapsedUserWrap} ref={collapsedUserWrapRef}>
+              {userMenuOpen && renderAccountMenu('collapsed')}
               <button
                 className={`${styles.collapsedUserBtn} ${userMenuOpen ? styles.collapsedUserBtnActive : ''}`}
                 onClick={() => setUserMenuOpen((v) => !v)}
@@ -264,7 +319,7 @@ export function Sidebar({
               >
                 {(user.full_name || user.username || '?')[0].toUpperCase()}
               </button>
-            </>
+            </div>
           )}
         </div>
       ) : (
@@ -374,6 +429,14 @@ export function Sidebar({
             )}
 
             <button
+              className={`${styles.settingsBtn} ${activePage === 'privacy-policy' ? styles.settingsBtnActive : ''}`}
+              onClick={() => onNavigate('privacy-policy')}
+            >
+              <Shield size={15} />
+              <span>{tr('privacyPolicy')}</span>
+            </button>
+
+            <button
               className={`${styles.settingsBtn} ${activePage === 'settings' ? styles.settingsBtnActive : ''}`}
               onClick={onOpenSettings}
             >
@@ -397,25 +460,7 @@ export function Sidebar({
                 >
                   <MoreVertical size={16} />
                 </button>
-                {userMenuOpen && (
-                  <div className={styles.userMenu}>
-                    <button
-                      className={styles.userMenuItemNeutral}
-                      onClick={() => { setUserMenuOpen(false); onNavigate('privacy-policy') }}
-                    >
-                      <Shield size={14} />
-                      <span>{tr('Privacy Policy') || 'Privacy Policy'}</span>
-                    </button>
-                    <div className={styles.userMenuDivider} />
-                    <button
-                      className={styles.userMenuItem}
-                      onClick={() => { setUserMenuOpen(false); onLogout() }}
-                    >
-                      <LogOut size={14} />
-                      <span>{tr('signOut')}</span>
-                    </button>
-                  </div>
-                )}
+                {userMenuOpen && renderAccountMenu('expanded')}
               </div>
             )}
           </div>
